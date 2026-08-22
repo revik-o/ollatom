@@ -5,7 +5,12 @@ describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
-    })
-      .compileComponents();
+    }).compileComponents();
+  });
+
+  it('creates the application', () => {
+    const fixture = TestBed.createComponent(App);
+
+    expect(fixture.componentInstance).toBeTruthy();
   });
 });
