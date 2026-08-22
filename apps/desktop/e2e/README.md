@@ -18,3 +18,25 @@ npm run e2e:ui
 
 These tests do not drive the native Tauri window or native commands. Native
 shell E2E coverage should use Tauri's WebDriver integration separately.
+
+## Mocking IPC
+
+Browser tests can install an IPC handler before Angular starts:
+
+```typescript
+import { installIpcMock } from '../support/ipc.mock';
+
+test('loads projects', async ({ page }) => {
+  await installIpcMock(page, (command) => {
+    if (command === 'list_projects') {
+      return [{ name: 'Example' }];
+    }
+
+    throw new Error(`Unexpected IPC command: ${command}`);
+  });
+  await page.goto('/');
+});
+```
+
+Unit tests can either use Tauri's `mockIPC` helper or replace the
+`IPC_TRANSPORT` Angular provider.
