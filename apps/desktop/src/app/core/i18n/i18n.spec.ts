@@ -1,5 +1,6 @@
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { ApplicationConfigService } from '../application-config/application-config.service';
 import { LanguageService } from './language.service';
 import { I18nMessageKey, I18nMessageParams, I18nTextKey } from './messages';
 import { I18nTxt } from './i18n';
@@ -20,9 +21,17 @@ class ParameterizedTestHost {
 
 describe('I18nTxt', () => {
   beforeEach(async () => {
-    localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [StaticTestHost, ParameterizedTestHost],
+      providers: [
+        {
+          provide: ApplicationConfigService,
+          useValue: {
+            read: vi.fn().mockRejectedValue(new Error('configuration value does not exist')),
+            add: vi.fn().mockResolvedValue('success'),
+          },
+        },
+      ],
     }).compileComponents();
   });
 
@@ -52,23 +61,23 @@ describe('I18nTxt', () => {
     expect(fixture.nativeElement.textContent).toContain('1 file selected');
   });
 
-  it('updates when the locale changes', () => {
+  it('updates when the locale changes', async () => {
     const fixture = TestBed.createComponent(StaticTestHost);
     const language = TestBed.inject(LanguageService);
 
     fixture.detectChanges();
-    language.setLocale('ua');
+    await language.setLocale('ua');
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('Вітаємо');
   });
 
-  it('renders parameterized messages from the current locale', () => {
+  it('renders parameterized messages from the current locale', async () => {
     const fixture = TestBed.createComponent(ParameterizedTestHost);
     const language = TestBed.inject(LanguageService);
 
     fixture.detectChanges();
-    language.setLocale('ua');
+    await language.setLocale('ua');
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('Вибрано 2 файли');

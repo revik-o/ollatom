@@ -3,6 +3,7 @@
 set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+CRATES_DIR="$ROOT_DIR/crates"
 DESKTOP_DIR="$ROOT_DIR/apps/desktop"
 TUI_MANIFEST="$ROOT_DIR/apps/tui/Cargo.toml"
 
@@ -75,6 +76,27 @@ test_desktop_e2e() {
     (cd "$DESKTOP_DIR" && npm run e2e)
 }
 
+test_crates() {
+    require_command cargo
+    crate_manifest_found=false
+
+    for crate_manifest in "$CRATES_DIR"/*/Cargo.toml; do
+        if [ ! -f "$crate_manifest" ]; then
+            continue
+        fi
+
+        crate_manifest_found=true
+        crate_name=$(basename -- "$(dirname -- "$crate_manifest")")
+        echo "==> Testing crate $crate_name"
+        cargo test --manifest-path "$crate_manifest"
+    done
+
+    if [ "$crate_manifest_found" = false ]; then
+        echo "error: no Rust crates were found in $CRATES_DIR" >&2
+        exit 1
+    fi
+}
+
 test_tui() {
     require_tui
     echo "==> Testing TUI app"
@@ -100,9 +122,10 @@ case "${1:-}" in
         ;;
     test-desktop) test_desktop ;;
     test-desktop-e2e) test_desktop_e2e ;;
+    test-crates) test_crates ;;
     test-tui) test_tui ;;
     *)
-        echo "usage: $0 {build-all|build-desktop|build-tui|run-desktop|run-tui|test-all|test-desktop|test-desktop-e2e|test-tui}" >&2
+        echo "usage: $0 {build-all|build-desktop|build-tui|run-desktop|run-tui|test-all|test-desktop|test-desktop-e2e|test-crates|test-tui}" >&2
         exit 2
         ;;
 esac

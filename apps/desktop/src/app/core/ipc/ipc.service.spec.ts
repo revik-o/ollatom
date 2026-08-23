@@ -28,4 +28,22 @@ describe('IpcService', () => {
     await expect(service.invoke<string[]>('list_projects')).resolves.toEqual(['first', 'second']);
     expect(invoke).toHaveBeenCalledWith('list_projects', undefined);
   });
+
+  it('provides the application configuration API', async () => {
+    const invoke = vi.fn().mockResolvedValueOnce('en').mockResolvedValueOnce('success');
+    TestBed.configureTestingModule({
+      providers: [{ provide: IPC_TRANSPORT, useValue: { invoke } }],
+    });
+    const service = TestBed.inject(IpcService);
+
+    await expect(service.getApplicationConfigValueByKey('app.language')).resolves.toBe('en');
+    await expect(service.setApplicationConfigValue('app.language', 'ua')).resolves.toBe('success');
+    expect(invoke).toHaveBeenNthCalledWith(1, 'get_application_config_value_by_key', {
+      key: 'app.language',
+    });
+    expect(invoke).toHaveBeenNthCalledWith(2, 'set_application_config_value', {
+      key: 'app.language',
+      value: 'ua',
+    });
+  });
 });
