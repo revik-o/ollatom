@@ -17,7 +17,7 @@ export const IPC_TRANSPORT = new InjectionToken<IpcTransport>('IPC_TRANSPORT', {
 export class IpcService {
   private readonly transport = inject(IPC_TRANSPORT);
 
-  public invoke<Result>(command: string, args?: InvokeArgs): Promise<Result> {
+  private invoke<Result>(command: string, args?: InvokeArgs): Promise<Result> {
     return this.transport.invoke<Result>(command, args);
   }
 
