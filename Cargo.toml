@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "apps/*/src-tauri",
+    "apps/*/src-tauri", "apps/tui/ollatom-tui",
     "crates/*",
 ]
 resolver = "2"
