@@ -26,16 +26,13 @@ pub(super) enum YamlConfigurationCommand {
     },
 }
 
-// TODO think about this. Should be better solution
 async fn replace_configuration_document(
     file_pointer: &FilePointer,
-    configuration_document: &mut Value,
     replacement_configuration_document: Value,
-) -> Result<(), FilesystemError> {
+) -> Result<Value, FilesystemError> {
     validate_configuration_document_root(&replacement_configuration_document, file_pointer.path())?;
     persist_configuration_document(file_pointer, &replacement_configuration_document).await?;
-    *configuration_document = replacement_configuration_document;
-    Ok(())
+    Ok(replacement_configuration_document)
 }
 
 async fn process_yaml_configuration_commands(
@@ -62,22 +59,26 @@ async fn process_yaml_configuration_commands(
                 parameters,
                 result_sender,
             } => {
-                let result =
-                    commit_parameters(&file_pointer, &mut configuration_document, parameters).await;
+                let result = commit_parameters(&file_pointer, &configuration_document, parameters)
+                    .await
+                    .map(|updated_configuration_document| {
+                        configuration_document = updated_configuration_document;
+                    });
                 let _result = result_sender.send(result);
             }
             YamlConfigurationCommand::ReplaceConfigurationDocument {
                 configuration_document: replacement_configuration_document,
                 result_sender,
             } => {
-                let _result = result_sender.send(
-                    replace_configuration_document(
-                        &file_pointer,
-                        &mut configuration_document,
-                        replacement_configuration_document,
-                    )
-                    .await,
-                );
+                let result = replace_configuration_document(
+                    &file_pointer,
+                    replacement_configuration_document,
+                )
+                .await
+                .map(|replacement_configuration_document| {
+                    configuration_document = replacement_configuration_document;
+                });
+                let _result = result_sender.send(result);
             }
         }
     }
@@ -106,9 +107,9 @@ pub(super) fn start_yaml_configuration_worker(
 
 async fn commit_parameters(
     file_pointer: &FilePointer,
-    configuration_document: &mut Value,
+    configuration_document: &Value,
     parameters: BTreeMap<String, Value>,
-) -> Result<(), FilesystemError> {
+) -> Result<Value, FilesystemError> {
     let mut updated_configuration_document = configuration_document.clone();
 
     for (configuration_key, configuration_value) in parameters {
@@ -120,6 +121,5 @@ async fn commit_parameters(
     }
 
     persist_configuration_document(file_pointer, &updated_configuration_document).await?;
-    *configuration_document = updated_configuration_document;
-    Ok(())
+    Ok(updated_configuration_document)
 }
