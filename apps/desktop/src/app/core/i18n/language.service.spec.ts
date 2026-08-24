@@ -3,14 +3,14 @@ import { ApplicationConfigService } from '../application-config/application-conf
 import { LanguageService } from './language.service';
 
 describe('LanguageService', () => {
-  let read: ReturnType<typeof vi.fn>;
-  let add: ReturnType<typeof vi.fn>;
+  let readProperty: ReturnType<typeof vi.fn>;
+  let addProperty: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    read = vi.fn().mockRejectedValue(new Error('configuration value does not exist'));
-    add = vi.fn().mockResolvedValue('success');
+    readProperty = vi.fn().mockRejectedValue(new Error('configuration value does not exist'));
+    addProperty = vi.fn().mockResolvedValue('success');
     TestBed.configureTestingModule({
-      providers: [{ provide: ApplicationConfigService, useValue: { read, add } }],
+      providers: [{ provide: ApplicationConfigService, useValue: { readProperty, addProperty } }],
     });
   });
 
@@ -28,7 +28,7 @@ describe('LanguageService', () => {
 
     await service.setLocale('ru');
 
-    expect(add).toHaveBeenCalledWith('app.language', 'ru');
+    expect(addProperty).toHaveBeenCalledWith('app.language', 'ru');
   });
 
   it('supports typed messages with parameters', async () => {
@@ -40,7 +40,7 @@ describe('LanguageService', () => {
   });
 
   it('loads the configured locale', async () => {
-    read.mockResolvedValue('ru');
+    readProperty.mockResolvedValue('ru');
     const service = TestBed.inject(LanguageService);
 
     await service.initialized;
@@ -51,7 +51,7 @@ describe('LanguageService', () => {
 
   it('does not replace a user selection with a late configuration read', async () => {
     let resolveRead: (value: string) => void = () => undefined;
-    read.mockImplementation(
+    readProperty.mockImplementation(
       () =>
         new Promise<string>((resolve) => {
           resolveRead = resolve;
