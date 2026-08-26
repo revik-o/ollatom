@@ -1,10 +1,11 @@
+use super::YamlConfigurationError;
 use super::document::{
     deserialize_configuration_document, deserialize_yaml_configuration,
     read_configuration_document, serialize_configuration_document, serialize_yaml_configuration,
     validate_configuration_key,
 };
 use super::worker::{YamlConfigurationCommand, start_yaml_configuration_worker};
-use crate::{FilesystemError, create_file};
+use filesystem::create_file;
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -41,7 +42,7 @@ impl YamlConfigurationStore {
         self,
         configuration_key: impl Into<String>,
         configuration_value: impl Into<Value>,
-    ) -> Result<YamlConfigurationUpdate, FilesystemError> {
+    ) -> Result<YamlConfigurationUpdate, YamlConfigurationError> {
         YamlConfigurationUpdate {
             configuration_store: self,
             parameters: BTreeMap::new(),
@@ -52,7 +53,7 @@ impl YamlConfigurationStore {
     pub async fn read_parameter(
         &self,
         configuration_key: &str,
-    ) -> Result<Option<Value>, FilesystemError> {
+    ) -> Result<Option<Value>, YamlConfigurationError> {
         validate_configuration_key(configuration_key)?;
         let configuration_key = configuration_key.to_owned();
         self.send_command_and_receive_result(|result_sender| {
@@ -66,7 +67,7 @@ impl YamlConfigurationStore {
 
     pub async fn read_yaml_configuration<Configuration>(
         &self,
-    ) -> Result<Configuration, FilesystemError>
+    ) -> Result<Configuration, YamlConfigurationError>
     where
         Configuration: DeserializeOwned,
     {
@@ -83,7 +84,7 @@ impl YamlConfigurationStore {
     pub async fn write_yaml_configuration<Configuration>(
         &self,
         configuration: &Configuration,
-    ) -> Result<&Self, FilesystemError>
+    ) -> Result<&Self, YamlConfigurationError>
     where
         Configuration: Serialize,
     {
@@ -103,21 +104,23 @@ impl YamlConfigurationStore {
     async fn send_command_and_receive_result<ResultValue>(
         &self,
         create_command: impl FnOnce(
-            oneshot::Sender<Result<ResultValue, FilesystemError>>,
+            oneshot::Sender<Result<ResultValue, YamlConfigurationError>>,
         ) -> YamlConfigurationCommand,
-    ) -> Result<ResultValue, FilesystemError> {
+    ) -> Result<ResultValue, YamlConfigurationError> {
         let (result_sender, result_receiver) = oneshot::channel();
         self.command_sender
             .send(create_command(result_sender))
             .await
-            .map_err(|_| FilesystemError::YamlConfigurationWorkerUnavailable {
+            .map_err(
+                |_| YamlConfigurationError::YamlConfigurationWorkerUnavailable {
+                    path: self.file_path.clone(),
+                },
+            )?;
+        result_receiver.await.map_err(|_| {
+            YamlConfigurationError::YamlConfigurationWorkerUnavailable {
                 path: self.file_path.clone(),
-            })?;
-        result_receiver
-            .await
-            .map_err(|_| FilesystemError::YamlConfigurationWorkerUnavailable {
-                path: self.file_path.clone(),
-            })?
+            }
+        })?
     }
 }
 
@@ -126,7 +129,7 @@ impl YamlConfigurationUpdate {
         mut self,
         configuration_key: impl Into<String>,
         configuration_value: impl Into<Value>,
-    ) -> Result<Self, FilesystemError> {
+    ) -> Result<Self, YamlConfigurationError> {
         let configuration_key = configuration_key.into();
         validate_configuration_key(&configuration_key)?;
         self.parameters
@@ -134,7 +137,7 @@ impl YamlConfigurationUpdate {
         Ok(self)
     }
 
-    pub async fn commit(self) -> Result<YamlConfigurationStore, FilesystemError> {
+    pub async fn commit(self) -> Result<YamlConfigurationStore, YamlConfigurationError> {
         let configuration_store = self.configuration_store;
         configuration_store
             .send_command_and_receive_result(|result_sender| {
@@ -151,7 +154,7 @@ impl YamlConfigurationUpdate {
 pub async fn create_yaml_configuration_file(
     file_name: impl AsRef<str>,
     directory_path: impl AsRef<Path>,
-) -> Result<YamlConfigurationStore, FilesystemError> {
+) -> Result<YamlConfigurationStore, YamlConfigurationError> {
     let file_pointer = create_file(file_name, directory_path).await?;
     let file_path = file_pointer.path().to_owned();
     let configuration_document = read_configuration_document(&file_pointer).await?;

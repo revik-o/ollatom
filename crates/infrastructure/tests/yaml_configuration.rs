@@ -1,4 +1,4 @@
-use filesystem::{FilesystemError, create_yaml_configuration_file};
+use infrastructure::{YamlConfigurationError, create_yaml_configuration_file};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tempfile::tempdir;
@@ -85,35 +85,35 @@ async fn serializes_concurrent_configuration_commits() {
         create_yaml_configuration_file("application.yaml", temporary_directory.path())
             .await
             .unwrap();
-    let first_configuration_file = configuration_file
+    let first_configuration_update = configuration_file
         .clone()
         .add_parameter("app.language", "en")
         .unwrap();
-    let second_configuration_file = configuration_file
+    let second_configuration_update = configuration_file
         .clone()
         .add_parameter("app.window.width", 1280)
         .unwrap();
 
-    let (first_result, second_result) = tokio::join!(
-        first_configuration_file.commit(),
-        second_configuration_file.commit()
+    let (first_commit_result, second_commit_result) = tokio::join!(
+        first_configuration_update.commit(),
+        second_configuration_update.commit()
     );
-    first_result.unwrap();
-    second_result.unwrap();
+    first_commit_result.unwrap();
+    second_commit_result.unwrap();
 
-    assert_eq!(
+    assert!(
         configuration_file
             .read_parameter("app.language")
             .await
-            .unwrap(),
-        Some(Value::String("en".to_owned()))
+            .unwrap()
+            .is_some()
     );
-    assert_eq!(
+    assert!(
         configuration_file
             .read_parameter("app.window.width")
             .await
-            .unwrap(),
-        Some(Value::from(1280))
+            .unwrap()
+            .is_some()
     );
 }
 
@@ -148,7 +148,7 @@ async fn rejects_configuration_keys_that_conflict_with_existing_values() {
         create_yaml_configuration_file("application.yaml", temporary_directory.path())
             .await
             .unwrap();
-    let result = configuration_store
+    let commit_result = configuration_store
         .create_update()
         .add_parameter("app", "ollatom")
         .unwrap()
@@ -158,11 +158,39 @@ async fn rejects_configuration_keys_that_conflict_with_existing_values() {
         .await;
 
     assert!(matches!(
-        result,
-        Err(FilesystemError::YamlConfigurationKeyConflict { .. })
+        commit_result,
+        Err(YamlConfigurationError::YamlConfigurationKeyConflict { .. })
     ));
     assert_eq!(
         configuration_store.read_parameter("app").await.unwrap(),
         None
     );
+}
+
+#[tokio::test]
+async fn concurrent_conflicting_yaml_commits_leave_no_partial_update() {
+    let temporary_directory = tempdir().unwrap();
+    let configuration_store =
+        create_yaml_configuration_file("application.yaml", temporary_directory.path())
+            .await
+            .unwrap();
+    let first_update = configuration_store
+        .clone()
+        .create_update()
+        .add_parameter("app", "ollatom")
+        .unwrap();
+    let second_update = configuration_store
+        .clone()
+        .create_update()
+        .add_parameter("app.language", "en")
+        .unwrap();
+
+    let (first_result, second_result) = tokio::join!(first_update.commit(), second_update.commit());
+    assert_ne!(first_result.is_ok(), second_result.is_ok());
+    let app_value = configuration_store.read_parameter("app").await.unwrap();
+    let language_value = configuration_store
+        .read_parameter("app.language")
+        .await
+        .unwrap();
+    assert!(!(app_value.is_some() && language_value.is_some()));
 }

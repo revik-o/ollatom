@@ -40,7 +40,10 @@ require_tui() {
 build_desktop() {
     require_desktop
     echo "==> Building desktop app"
-    (cd "$DESKTOP_DIR" && npm run tauri -- build)
+    case "$(uname -s)" in
+        Linux) (cd "$DESKTOP_DIR" && npm run tauri:build:linux) ;;
+        *) (cd "$DESKTOP_DIR" && npm run tauri -- build) ;;
+    esac
 }
 
 build_tui() {

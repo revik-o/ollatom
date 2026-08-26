@@ -56,3 +56,42 @@ async fn rejects_entry_names_that_escape_the_parent_directory() {
         Err(FilesystemError::InvalidFilesystemEntryName { .. })
     ));
 }
+
+#[tokio::test]
+async fn atomically_replaces_file_contents() {
+    let temporary_directory = tempdir().unwrap();
+    let file_pointer = create_file("example.txt", temporary_directory.path())
+        .await
+        .unwrap();
+
+    file_pointer
+        .write_text("old contents")
+        .await
+        .unwrap()
+        .write_text_atomically("new contents")
+        .await
+        .unwrap();
+
+    assert_eq!(file_pointer.read_text().await.unwrap(), "new contents");
+}
+
+#[tokio::test]
+async fn atomically_replaces_binary_file_contents() {
+    let temporary_directory = tempdir().unwrap();
+    let file_pointer = create_file("example.bin", temporary_directory.path())
+        .await
+        .unwrap();
+
+    file_pointer
+        .write_bytes(b"old bytes")
+        .await
+        .unwrap()
+        .write_bytes_atomically(b"new bytes")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        file_pointer.read_bytes().await.unwrap(),
+        b"new bytes".to_vec()
+    );
+}

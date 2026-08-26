@@ -1,9 +1,9 @@
+use super::YamlConfigurationError;
 use super::document::{
     add_value_to_configuration_document, read_value_from_configuration_document,
     serialize_configuration_document, validate_configuration_document_root,
 };
-use crate::file::write_file_atomically;
-use crate::{FilePointer, FilesystemError};
+use filesystem::FilePointer;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
@@ -11,25 +11,25 @@ use tokio::sync::{mpsc::Receiver, oneshot::Sender};
 pub(super) enum YamlConfigurationCommand {
     ReadParameter {
         configuration_key: String,
-        result_sender: Sender<Result<Option<Value>, FilesystemError>>,
+        result_sender: Sender<Result<Option<Value>, YamlConfigurationError>>,
     },
     ReadConfigurationDocument {
-        result_sender: Sender<Result<Value, FilesystemError>>,
+        result_sender: Sender<Result<Value, YamlConfigurationError>>,
     },
     CommitParameters {
         parameters: BTreeMap<String, Value>,
-        result_sender: Sender<Result<(), FilesystemError>>,
+        result_sender: Sender<Result<(), YamlConfigurationError>>,
     },
     ReplaceConfigurationDocument {
         configuration_document: Value,
-        result_sender: Sender<Result<(), FilesystemError>>,
+        result_sender: Sender<Result<(), YamlConfigurationError>>,
     },
 }
 
 async fn replace_configuration_document(
     file_pointer: &FilePointer,
     replacement_configuration_document: Value,
-) -> Result<Value, FilesystemError> {
+) -> Result<Value, YamlConfigurationError> {
     validate_configuration_document_root(&replacement_configuration_document, file_pointer.path())?;
     persist_configuration_document(file_pointer, &replacement_configuration_document).await?;
     Ok(replacement_configuration_document)
@@ -46,39 +46,40 @@ async fn process_yaml_configuration_commands(
                 configuration_key,
                 result_sender,
             } => {
-                let result = Ok(read_value_from_configuration_document(
+                let command_result = Ok(read_value_from_configuration_document(
                     &configuration_document,
                     &configuration_key,
                 ));
-                let _result = result_sender.send(result);
+                let _send_result = result_sender.send(command_result);
             }
             YamlConfigurationCommand::ReadConfigurationDocument { result_sender } => {
-                let _result = result_sender.send(Ok(configuration_document.clone()));
+                let _send_result = result_sender.send(Ok(configuration_document.clone()));
             }
             YamlConfigurationCommand::CommitParameters {
                 parameters,
                 result_sender,
             } => {
-                let result = commit_parameters(&file_pointer, &configuration_document, parameters)
-                    .await
-                    .map(|updated_configuration_document| {
-                        configuration_document = updated_configuration_document;
-                    });
-                let _result = result_sender.send(result);
+                let command_result =
+                    commit_parameters(&file_pointer, &configuration_document, parameters)
+                        .await
+                        .map(|updated_configuration_document| {
+                            configuration_document = updated_configuration_document;
+                        });
+                let _send_result = result_sender.send(command_result);
             }
             YamlConfigurationCommand::ReplaceConfigurationDocument {
                 configuration_document: replacement_configuration_document,
                 result_sender,
             } => {
-                let result = replace_configuration_document(
+                let command_result = replace_configuration_document(
                     &file_pointer,
                     replacement_configuration_document,
                 )
                 .await
-                .map(|replacement_configuration_document| {
-                    configuration_document = replacement_configuration_document;
+                .map(|updated_configuration_document| {
+                    configuration_document = updated_configuration_document;
                 });
-                let _result = result_sender.send(result);
+                let _send_result = result_sender.send(command_result);
             }
         }
     }
@@ -87,10 +88,13 @@ async fn process_yaml_configuration_commands(
 async fn persist_configuration_document(
     file_pointer: &FilePointer,
     configuration_document: &Value,
-) -> Result<(), FilesystemError> {
+) -> Result<(), YamlConfigurationError> {
     let configuration_contents =
         serialize_configuration_document(configuration_document, file_pointer.path())?;
-    write_file_atomically(file_pointer.path(), configuration_contents.into_bytes()).await
+    file_pointer
+        .write_text_atomically(configuration_contents)
+        .await?;
+    Ok(())
 }
 
 pub(super) fn start_yaml_configuration_worker(
@@ -109,7 +113,7 @@ async fn commit_parameters(
     file_pointer: &FilePointer,
     configuration_document: &Value,
     parameters: BTreeMap<String, Value>,
-) -> Result<Value, FilesystemError> {
+) -> Result<Value, YamlConfigurationError> {
     let mut updated_configuration_document = configuration_document.clone();
 
     for (configuration_key, configuration_value) in parameters {

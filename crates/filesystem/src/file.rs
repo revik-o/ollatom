@@ -38,6 +38,22 @@ impl FilePointer {
         self.write_bytes(contents.as_bytes()).await
     }
 
+    pub async fn write_bytes_atomically(
+        &self,
+        contents: impl Into<Vec<u8>>,
+    ) -> Result<&Self, FilesystemError> {
+        write_file_atomically(&self.path, contents).await?;
+        Ok(self)
+    }
+
+    pub async fn write_text_atomically(
+        &self,
+        contents: impl Into<String>,
+    ) -> Result<&Self, FilesystemError> {
+        self.write_bytes_atomically(contents.into().into_bytes())
+            .await
+    }
+
     pub async fn append_bytes(&self, contents: &[u8]) -> Result<&Self, FilesystemError> {
         let mut file = OpenOptions::new()
             .append(true)
@@ -112,7 +128,7 @@ fn create_entry_path(
     Ok(parent_directory_path.join(entry_name_path))
 }
 
-pub(crate) async fn write_file_atomically(
+async fn write_file_atomically(
     file_path: impl AsRef<Path>,
     contents: impl Into<Vec<u8>>,
 ) -> Result<(), FilesystemError> {
@@ -120,21 +136,16 @@ pub(crate) async fn write_file_atomically(
     let filesystem_operation_path = file_path.clone();
     let contents = contents.into();
 
-    tokio::task::spawn_blocking(move || {
-        let mut atomic_file =
-            AtomicWriteFile::open(&filesystem_operation_path).map_err(|source| {
-                FilesystemError::from_input_output_operation(&filesystem_operation_path, source)
-            })?;
-        atomic_file.write_all(&contents).map_err(|source| {
-            FilesystemError::from_input_output_operation(&filesystem_operation_path, source)
-        })?;
-        atomic_file.commit().map_err(|source| {
-            FilesystemError::from_input_output_operation(&filesystem_operation_path, source)
-        })
+    tokio::task::spawn_blocking(move || -> Result<(), std::io::Error> {
+        let mut atomic_file = AtomicWriteFile::open(&filesystem_operation_path)?;
+        atomic_file.write_all(&contents)?;
+        atomic_file.commit()?;
+        Ok(())
     })
     .await
     .map_err(|source| FilesystemError::FilesystemOperationTaskFailed {
-        path: file_path,
+        path: file_path.clone(),
         source,
     })?
+    .map_err(|source| FilesystemError::from_input_output_operation(file_path, source))
 }

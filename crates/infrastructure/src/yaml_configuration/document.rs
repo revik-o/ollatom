@@ -1,4 +1,5 @@
-use crate::{FilePointer, FilesystemError};
+use super::YamlConfigurationError;
+use filesystem::FilePointer;
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::{Map, Value};
 use std::path::Path;
@@ -6,20 +7,22 @@ use std::path::Path;
 pub(super) fn serialize_yaml_configuration<Configuration>(
     configuration: &Configuration,
     file_path: &Path,
-) -> Result<String, FilesystemError>
+) -> Result<String, YamlConfigurationError>
 where
     Configuration: Serialize,
 {
-    serde_saphyr::to_string(configuration).map_err(|source| FilesystemError::YamlSerialization {
-        path: file_path.to_owned(),
-        source: Box::new(source),
+    serde_saphyr::to_string(configuration).map_err(|source| {
+        YamlConfigurationError::YamlSerialization {
+            path: file_path.to_owned(),
+            source: Box::new(source),
+        }
     })
 }
 
 pub(super) fn deserialize_configuration_document(
     configuration_contents: &str,
     file_path: &Path,
-) -> Result<Value, FilesystemError> {
+) -> Result<Value, YamlConfigurationError> {
     let configuration_document = deserialize_yaml_configuration(configuration_contents, file_path)?;
     validate_configuration_document_root(&configuration_document, file_path)?;
     Ok(configuration_document)
@@ -27,32 +30,30 @@ pub(super) fn deserialize_configuration_document(
 
 pub(super) async fn read_configuration_document(
     file_pointer: &FilePointer,
-) -> Result<Value, FilesystemError> {
+) -> Result<Value, YamlConfigurationError> {
     let configuration_contents = file_pointer.read_text().await?;
-
     if configuration_contents.trim().is_empty() {
         return Ok(Value::Object(Map::new()));
     }
-
     deserialize_configuration_document(&configuration_contents, file_pointer.path())
 }
 
 pub(super) fn serialize_configuration_document(
     configuration_document: &Value,
     file_path: &Path,
-) -> Result<String, FilesystemError> {
+) -> Result<String, YamlConfigurationError> {
     serialize_yaml_configuration(configuration_document, file_path)
 }
 
 pub(super) fn deserialize_yaml_configuration<Configuration>(
     configuration_contents: &str,
     file_path: &Path,
-) -> Result<Configuration, FilesystemError>
+) -> Result<Configuration, YamlConfigurationError>
 where
     Configuration: DeserializeOwned,
 {
     serde_saphyr::from_str(configuration_contents).map_err(|source| {
-        FilesystemError::YamlDeserialization {
+        YamlConfigurationError::YamlDeserialization {
             path: file_path.to_owned(),
             source: Box::new(source),
         }
@@ -62,27 +63,27 @@ where
 pub(super) fn validate_configuration_document_root(
     configuration_document: &Value,
     file_path: &Path,
-) -> Result<(), FilesystemError> {
+) -> Result<(), YamlConfigurationError> {
     if configuration_document.is_null() || configuration_document.is_object() {
         return Ok(());
     }
-
-    Err(FilesystemError::YamlRootIsNotMapping {
+    Err(YamlConfigurationError::YamlRootIsNotMapping {
         path: file_path.to_owned(),
     })
 }
 
-pub(super) fn validate_configuration_key(configuration_key: &str) -> Result<(), FilesystemError> {
+pub(super) fn validate_configuration_key(
+    configuration_key: &str,
+) -> Result<(), YamlConfigurationError> {
     if configuration_key.is_empty()
         || configuration_key
             .split('.')
             .any(|configuration_key_segment| configuration_key_segment.is_empty())
     {
-        return Err(FilesystemError::InvalidYamlConfigurationKey {
+        return Err(YamlConfigurationError::InvalidYamlConfigurationKey {
             configuration_key: configuration_key.to_owned(),
         });
     }
-
     Ok(())
 }
 
@@ -90,7 +91,7 @@ pub(super) fn add_value_to_configuration_document(
     configuration_document: &mut Value,
     configuration_key: &str,
     configuration_value: Value,
-) -> Result<(), FilesystemError> {
+) -> Result<(), YamlConfigurationError> {
     if configuration_document.is_null() {
         *configuration_document = Value::Object(Map::new());
     }
@@ -103,7 +104,7 @@ pub(super) fn add_value_to_configuration_document(
     {
         let current_configuration_mapping = current_configuration_value
             .as_object_mut()
-            .ok_or_else(|| FilesystemError::YamlConfigurationKeyConflict {
+            .ok_or_else(|| YamlConfigurationError::YamlConfigurationKeyConflict {
                 configuration_key: configuration_key.to_owned(),
             })?;
         current_configuration_value = current_configuration_mapping
@@ -111,7 +112,7 @@ pub(super) fn add_value_to_configuration_document(
             .or_insert_with(|| Value::Object(Map::new()));
 
         if !current_configuration_value.is_object() {
-            return Err(FilesystemError::YamlConfigurationKeyConflict {
+            return Err(YamlConfigurationError::YamlConfigurationKeyConflict {
                 configuration_key: configuration_key.to_owned(),
             });
         }
@@ -122,7 +123,7 @@ pub(super) fn add_value_to_configuration_document(
         .expect("validated configuration keys always contain a segment");
     current_configuration_value
         .as_object_mut()
-        .ok_or_else(|| FilesystemError::YamlConfigurationKeyConflict {
+        .ok_or_else(|| YamlConfigurationError::YamlConfigurationKeyConflict {
             configuration_key: configuration_key.to_owned(),
         })?
         .insert(
