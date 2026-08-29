@@ -1,0 +1,72 @@
+<section
+  class="window-frame"
+  [class.window-frame--client-controls]="hasClientControls()"
+  [class.window-frame--native-standard]="nativeStandardWindow()"
+  [ngStyle]="titleBarStyle()"
+>
+  @if (!nativeStandardWindow()) {
+    <header class="window-frame__titlebar" (pointerdown)="dragWindow()">
+      @if (hasClientControls() && controlsOnLeft()) {
+        <app-window-controls />
+      }
+
+      <div class="window-frame__titlebar-space"></div>
+      @if (hasClientControls() && !controlsOnLeft()) {
+        <app-window-controls />
+      }
+    </header>
+  }
+
+  <main class="window-frame__content"><ng-content /></main>
+
+  @if (hasClientControls()) {
+    <button
+      class="window-frame__resize window-frame__resize--n"
+      aria-hidden="true"
+      tabindex="-1"
+      (pointerdown)="resizeWindow('North')"
+    ></button>
+    <button
+      class="window-frame__resize window-frame__resize--ne"
+      aria-hidden="true"
+      tabindex="-1"
+      (pointerdown)="resizeWindow('NorthEast')"
+    ></button>
+    <button
+      class="window-frame__resize window-frame__resize--e"
+      aria-hidden="true"
+      tabindex="-1"
+      (pointerdown)="resizeWindow('East')"
+    ></button>
+    <button
+      class="window-frame__resize window-frame__resize--se"
+      aria-hidden="true"
+      tabindex="-1"
+      (pointerdown)="resizeWindow('SouthEast')"
+    ></button>
+    <button
+      class="window-frame__resize window-frame__resize--s"
+      aria-hidden="true"
+      tabindex="-1"
+      (pointerdown)="resizeWindow('South')"
+    ></button>
+    <button
+      class="window-frame__resize window-frame__resize--sw"
+      aria-hidden="true"
+      tabindex="-1"
+      (pointerdown)="resizeWindow('SouthWest')"
+    ></button>
+    <button
+      class="window-frame__resize window-frame__resize--w"
+      aria-hidden="true"
+      tabindex="-1"
+      (pointerdown)="resizeWindow('West')"
+    ></button>
+    <button
+      class="window-frame__resize window-frame__resize--nw"
+      aria-hidden="true"
+      tabindex="-1"
+      (pointerdown)="resizeWindow('NorthWest')"
+    ></button>
+  }
+</section>

@@ -1,0 +1,24 @@
+{
+  "app": {
+    "windows": [
+      {
+        "title": "Ollatom",
+        "width": 800,
+        "height": 600,
+        "minWidth": 330,
+        "minHeight": 240,
+        "resizable": true,
+        "maximizable": true,
+        "minimizable": true,
+        "closable": true,
+        "fullscreen": false,
+        "visible": false,
+        "transparent": false,
+        "decorations": true,
+        "shadow": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
+      }
+    ]
+  }
+}

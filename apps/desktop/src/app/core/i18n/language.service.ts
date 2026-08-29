@@ -4,8 +4,8 @@ import { type Status } from '../ipc/ipc.service';
 import { SUPPORTED_LOCALES, type Locale } from './locale.definition';
 import { Messages } from './messages';
 import { en } from './locales/en';
-import { ru } from './locales/ru';
-import { ua } from './locales/ua';
+import { ru } from './locales/slavic/ru';
+import { ua } from './locales/slavic/ua';
 
 const CATALOGS = { en, ru, ua } as const satisfies Record<Locale, Messages>;
 const applicationLanguageConfigurationKey = 'app.language';

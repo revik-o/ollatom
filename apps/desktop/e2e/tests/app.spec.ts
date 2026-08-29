@@ -10,6 +10,21 @@ test('opens the desktop application UI with mocked IPC', async ({ page }) => {
       return 'en';
     }
 
+    if (command === 'wait_for_background_ready') {
+      return {
+        backdrop: 'opaque',
+        chrome: {
+          mode: 'native_standard',
+          controls: [],
+          titleBarHeight: 0,
+          controlsSide: 'right',
+          controlsInsetStart: 0,
+          controlsInsetEnd: 0,
+          scaleFactor: 1,
+        },
+      };
+    }
+
     throw new Error(`Unexpected IPC command: ${command}`);
   });
   await page.goto('/');

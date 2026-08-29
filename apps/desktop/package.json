@@ -10,7 +10,10 @@
     "test": "ng test",
     "e2e": "playwright test --config e2e/playwright.config.ts",
     "e2e:ui": "playwright test --config e2e/playwright.config.ts --ui",
-    "e2e:install": "playwright install chromium"
+    "e2e:install": "playwright install chromium",
+    "tauri:build:linux": "tauri build --features wayland-blur",
+    "tauri:build:macos:store": "tauri build --config src-tauri/tauri.macos-store.conf.json",
+    "tauri:build:macos:direct": "tauri build --config src-tauri/tauri.macos-direct.conf.json --features macos-direct"
   },
   "private": true,
   "packageManager": "npm@12.0.1",

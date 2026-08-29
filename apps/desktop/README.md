@@ -8,6 +8,42 @@ npm run build
 npm run test
 ```
 
+## Production builds
+
+Install a current Rust stable toolchain (including `cargo`) and Node/npm, then
+run `npm ci` in this directory. Tauri's `build` command creates an optimized
+release build; artifacts are written to the workspace `target/release/bundle/`.
+The workspace release profile enables optimization level 3, fat LTO, one codegen
+unit, and abort-on-panic.
+
+From the repository root, the canonical optimized current-platform build is:
+
+```bash
+./cli/build-desktop.sh
+```
+
+Run each platform build on its native OS (or a matching CI runner):
+
+```bash
+# Windows: executable and configured installer bundles
+npm run tauri -- build
+
+# macOS: App Store-safe opaque build
+npm run tauri:build:macos:store
+
+# macOS: directly distributed build with vibrancy
+npm run tauri:build:macos:direct
+
+# Linux: AppImage/executable plus .deb and .rpm bundles
+npm run tauri:build:linux
+```
+
+On Debian/Ubuntu build hosts, install `librsvg2-dev` for the GTK AppImage
+plugin (`sudo apt-get install librsvg2-dev`). Tauri runs `linuxdeploy` in
+extract-and-run mode, so FUSE is not required by this build.
+
+Before distribution, sign/notarize macOS artifacts and sign Windows installers.
+
 ## Project organization
 
 This application uses **feature-first architecture** (also known as

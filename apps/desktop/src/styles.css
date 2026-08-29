@@ -1,1 +1,63 @@
-/* You can add global styles to this file, and also import other style files */
+:root {
+  --color-canvas: #ffffff;
+  --color-surface: #f5f5f5;
+  --color-surface-raised: #ededed;
+  --color-text: #0a0a0a;
+  --color-text-muted: #5c5c5c;
+  --color-border: #d6d6d6;
+  --color-hover: #e8e8e8;
+  --color-focus: #000000;
+  --color-skeleton: #e5e5e5;
+  --color-skeleton-highlight: #f8f8f8;
+  --color-window-backdrop: rgba(255, 255, 255, 0.78);
+  color-scheme: light;
+}
+
+:root[data-theme='black'] {
+  --color-canvas: #000000;
+  --color-surface: #0f0f0f;
+  --color-surface-raised: #181818;
+  --color-text: #fafafa;
+  --color-text-muted: #a3a3a3;
+  --color-border: #2e2e2e;
+  --color-hover: #202020;
+  --color-focus: #ffffff;
+  --color-skeleton: #1c1c1c;
+  --color-skeleton-highlight: #333333;
+  --color-window-backdrop: rgba(0, 0, 0, 0.82);
+  color-scheme: dark;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-text);
+}
+
+html[data-backdrop='acrylic'] body,
+html[data-backdrop='vibrancy'] body,
+html[data-backdrop='wayland_blur'] body {
+  background: var(--color-window-backdrop);
+}
+
+body {
+  overflow: hidden;
+  font-family: system-ui, sans-serif;
+}
+
+app-root {
+  display: block;
+  min-height: 100dvh;
+  visibility: hidden;
+}
+
+html[data-ui-prepared='true'] app-root {
+  visibility: visible;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}

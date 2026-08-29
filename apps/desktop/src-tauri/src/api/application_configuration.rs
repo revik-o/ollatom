@@ -1,10 +1,7 @@
-use filesystem::{YamlConfigurationStore, create_yaml_configuration_file};
+use crate::api::application_startup::StartupState;
 use serde::Serialize;
 use serde_json::Value;
-use std::error::Error;
-use tauri::{Manager, State};
-
-const APPLICATION_CONFIGURATION_FILE_NAME: &str = "application.yaml";
+use tauri::State;
 
 #[derive(Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -12,23 +9,15 @@ pub enum ApplicationConfigurationUpdateStatus {
     Success,
 }
 
-pub fn initialize(application: &mut tauri::App) -> Result<(), Box<dyn Error>> {
-    let application_configuration_directory_path = application.path().app_config_dir()?;
-    let application_configuration_store =
-        tauri::async_runtime::block_on(create_yaml_configuration_file(
-            APPLICATION_CONFIGURATION_FILE_NAME,
-            application_configuration_directory_path,
-        ))?;
-    application.manage(application_configuration_store);
-    Ok(())
-}
-
 #[tauri::command]
 pub async fn get_application_config_value_by_key(
-    application_configuration_store: State<'_, YamlConfigurationStore>,
+    startup: State<'_, StartupState>,
     key: String,
 ) -> Result<Value, String> {
-    application_configuration_store
+    startup
+        .resources()
+        .await?
+        .configuration
         .read_parameter(&key)
         .await
         .map_err(|error| error.to_string())?
@@ -38,18 +27,23 @@ pub async fn get_application_config_value_by_key(
 
 #[tauri::command]
 pub async fn set_application_config_value(
-    application_configuration_store: State<'_, YamlConfigurationStore>,
+    startup: State<'_, StartupState>,
     key: String,
     value: Value,
 ) -> Result<ApplicationConfigurationUpdateStatus, String> {
     let value = validate_application_configuration_value(value)?;
-    application_configuration_store
+
+    startup
+        .resources()
+        .await?
+        .configuration
         .create_update()
         .add_parameter(key, value)
         .map_err(|error| error.to_string())?
         .commit()
         .await
         .map_err(|error| error.to_string())?;
+
     Ok(ApplicationConfigurationUpdateStatus::Success)
 }
 

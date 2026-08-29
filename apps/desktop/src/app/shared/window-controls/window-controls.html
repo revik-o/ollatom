@@ -1,0 +1,35 @@
+<div
+  class="window-frame__controls"
+  aria-label="Window controls"
+  data-window-interactive
+  [style.order]="controlsOnLeft() ? -1 : 1"
+>
+  <button
+    type="button"
+    aria-label="Minimize"
+    [style.order]="controlOrder('minimize')"
+    (pointerdown)="$event.stopPropagation()"
+    (click)="minimizeWindow()"
+  >
+    −
+  </button>
+  <button
+    type="button"
+    aria-label="Maximize or restore"
+    [style.order]="controlOrder('maximize')"
+    (pointerdown)="$event.stopPropagation()"
+    (click)="toggleMaximizeWindow()"
+  >
+    ▫
+  </button>
+  <button
+    type="button"
+    aria-label="Close"
+    class="window-frame__close"
+    [style.order]="controlOrder('close')"
+    (pointerdown)="$event.stopPropagation()"
+    (click)="closeWindow()"
+  >
+    ×
+  </button>
+</div>

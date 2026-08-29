@@ -22,7 +22,7 @@ pub fn run() {
 
     application_builder
         .setup(|app| {
-            api::application_configuration::initialize(app)?;
+            api::application_startup::initialize(app)?;
 
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -35,7 +35,10 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             api::application_configuration::get_application_config_value_by_key,
-            api::application_configuration::set_application_config_value
+            api::application_configuration::set_application_config_value,
+            api::application_startup::wait_for_background_ready,
+            api::application_startup::set_window_appearance,
+            api::application_startup::set_window_interactive_regions
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

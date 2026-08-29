@@ -1,12 +1,11 @@
-import { Component, signal } from '@angular/core';
+import { Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { WindowFrameComponent } from './shared/window-frame/window-frame.component';
 
 @Component({
-  imports: [RouterOutlet],
+  imports: [RouterOutlet, WindowFrameComponent],
   selector: 'app-root',
   styleUrl: './app.css',
   templateUrl: './app.html',
 })
-export class App {
-  protected readonly title = signal('ollatom-desktop');
-}
+export class App { }

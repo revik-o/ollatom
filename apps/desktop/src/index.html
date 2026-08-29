@@ -1,13 +1,129 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>ollatom</title>
-  <base href="/">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
-</head>
-<body>
-  <app-root></app-root>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <title>Ollatom</title>
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <script>
+      try {
+        const cachedPreference = localStorage.getItem('ollatom.theme.preference');
+        const explicitTheme =
+          cachedPreference === 'black' || cachedPreference === 'white' ? cachedPreference : null;
+        const theme =
+          explicitTheme ??
+          (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'black' : 'white');
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme === 'black' ? 'dark' : 'light';
+      } catch {
+        document.documentElement.dataset.theme = window.matchMedia('(prefers-color-scheme: light)')
+          .matches
+          ? 'white'
+          : 'black';
+      }
+    </script>
+    <style id="app-splash-critical-styles">
+      :root {
+        --splash-canvas: #000;
+        --splash-text: #fafafa;
+        --splash-base: #000;
+        --splash-highlight: #333;
+      }
+
+      #app-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        background: var(--splash-canvas);
+        color: var(--splash-text);
+      }
+
+      .app-splash__skeleton {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        background: var(--splash-base);
+      }
+
+      .app-splash__shimmer {
+        position: absolute;
+        inset: 0;
+        width: 100vw;
+        background: linear-gradient(90deg, transparent, var(--splash-highlight), transparent);
+        animation: ollatom-skeleton-shimmer 1.4s linear infinite;
+      }
+
+      .app-splash__title {
+        position: relative;
+        z-index: 1;
+        margin: 0;
+        font:
+          600 clamp(2rem, 7vw, 4rem)/1 system-ui,
+          sans-serif;
+        letter-spacing: -0.04em;
+      }
+
+      .app-splash--exiting {
+        animation: ollatom-splash-exit 320ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      }
+
+      .app-splash__error {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        gap: 1rem;
+        justify-items: center;
+        font:
+          500 1rem/1.4 system-ui,
+          sans-serif;
+      }
+
+      .app-splash__error p {
+        margin: 0;
+      }
+
+      .app-splash__error button {
+        padding: 0.6rem 1rem;
+        border: 1px solid currentColor;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+      }
+
+      @keyframes ollatom-skeleton-shimmer {
+        from {
+          transform: translate3d(-100%, 0, 0);
+        }
+        to {
+          transform: translate3d(100%, 0, 0);
+        }
+      }
+
+      @keyframes ollatom-splash-exit {
+        to {
+          transform: translate3d(0, -100%, 0);
+          filter: blur(100px);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .app-splash__shimmer {
+          animation: none;
+        }
+      }
+    </style>
+  </head>
+  <body aria-busy="true">
+    <div id="app-splash" role="status" aria-labelledby="app-splash-title">
+      <div class="app-splash__skeleton" aria-hidden="true">
+        <span class="app-splash__shimmer"></span>
+      </div>
+      <h1 id="app-splash-title" class="app-splash__title">Ollatom</h1>
+    </div>
+    <app-root inert aria-hidden="true"></app-root>
+  </body>
 </html>
