@@ -1,0 +1,1 @@
+//! OpenAI ChatGPT provider integration.

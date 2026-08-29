@@ -1,0 +1,12 @@
+[package]
+name = "ollama-benchmark"
+version = "0.0.1"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "ollama-benchmark"
+path = "src/main.rs"
+
+[dependencies]
+ollama = { path = ".." }

@@ -1,7 +1,12 @@
 [workspace]
 members = [
-    "apps/*/src-tauri", "apps/tui",
-    "crates/*",
+    "apps/*/src-tauri",
+    "apps/tui",
+    "crates/filesystem",
+    "crates/infrastructure",
+    "crates/llm",
+    "crates/ai-providers/*",
+    "crates/ai-providers/ollama/benchmark",
 ]
 resolver = "2"
 
