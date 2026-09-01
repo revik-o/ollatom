@@ -5,7 +5,13 @@ members = [
     "crates/filesystem",
     "crates/infrastructure",
     "crates/llm",
-    "crates/ai-providers/*",
+    "crates/ai-providers",
+    "crates/ai-providers/chatgpt",
+    "crates/ai-providers/claude",
+    "crates/ai-providers/gemini",
+    "crates/ai-providers/llama-cpp",
+    "crates/ai-providers/lm-studio",
+    "crates/ai-providers/ollama",
     "crates/ai-providers/ollama/benchmark",
 ]
 resolver = "2"

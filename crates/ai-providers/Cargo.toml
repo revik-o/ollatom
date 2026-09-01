@@ -1,0 +1,13 @@
+[package]
+name = "ai-providers"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+llm = { path = "../llm" }
+chatgpt = { path = "chatgpt" }
+claude = { path = "claude" }
+gemini = { path = "gemini" }
+ollama = { path = "ollama" }
+llama-cpp = { path = "llama-cpp" }
+lm-studio = { path = "lm-studio" }

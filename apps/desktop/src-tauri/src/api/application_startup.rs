@@ -1,4 +1,8 @@
 use crate::api::application_infrastructure;
+#[cfg(target_os = "linux")]
+use crate::api::gtk_window_controls::{
+    GtkWindowControls, GtkWindowControlsSide, parse_gtk_window_controls,
+};
 use infrastructure::YamlConfigurationStore;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -6,7 +10,7 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 use tokio::sync::Notify;
 
-const APPEARANCE_CHANGED_EVENT: &str = "window-appearance-changed";
+const WINDOW_APPEARANCE_CHANGED_EVENT: &str = "window-appearance-changed";
 const APPLICATION_CONFIGURATION_FILE_NAME: &str = "application.yaml";
 
 #[derive(Clone, Debug, Serialize)]
@@ -89,13 +93,13 @@ impl StartupState {
     pub async fn resources(&self) -> Result<StartupResources, String> {
         loop {
             let notified = self.resources_ready.notified();
-
-            if let Some(value) = self
+            let resources = self
                 .resources
                 .lock()
                 .map_err(|_| "startup state is unavailable")?
-                .clone()
-            {
+                .clone();
+
+            if let Some(value) = resources {
                 return value;
             }
 
@@ -104,12 +108,15 @@ impl StartupState {
     }
 
     fn complete_resources(&self, value: Result<StartupResources, String>) {
-        if let Ok(mut resources) = self.resources.lock()
-            && resources.is_none()
-        {
-            *resources = Some(value);
-            self.resources_ready.notify_waiters();
+        let Ok(mut resources) = self.resources.lock() else {
+            return;
+        };
+        if resources.is_some() {
+            return;
         }
+
+        *resources = Some(value);
+        self.resources_ready.notify_waiters();
     }
 
     fn snapshot(&self) -> Result<StartupSnapshot, String> {
@@ -193,7 +200,7 @@ pub(crate) fn initialize(application: &mut tauri::App) -> Result<(), Box<dyn Err
         state.complete_resources(result);
 
         if let Ok(snapshot) = state.snapshot() {
-            let _ = handle.emit(APPEARANCE_CHANGED_EVENT, snapshot);
+            let _ = handle.emit(WINDOW_APPEARANCE_CHANGED_EVENT, snapshot);
         }
     });
     Ok(())
@@ -222,7 +229,7 @@ pub(crate) fn set_window_appearance(
         .ok_or_else(|| "the main window is unavailable".to_owned())?;
     let backdrop = apply_backdrop(&window, &theme);
     let snapshot = startup.update_backdrop(backdrop.clone())?;
-    let _ = app.emit(APPEARANCE_CHANGED_EVENT, snapshot);
+    let _ = app.emit(WINDOW_APPEARANCE_CHANGED_EVENT, snapshot);
 
     Ok(backdrop)
 }
@@ -233,14 +240,8 @@ pub(crate) fn set_window_interactive_regions(
     startup: State<'_, StartupState>,
     regions: Vec<LogicalRect>,
 ) -> Result<(), String> {
-    if regions.iter().any(|r| {
-        !r.x.is_finite()
-            || !r.y.is_finite()
-            || !r.width.is_finite()
-            || !r.height.is_finite()
-            || r.width < 0.0
-            || r.height < 0.0
-    }) {
+    let are_regions_valid = regions.iter().all(is_valid_interactive_region);
+    if !are_regions_valid {
         return Err("interactive regions must be finite, non-negative rectangles".to_owned());
     }
 
@@ -262,25 +263,35 @@ pub(crate) fn set_window_interactive_regions(
     Ok(())
 }
 
+fn is_valid_interactive_region(region: &LogicalRect) -> bool {
+    let has_finite_origin = region.x.is_finite() && region.y.is_finite();
+    let has_finite_size = region.width.is_finite() && region.height.is_finite();
+    let has_non_negative_size = region.width >= 0.0 && region.height >= 0.0;
+
+    has_finite_origin && has_finite_size && has_non_negative_size
+}
+
 fn initial_chrome_metrics(window: &WebviewWindow) -> WindowChromeMetrics {
     let scale_factor = window.scale_factor().unwrap_or(1.0);
 
     #[cfg(target_os = "linux")]
-    return WindowChromeMetrics {
-        mode: WindowChromeMode::ClientDrawn,
-        controls: gtk_controls(window),
-        title_bar_height: 40.0,
-        controls_side: gtk_controls_side(window),
-        controls_inset_start: 0.0,
-        controls_inset_end: 0.0,
-        scale_factor,
-    };
+    {
+        let gtk_window_controls = gtk_window_controls(window);
+        return WindowChromeMetrics {
+            mode: WindowChromeMode::ClientDrawn,
+            controls: gtk_window_controls.names,
+            title_bar_height: 40.0,
+            controls_side: window_controls_side(gtk_window_controls.side),
+            controls_inset_start: 0.0,
+            controls_inset_end: 0.0,
+            scale_factor,
+        };
+    }
 
     #[cfg(target_os = "macos")]
     {
-        if let Ok((controls_inset_start, title_bar_height)) =
-            crate::api::macos_chrome::native_metrics(window)
-        {
+        let native_metrics = crate::api::macos_chrome::native_metrics(window);
+        if let Ok((controls_inset_start, title_bar_height)) = native_metrics {
             return WindowChromeMetrics {
                 mode: WindowChromeMode::NativeOverlay,
                 controls: Vec::new(),
@@ -399,57 +410,19 @@ fn apply_backdrop(window: &WebviewWindow, theme: &str) -> BackdropKind {
 }
 
 #[cfg(target_os = "linux")]
-fn gtk_controls_side(window: &WebviewWindow) -> WindowControlsSide {
+fn gtk_window_controls(window: &WebviewWindow) -> GtkWindowControls {
     use gtk::prelude::{GtkSettingsExt, WidgetExt};
     let layout = window
         .gtk_window()
         .ok()
         .and_then(|window| window.settings())
         .and_then(|settings| settings.gtk_decoration_layout());
-    parse_gtk_decoration_layout(layout.as_deref())
+    parse_gtk_window_controls(layout.as_deref())
 }
 
 #[cfg(target_os = "linux")]
-fn gtk_controls(window: &WebviewWindow) -> Vec<String> {
-    use gtk::prelude::{GtkSettingsExt, WidgetExt};
-    let layout = window
-        .gtk_window()
-        .ok()
-        .and_then(|window| window.settings())
-        .and_then(|settings| settings.gtk_decoration_layout());
-    parse_gtk_controls(layout.as_deref())
-}
-
-#[cfg(target_os = "linux")]
-fn parse_gtk_controls(layout: Option<&str>) -> Vec<String> {
-    let controls = layout
-        .unwrap_or_default()
-        .split_once(':')
-        .into_iter()
-        .flat_map(|(left, right)| left.split(',').chain(right.split(',')))
-        .map(str::trim)
-        .filter(|item| matches!(*item, "minimize" | "maximize" | "close"))
-        .map(str::to_owned)
-        .collect::<Vec<_>>();
-
-    if controls.is_empty() {
-        vec!["minimize".into(), "maximize".into(), "close".into()]
-    } else {
-        controls
-    }
-}
-
-#[cfg(target_os = "linux")]
-fn parse_gtk_decoration_layout(layout: Option<&str>) -> WindowControlsSide {
-    let Some((left, _right)) = layout.unwrap_or_default().split_once(':') else {
-        return WindowControlsSide::Right;
-    };
-    let has_controls = |side: &str| {
-        side.split(',')
-            .any(|item| matches!(item.trim(), "minimize" | "maximize" | "close"))
-    };
-
-    if has_controls(left) {
+fn window_controls_side(side: GtkWindowControlsSide) -> WindowControlsSide {
+    if side == GtkWindowControlsSide::Left {
         WindowControlsSide::Left
     } else {
         WindowControlsSide::Right
@@ -460,50 +433,23 @@ fn parse_gtk_decoration_layout(layout: Option<&str>) -> WindowControlsSide {
 fn install_gtk_layout_listener(window: &WebviewWindow, handle: AppHandle) {
     use gtk::prelude::{GtkSettingsExt, WidgetExt};
 
-    let Some(settings) = window
+    let gtk_settings = window
         .gtk_window()
         .ok()
-        .and_then(|window| window.settings())
-    else {
+        .and_then(|window| window.settings());
+    let Some(settings) = gtk_settings else {
         return;
     };
 
     settings.connect_gtk_decoration_layout_notify(move |settings| {
         let layout = settings.gtk_decoration_layout();
-        let side = parse_gtk_decoration_layout(layout.as_deref());
-        let controls = parse_gtk_controls(layout.as_deref());
+        let gtk_window_controls = parse_gtk_window_controls(layout.as_deref());
+        let controls_side = window_controls_side(gtk_window_controls.side);
         let state = handle.state::<StartupState>();
-        if let Ok(snapshot) = state.update_linux_controls(side, controls) {
-            let _ = handle.emit(APPEARANCE_CHANGED_EVENT, snapshot);
+        let updated_snapshot =
+            state.update_linux_controls(controls_side, gtk_window_controls.names);
+        if let Ok(snapshot) = updated_snapshot {
+            let _ = handle.emit(WINDOW_APPEARANCE_CHANGED_EVENT, snapshot);
         }
     });
-}
-
-#[cfg(all(test, target_os = "linux"))]
-mod tests {
-    use super::{WindowControlsSide, parse_gtk_controls, parse_gtk_decoration_layout};
-
-    #[test]
-    fn gtk_layout_defaults_to_right_with_standard_order() {
-        assert!(matches!(
-            parse_gtk_decoration_layout(None),
-            WindowControlsSide::Right
-        ));
-        assert_eq!(
-            parse_gtk_controls(None),
-            vec!["minimize", "maximize", "close"]
-        );
-    }
-
-    #[test]
-    fn gtk_layout_preserves_declared_control_order() {
-        assert!(matches!(
-            parse_gtk_decoration_layout(Some("close,maximize,minimize:menu")),
-            WindowControlsSide::Left
-        ));
-        assert_eq!(
-            parse_gtk_controls(Some("close,maximize,minimize:menu")),
-            vec!["close", "maximize", "minimize"]
-        );
-    }
 }

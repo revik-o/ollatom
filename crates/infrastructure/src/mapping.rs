@@ -22,8 +22,8 @@ pub(crate) fn map_project_row(database_row: &SqliteRow) -> InfrastructureResult<
         )?,
         cpu_usage_percentage: read_u8(database_row, "cpu_usage_percentage")?,
         gpu_usage_percentage: read_u8(database_row, "gpu_usage_percentage")?,
-        created_at: parse_timestamp(&read_column::<&str>(database_row, "created_at")?)?,
-        updated_at: parse_timestamp(&read_column::<&str>(database_row, "updated_at")?)?,
+        created_at: parse_timestamp(read_column::<&str>(database_row, "created_at")?)?,
+        updated_at: parse_timestamp(read_column::<&str>(database_row, "updated_at")?)?,
     })
 }
 
@@ -39,8 +39,8 @@ pub(crate) fn map_chat_row(database_row: &SqliteRow) -> InfrastructureResult<Cha
         )?,
         cpu_usage_percentage: read_u8(database_row, "cpu_usage_percentage")?,
         gpu_usage_percentage: read_u8(database_row, "gpu_usage_percentage")?,
-        created_at: parse_timestamp(&read_column::<&str>(database_row, "created_at")?)?,
-        updated_at: parse_timestamp(&read_column::<&str>(database_row, "updated_at")?)?,
+        created_at: parse_timestamp(read_column::<&str>(database_row, "created_at")?)?,
+        updated_at: parse_timestamp(read_column::<&str>(database_row, "updated_at")?)?,
     })
 }
 
@@ -62,7 +62,7 @@ pub(crate) fn map_attachment_row(database_row: &SqliteRow) -> InfrastructureResu
                 format!("failed to deserialize attachment metadata: {source}"),
             )
         })?,
-        created_at: parse_timestamp(&read_column::<&str>(database_row, "created_at")?)?,
+        created_at: parse_timestamp(read_column::<&str>(database_row, "created_at")?)?,
     })
 }
 
@@ -119,7 +119,7 @@ pub(crate) fn map_message_row(
         attachments,
         role_metadata,
         validity,
-        created_at: parse_timestamp(&read_column::<&str>(database_row, "created_at")?)?,
+        created_at: parse_timestamp(read_column::<&str>(database_row, "created_at")?)?,
         updated_at: parse_optional_timestamp(read_column(database_row, "updated_at")?)?,
         deprecated_at: parse_optional_timestamp(read_column(database_row, "deprecated_at")?)?,
     })

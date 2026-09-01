@@ -18,6 +18,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ai-providers"
+version = "0.0.1"
+dependencies = [
+ "chatgpt",
+ "claude",
+ "gemini",
+ "llama-cpp",
+ "llm",
+ "lm-studio",
+ "ollama",
+]
+
+[[package]]
 name = "alloc-no-stdlib"
 version = "2.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -565,6 +578,9 @@ dependencies = [
 [[package]]
 name = "chatgpt"
 version = "0.0.1"
+dependencies = [
+ "llm",
+]
 
 [[package]]
 name = "chrono"
@@ -581,6 +597,9 @@ dependencies = [
 [[package]]
 name = "claude"
 version = "0.0.1"
+dependencies = [
+ "llm",
+]
 
 [[package]]
 name = "cmov"
@@ -1529,6 +1548,9 @@ dependencies = [
 [[package]]
 name = "gemini"
 version = "0.0.1"
+dependencies = [
+ "llm",
+]
 
 [[package]]
 name = "generic-array"
@@ -2360,14 +2382,26 @@ checksum = "47d9d19d1d6efa0109d2f65ff4c85cddd50bd572e5a00127ab10987290bcefae"
 [[package]]
 name = "llama-cpp"
 version = "0.0.1"
+dependencies = [
+ "llm",
+]
 
 [[package]]
 name = "llm"
 version = "0.0.1"
+dependencies = [
+ "regex",
+ "serde",
+ "serde_json",
+ "tokio",
+]
 
 [[package]]
 name = "lm-studio"
 version = "0.0.1"
+dependencies = [
+ "llm",
+]
 
 [[package]]
 name = "lock_api"
@@ -2760,6 +2794,9 @@ dependencies = [
 [[package]]
 name = "ollama"
 version = "0.0.1"
+dependencies = [
+ "llm",
+]
 
 [[package]]
 name = "ollama-benchmark"

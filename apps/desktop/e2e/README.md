@@ -24,10 +24,10 @@ shell E2E coverage should use Tauri's WebDriver integration separately.
 Browser tests can install an IPC handler before Angular starts:
 
 ```typescript
-import { installIpcMock } from '../support/ipc.mock';
+import { installTauriIpcMock } from '../support/ipc.mock';
 
 test('loads projects', async ({ page }) => {
-  await installIpcMock(page, (command) => {
+  await installTauriIpcMock(page, (command) => {
     if (command === 'list_projects') {
       return [{ name: 'Example' }];
     }

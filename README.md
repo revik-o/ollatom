@@ -8,11 +8,20 @@ git clone --single-branch --depth=1 git@github.com:revik-o/ollatom.git ollatom
 
 ## Developer commands
 
-Run these commands from the repository root. On Windows, replace `.sh` with
-`.bat`.
+The repository uses [mise](https://mise.jdx.dev/) to provide the pinned Rust
+and Node.js versions declared in `mise.toml`. Install mise, then prepare the
+toolchains once from the repository root:
 
 ```bash
-# Build or test every app
+mise install
+```
+
+The command wrappers automatically run inside the mise environment, so the
+Rust, Cargo, Node.js, and npm versions always come from `mise.toml`. On Windows,
+replace `.sh` with `.bat`.
+
+```bash
+# Build every app, or test every crate and app
 ./cli/build.sh
 ./cli/test.sh
 
@@ -27,9 +36,10 @@ Run these commands from the repository root. On Windows, replace `.sh` with
 ./cli/test-tui.sh
 ```
 
-The desktop commands require Rust, Cargo, Node.js, npm, and dependencies
-installed with `npm ci` in `apps/desktop`. The TUI command wrappers are ready,
-but the TUI itself must first be initialized with `apps/tui/Cargo.toml`.
+The desktop commands require the dependencies installed by running `npm ci` in
+`apps/desktop`; mise supplies the language toolchains. The TUI command wrappers
+are ready, but the TUI itself must first be initialized with
+`apps/tui/Cargo.toml`.
 
 Before the first desktop E2E test run, install Playwright's Chromium browser:
 

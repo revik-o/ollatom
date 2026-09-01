@@ -1,6 +1,8 @@
 import { Injectable } from '@angular/core';
 import { invoke, transformCallback } from '@tauri-apps/api/core';
-import { EventCallback, listen, TauriEvent, UnlistenFn } from '@tauri-apps/api/event';
+import { listen } from '@tauri-apps/api/event';
+import type { EventCallback, UnlistenFn } from '@tauri-apps/api/event';
+import { WINDOW_APPEARANCE_CHANGED_EVENT_NAME } from './ipc-events';
 
 export type BackdropKind = 'acrylic' | 'vibrancy' | 'wayland_blur' | 'opaque';
 export type ApplicationConfigValue = string | number;
@@ -27,7 +29,6 @@ export interface StartupSnapshot {
 
 @Injectable({ providedIn: 'root' })
 export class IpcService {
-
   public isIPCRuntime(): boolean {
     return '__TAURI_INTERNALS__' in window;
   }
@@ -44,7 +45,9 @@ export class IpcService {
     return invoke<Status>('set_application_config_value', { key, value });
   }
 
-  public setWindowInteractiveRegions(regions: ReadonlyArray<WindowInteractiveRegion>): Promise<void> {
+  public setWindowInteractiveRegions(
+    regions: ReadonlyArray<WindowInteractiveRegion>,
+  ): Promise<void> {
     return invoke<void>('set_window_interactive_regions', { regions });
   }
 
@@ -52,15 +55,13 @@ export class IpcService {
     return invoke<BackdropKind>('set_window_appearance', { theme });
   }
 
-  public windowAppearanceChanged(): Promise<StartupSnapshot> {
-    return invoke<StartupSnapshot>('window_appearance_changed');
-  }
-
   public waitForBackgroundReady(): Promise<StartupSnapshot> {
     return invoke<StartupSnapshot>('wait_for_background_ready');
   }
 
-  public listenWindowAppearanceChanged(callback: EventCallback<StartupSnapshot>): Promise<UnlistenFn> {
-    return listen<StartupSnapshot>(TauriEvent.WINDOW_THEME_CHANGED, callback);
+  public listenWindowAppearanceChanged(
+    callback: EventCallback<StartupSnapshot>,
+  ): Promise<UnlistenFn> {
+    return listen<StartupSnapshot>(WINDOW_APPEARANCE_CHANGED_EVENT_NAME, callback);
   }
 }
