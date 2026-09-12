@@ -1,0 +1,1 @@
+Create a Vite React project with TypeScript in the benchmark project root. Install dependencies, build the application, inspect every failure, and continue working in the same uninterrupted agent loop until the project builds successfully. Do not stop before the build succeeds.

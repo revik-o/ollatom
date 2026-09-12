@@ -1,5 +1,8 @@
 mod builder;
+mod context_optimization;
+mod context_optimization_host;
 pub(crate) mod execution;
+mod execution_lifecycle;
 mod execution_outcome;
 mod facade;
 mod host;

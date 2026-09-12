@@ -1,9 +1,10 @@
-use super::interactions::InteractionHub;
+use super::{context_optimization::ContextOptimizer, interactions::InteractionHub};
 use crate::{
-    AskUserRequest, InteractionReply, InteractionRequest, InvokeSubagentRequest, LlmError,
-    ProviderRunHost, QuestionAnswer, RunEvent, RunId, RunLimits, RunPolicy, StopToken,
-    SubagentOutcome, SubagentProfileRegistry, ToolCall, ToolOutput, ToolRegistry,
-    events::EventDispatcher, interaction::InteractionCallback, subagent::SharedSubagentRunner,
+    AskUserRequest, ContextOptimizationOutcome, ContextOptimizationRequest, InteractionReply,
+    InteractionRequest, InvokeSubagentRequest, LlmError, ProviderRunHost, QuestionAnswer, RunEvent,
+    RunId, RunLimits, RunPolicy, StopToken, SubagentOutcome, SubagentProfileRegistry, ToolCall,
+    ToolOutput, ToolRegistry, Usage, events::EventDispatcher, interaction::InteractionCallback,
+    subagent::SharedSubagentRunner,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -25,6 +26,7 @@ pub(crate) struct RunHost {
     pub subagent_runner: Option<SharedSubagentRunner>,
     pub authorizer: Option<Arc<dyn crate::ToolAuthorizer>>,
     pub parent_context: Vec<crate::ConversationMessage>,
+    pub context_optimizer: ContextOptimizer,
     pub(super) state: Mutex<HostState>,
     pub(super) execution: Mutex<()>,
 }
@@ -56,6 +58,7 @@ impl ProviderRunHost for RunHost {
             self.events.emit(event).await
         })
     }
+
     fn begin_round(&self, round: u16) -> crate::BoxFuture<'_, Result<(), LlmError>> {
         Box::pin(async move {
             if self.stop.is_stopped() {
@@ -80,13 +83,14 @@ impl ProviderRunHost for RunHost {
                 .await
         })
     }
+
     fn execute_tool_round(
         &self,
         round: u16,
         tool_calls: Vec<ToolCall>,
     ) -> crate::BoxFuture<'_, Result<Vec<ToolOutput>, LlmError>> {
         Box::pin(async move {
-            let _execution_guard = self.execution.lock().await;
+            let _tool_execution_guard = self.execution.lock().await;
             self.validate_tool_round(round, &tool_calls).await?;
             let mut tool_outputs = Vec::with_capacity(tool_calls.len());
 
@@ -97,6 +101,7 @@ impl ProviderRunHost for RunHost {
             Ok(tool_outputs)
         })
     }
+
     fn ask_user(
         &self,
         request: AskUserRequest,
@@ -150,6 +155,45 @@ impl ProviderRunHost for RunHost {
             self.invoke_configured_subagent(request).await
         })
     }
+
+    fn optimize_context(
+        &self,
+        context_optimization_request: ContextOptimizationRequest,
+    ) -> crate::BoxFuture<'_, Result<ContextOptimizationOutcome, LlmError>> {
+        Box::pin(async move {
+            let _context_optimization_execution_guard = self.execution.lock().await;
+            let original_message_count = context_optimization_request.history.len();
+            let observed_input_tokens = context_optimization_request.observed_input_tokens;
+            let input_token_limit = context_optimization_request.input_token_limit;
+            let context_optimization_outcome = self
+                .context_optimizer
+                .optimize(context_optimization_request)
+                .await?;
+
+            if context_optimization_outcome.usage != Usage::default() {
+                self.state
+                    .lock()
+                    .await
+                    .child_usage
+                    .push(context_optimization_outcome.usage.clone());
+            }
+
+            if context_optimization_outcome.optimized {
+                self.events
+                    .emit(RunEvent::ContextOptimized {
+                        original_message_count,
+                        optimized_message_count: context_optimization_outcome
+                            .model_visible_history
+                            .len(),
+                        observed_input_tokens,
+                        input_token_limit,
+                    })
+                    .await?;
+            }
+
+            Ok(context_optimization_outcome)
+        })
+    }
 }
 
 fn is_host_owned_event(event: &RunEvent) -> bool {
@@ -158,6 +202,7 @@ fn is_host_owned_event(event: &RunEvent) -> bool {
         RunEvent::Tool(_)
             | RunEvent::InteractionRequested(_)
             | RunEvent::ProviderRoundStarted { .. }
+            | RunEvent::ContextOptimized { .. }
     );
 
     is_host_operation || event.is_terminal()

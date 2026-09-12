@@ -24,9 +24,11 @@ impl RunHost {
             let mut host_state = self.state.lock().await;
             let reached_depth_limit = self.limits.subagent_depth == 0;
             let reached_child_limit = host_state.children >= self.limits.child_subagents;
+
             if reached_depth_limit || reached_child_limit {
                 return Err(LlmError::LoopLimit("child subagent limit".into()));
             }
+
             host_state.children += 1;
         }
         let subagent_runner = self

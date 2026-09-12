@@ -1,13 +1,11 @@
-use crate::{BoxFuture, InteractionRequest, LlmError, RunId, ToolCall, ToolOutput, Usage};
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::VecDeque,
-    sync::{
-        Arc, Mutex as StdMutex,
-        atomic::{AtomicBool, Ordering},
-    },
+pub use crate::event_queue::RunEventStream;
+use crate::{
+    BoxFuture, InteractionRequest, LlmError, RunId, ToolCall, ToolOutput, Usage,
+    event_queue::EventQueue,
 };
-use tokio::sync::{Mutex, Notify, OnceCell, mpsc};
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tokio::sync::{Mutex, OnceCell, mpsc};
 
 const CALLBACK_QUEUE_CAPACITY: usize = 64;
 
@@ -30,7 +28,15 @@ pub enum RunEvent {
     Usage(Usage),
     Warning(String),
     InteractionRequested(InteractionRequest),
-    ProviderRoundStarted { round: u16 },
+    ProviderRoundStarted {
+        round: u16,
+    },
+    ContextOptimized {
+        original_message_count: usize,
+        optimized_message_count: usize,
+        observed_input_tokens: u64,
+        input_token_limit: u64,
+    },
     Completed,
     Cancelled,
     Failed(String),
@@ -42,11 +48,13 @@ impl RunEvent {
             self,
             Self::Tool(_)
                 | Self::InteractionRequested(_)
+                | Self::ContextOptimized { .. }
                 | Self::Completed
                 | Self::Cancelled
                 | Self::Failed(_)
         )
     }
+
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Completed | Self::Cancelled | Self::Failed(_))
     }
@@ -73,51 +81,6 @@ pub struct EventCallbacks {
 impl EventCallbacks {
     pub fn push(&mut self, callback: EventCallback) {
         self.callbacks.push(callback);
-    }
-}
-
-pub struct RunEventStream {
-    event_queue: Arc<EventQueue>,
-}
-
-impl RunEventStream {
-    pub async fn next(&mut self) -> Option<SequencedEvent> {
-        loop {
-            let event_available = self.event_queue.notify.notified();
-            if let Some(event) = self.event_queue.events.lock().ok()?.pop_front() {
-                return Some(event);
-            }
-            if self.event_queue.closed.load(Ordering::SeqCst) {
-                return None;
-            }
-            event_available.await;
-        }
-    }
-}
-
-struct EventQueue {
-    events: StdMutex<VecDeque<SequencedEvent>>,
-    notify: Notify,
-    closed: AtomicBool,
-}
-
-impl EventQueue {
-    fn push(&self, sequenced_event: SequencedEvent) {
-        let Ok(mut queued_events) = self.events.lock() else {
-            return;
-        };
-        queued_events.push_back(sequenced_event);
-        let terminal_event_was_queued = queued_events
-            .back()
-            .is_some_and(|queued_event| queued_event.event.is_terminal());
-        if terminal_event_was_queued {
-            self.closed.store(true, Ordering::SeqCst);
-        }
-        self.notify.notify_one();
-    }
-    fn close(&self) {
-        self.closed.store(true, Ordering::SeqCst);
-        self.notify.notify_waiters();
     }
 }
 
@@ -162,15 +125,9 @@ impl EventDispatcher {
         event_sink: Option<Arc<dyn RunEventSink>>,
         callbacks: EventCallbacks,
     ) -> (Self, RunEventStream) {
-        let event_queue = Arc::new(EventQueue {
-            events: StdMutex::new(VecDeque::new()),
-            notify: Notify::new(),
-            closed: AtomicBool::new(false),
-        });
+        let event_queue = Arc::new(EventQueue::new());
 
-        let stream = RunEventStream {
-            event_queue: event_queue.clone(),
-        };
+        let stream = RunEventStream::new(event_queue.clone());
 
         (
             Self {
@@ -198,7 +155,9 @@ impl EventDispatcher {
         }
 
         let event_is_terminal = event.is_terminal();
+
         state.accumulate_streamed_output(&event);
+
         let sequenced_event = SequencedEvent {
             run_id: self.run_id,
             sequence: state.next_sequence,

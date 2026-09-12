@@ -49,6 +49,7 @@ impl<State> RequestBuilder<State> {
             Ok(model) => self.data.model = Some(model),
             Err(error) => self.set_error(error),
         }
+
         self
     }
 
@@ -61,6 +62,7 @@ impl<State> RequestBuilder<State> {
             Ok(effort) => self.data.explicit_effort = Some(effort),
             Err(error) => self.set_error(LlmError::UnsupportedEffort(error.to_string())),
         }
+
         self
     }
 
@@ -98,6 +100,7 @@ impl<State> RequestBuilder<State> {
                 .policy
                 .add_trusted_folder(TrustedFolder::standard(path));
         }
+
         self
     }
 
@@ -108,6 +111,7 @@ impl<State> RequestBuilder<State> {
         for folder in folders {
             self.data.policy.add_trusted_folder(folder);
         }
+
         self
     }
 

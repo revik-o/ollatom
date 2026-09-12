@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-const MAXIMUM_RUST_SOURCE_FILE_LINES: usize = 270;
+const MAXIMUM_RUST_SOURCE_FILE_LINES: usize = 250;
 
 #[derive(Clone, Copy)]
 enum InlineTestPolicy {

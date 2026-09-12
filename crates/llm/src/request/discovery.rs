@@ -30,6 +30,7 @@ impl<State> RequestBuilder<State> {
 
     pub async fn get_info(self) -> Result<ModelInfo, LlmError> {
         self.validate()?;
+
         let provider_id = self.provider_id()?.clone();
         let (registration, model_id) = self
             .runtime()?

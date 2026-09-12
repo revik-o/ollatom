@@ -19,18 +19,20 @@ impl RunHost {
             )));
         }
 
-        if tool_calls.len() > self.limits.tool_calls_per_round as usize {
+        let tool_call_count = u16::try_from(tool_calls.len())
+            .map_err(|_| LlmError::LoopLimit("tool calls per round".into()))?;
+
+        if tool_call_count > self.limits.tool_calls_per_round {
             return Err(LlmError::LoopLimit("tool calls per round".into()));
         }
 
-        let projected_total_calls = host_state
-            .total_calls
-            .saturating_add(tool_calls.len() as u16);
+        let projected_total_calls = host_state.total_calls.saturating_add(tool_call_count);
+
         if projected_total_calls > self.limits.total_tool_calls {
             return Err(LlmError::LoopLimit("total tool calls".into()));
         }
 
-        host_state.total_calls += tool_calls.len() as u16;
+        host_state.total_calls += tool_call_count;
 
         Ok(())
     }
@@ -68,6 +70,7 @@ impl RunHost {
 
         let argument_validation =
             crate::tools::validate_arguments(&definition.input_schema, &tool_call.arguments);
+
         if let Err(failure) = argument_validation {
             return self.finish_tool_failure(&tool_call, failure).await;
         }
@@ -95,7 +98,9 @@ impl RunHost {
                     .await;
             }
         };
+
         self.emit_tool_started(&tool_call).await?;
+
         let timeout = tool_plan
             .timeout
             .unwrap_or_else(|| std::time::Duration::from_millis(self.limits.tool_timeout_ms));
@@ -118,6 +123,7 @@ impl RunHost {
                 }
             },
         };
+
         self.finish_tool_output(&tool_call, tool_output).await
     }
 }

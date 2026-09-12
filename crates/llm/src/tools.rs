@@ -182,8 +182,6 @@ pub(crate) fn validate_arguments(
 }
 
 pub(crate) fn plan_fingerprint(plan: &ToolPlan) -> String {
-    let normalized_arguments = serde_json::to_string(&plan.normalized_arguments)
-        .expect("serializing serde_json::Value cannot fail");
-
+    let normalized_arguments = plan.normalized_arguments.to_string();
     format!("{}:{}:{normalized_arguments}", plan.call.name, plan.call.id)
 }

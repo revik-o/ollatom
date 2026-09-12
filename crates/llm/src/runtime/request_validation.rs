@@ -37,6 +37,7 @@ pub(super) fn resolve_selected_tool_definitions(
                 let is_subagent_tool = name == crate::builtins::INVOKE_SUBAGENT_TOOL_NAME;
                 let subagents_are_unconfigured =
                     runtime.inner.profiles.is_empty() || runtime.inner.subagent_runner.is_none();
+
                 if is_subagent_tool && subagents_are_unconfigured {
                     return Err(LlmError::InvalidRequest(
                         "invoke_subagent requires profiles and a runner".into(),
@@ -57,6 +58,7 @@ pub(super) fn validate_tool_limits(
 ) -> Result<(), LlmError> {
     let tools_are_selected = !names.is_empty();
     let tool_calls_are_disabled = limits.total_tool_calls == 0 || limits.tool_calls_per_round == 0;
+
     if tools_are_selected && tool_calls_are_disabled {
         return Err(LlmError::InvalidRequest(
             "selected tools require non-zero tool-call limits".into(),
@@ -65,6 +67,7 @@ pub(super) fn validate_tool_limits(
 
     let subagent_tool_is_selected = names.contains(crate::builtins::INVOKE_SUBAGENT_TOOL_NAME);
     let subagents_are_disabled = limits.child_subagents == 0 || limits.subagent_depth == 0;
+
     if subagent_tool_is_selected && subagents_are_disabled {
         return Err(LlmError::InvalidRequest(
             "invoke_subagent requires non-zero child count and depth limits".into(),

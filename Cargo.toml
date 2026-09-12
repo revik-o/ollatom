@@ -3,6 +3,7 @@ members = [
     "apps/*/src-tauri",
     "apps/tui",
     "crates/filesystem",
+    "crates/os",
     "crates/infrastructure",
     "crates/llm",
     "crates/ai-providers",

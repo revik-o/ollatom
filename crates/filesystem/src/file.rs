@@ -11,6 +11,10 @@ pub struct FilePointer {
 }
 
 impl FilePointer {
+    pub fn from_path(path: impl Into<PathBuf>) -> Self {
+        Self { path: path.into() }
+    }
+
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -67,6 +71,7 @@ impl FilePointer {
         file.flush()
             .await
             .map_err(|source| FilesystemError::from_input_output_operation(&self.path, source))?;
+
         Ok(self)
     }
 
@@ -80,9 +85,11 @@ pub async fn create_folder(
     parent_directory_path: impl AsRef<Path>,
 ) -> Result<PathBuf, FilesystemError> {
     let folder_path = create_entry_path(folder_name.as_ref(), parent_directory_path.as_ref())?;
+
     fs::create_dir_all(&folder_path)
         .await
         .map_err(|source| FilesystemError::from_input_output_operation(&folder_path, source))?;
+
     Ok(folder_path)
 }
 
@@ -91,11 +98,13 @@ pub async fn create_file(
     directory_path: impl AsRef<Path>,
 ) -> Result<FilePointer, FilesystemError> {
     let directory_path = directory_path.as_ref();
+
     fs::create_dir_all(directory_path)
         .await
         .map_err(|source| FilesystemError::from_input_output_operation(directory_path, source))?;
 
     let file_path = create_entry_path(file_name.as_ref(), directory_path)?;
+
     OpenOptions::new()
         .create(true)
         .read(true)

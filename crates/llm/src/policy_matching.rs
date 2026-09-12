@@ -37,7 +37,7 @@ fn normalize_command_argument(argument: &str) -> String {
     if can_remain_unquoted(argument) {
         argument.into()
     } else {
-        serde_json::to_string(argument).expect("serializing a command argument cannot fail")
+        serde_json::Value::String(argument.to_owned()).to_string()
     }
 }
 

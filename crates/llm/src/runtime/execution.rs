@@ -1,5 +1,7 @@
 use super::{
     LlmRuntime,
+    context_optimization::ContextOptimizer,
+    execution_lifecycle::{ActiveRunGuard, terminal_event_for},
     execution_outcome::{
         HostResults, attach_host_results, cancelled_outcome, empty_cancelled_outcome,
     },
@@ -18,8 +20,7 @@ pub(crate) fn start_run(mut request_data: crate::request::RequestData) -> LlmRun
     let run_id = request_data
         .runtime
         .as_ref()
-        .map(LlmRuntime::next_run_id)
-        .unwrap_or(crate::RunId(0));
+        .map_or(crate::RunId(0), LlmRuntime::next_run_id);
     let event_sink = request_data
         .runtime
         .as_ref()
@@ -27,19 +28,16 @@ pub(crate) fn start_run(mut request_data: crate::request::RequestData) -> LlmRun
     let (event_dispatcher, event_stream) =
         EventDispatcher::new(run_id, event_sink, request_data.callbacks.clone());
     let event_dispatcher = Arc::new(event_dispatcher);
-
     let registration_error = request_data
         .runtime
         .as_ref()
         .and_then(|runtime| runtime.register_run(run_id, stop_handle.clone()).err());
+
     if let Some(error) = registration_error {
         request_data.validation_error = Some(error);
     }
 
-    let registration_guard = ActiveRunGuard {
-        runtime: request_data.runtime.clone(),
-        run_id,
-    };
+    let registration_guard = ActiveRunGuard::new(request_data.runtime.clone(), run_id);
     let execution_stop_handle = stop_handle.clone();
     let outcome_future = Box::pin(async move {
         let (outcome_sender, outcome_receiver) = tokio::sync::oneshot::channel();
@@ -59,7 +57,7 @@ pub(crate) fn start_run(mut request_data: crate::request::RequestData) -> LlmRun
                 Ok(()) => run_result,
                 Err(error) => Err(error),
             };
-            let _ignored_receiver = outcome_sender.send(final_result);
+            let _ignored_send_result = outcome_sender.send(final_result);
         });
 
         outcome_receiver
@@ -87,6 +85,7 @@ async fn execute_request(
     if let Some(error) = request_data.validation_error.clone() {
         return Err(error);
     }
+
     let runtime = request_data
         .runtime
         .as_ref()
@@ -99,26 +98,33 @@ async fn execute_request(
         runtime.resolve_selected_or_default_model(&provider_id, request_data.model.as_ref())?;
     negotiation::validate_context(&provider_id, &request_data.context)?;
     request_data.limits.validate()?;
+
     if let Some(user_message) = &request_data.user_message {
         negotiation::validate_user_message(&provider_id, user_message)?;
     }
+
     if let Some(reasoning_effort) = request_data.explicit_effort {
         request_data.options.reasoning.effort = reasoning_effort;
     }
+
     let warnings = negotiation::negotiate_options(registration, &mut request_data.options)?;
+
     for warning in warnings {
         event_dispatcher.emit(RunEvent::Warning(warning)).await?;
     }
+
     let tool_definitions = request_validation::resolve_selected_tool_definitions(
         runtime,
         &request_data.selected_tools,
     )?;
+
     request_validation::validate_tool_limits(&request_data.selected_tools, request_data.limits)?;
     request_validation::validate_policy(
         &tool_definitions,
         &request_data.policy,
         request_data.interaction_callback.is_some(),
     )?;
+
     let run_host = Arc::new(RunHost::new(RunHostDependencies {
         run_id,
         event_dispatcher: event_dispatcher.clone(),
@@ -133,7 +139,17 @@ async fn execute_request(
         subagent_runner: runtime.inner.subagent_runner.clone(),
         tool_authorizer: runtime.inner.authorizer.clone(),
         parent_context: request_data.context.clone(),
+        context_optimizer: ContextOptimizer::new(
+            registration.provider.clone(),
+            provider_id.clone(),
+            model_id.clone(),
+            run_id,
+            request_data.system_prompt.clone(),
+            request_data.options.clone(),
+            stop_token.clone(),
+        ),
     }));
+
     let provider_request = crate::ProviderRunRequest {
         run_id,
         provider: provider_id.clone(),
@@ -148,9 +164,11 @@ async fn execute_request(
         tools: tool_definitions,
         limits: request_data.limits,
     };
+
     if stop_token.is_stopped() {
         return Ok(empty_cancelled_outcome(provider_id, model_id));
     }
+
     let provider_future =
         registration
             .provider
@@ -161,19 +179,24 @@ async fn execute_request(
         &stop_handle,
     )
     .await;
+
     if let Err(timeout_error @ LlmError::Timeout(_)) = &provider_result {
         return Err(timeout_error.clone());
     }
+
     if let Ok(provider_outcome) = &provider_result {
         super::outcome_validation::validate_identity(provider_outcome, &provider_id, &model_id)?;
     }
+
     if matches!(&provider_result, Err(LlmError::Cancelled)) {
         stop_handle.stop();
     }
+
     let host_results = HostResults::new(
         run_host.take_child_usage().await,
         run_host.take_tool_records().await,
     );
+
     if stop_token.is_stopped() {
         return Ok(cancelled_outcome(
             provider_result,
@@ -184,7 +207,9 @@ async fn execute_request(
         )
         .await);
     }
+
     let provider_outcome = attach_host_results(provider_result?, host_results);
+
     Ok(match provider_outcome {
         ProviderRunOutcome::Completed(response) if stop_token.is_stopped() => {
             LlmRunOutcome::Cancelled(response.into())
@@ -204,6 +229,7 @@ async fn await_provider(
     let Some(timeout_milliseconds) = overall_timeout_milliseconds else {
         return provider_future.await;
     };
+
     match tokio::time::timeout(
         std::time::Duration::from_millis(timeout_milliseconds),
         provider_future,
@@ -216,26 +242,6 @@ async fn await_provider(
             Err(LlmError::Timeout(format!(
                 "LLM run exceeded {timeout_milliseconds}ms"
             )))
-        }
-    }
-}
-
-fn terminal_event_for(result: &Result<LlmRunOutcome, LlmError>) -> RunEvent {
-    match result {
-        Ok(LlmRunOutcome::Completed(_)) => RunEvent::Completed,
-        Ok(LlmRunOutcome::Cancelled(_)) | Err(LlmError::Cancelled) => RunEvent::Cancelled,
-        Err(error) => RunEvent::Failed(error.to_string()),
-    }
-}
-
-struct ActiveRunGuard {
-    runtime: Option<LlmRuntime>,
-    run_id: crate::RunId,
-}
-impl Drop for ActiveRunGuard {
-    fn drop(&mut self) {
-        if let Some(runtime) = &self.runtime {
-            runtime.unregister_run(self.run_id);
         }
     }
 }

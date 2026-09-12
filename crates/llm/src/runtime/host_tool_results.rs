@@ -49,6 +49,7 @@ impl RunHost {
                 tool_call.name, tool_output.call_id
             )));
         }
+
         self.record_tool_output(tool_call, &tool_output).await;
         self.events
             .emit(RunEvent::Tool(ToolEvent::Finished {
@@ -85,6 +86,7 @@ impl RunHost {
                 ),
             )
             .is_none();
+
         if is_first_output {
             host_state.tool_records.push(crate::ToolExecutionRecord {
                 call_id: tool_call.id.clone(),

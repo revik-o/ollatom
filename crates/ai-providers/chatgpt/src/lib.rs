@@ -1,3 +1,5 @@
 //! OpenAI ChatGPT provider integration.
 
-pub const BUILT_IN_PROVIDER: llm::BuiltInProvider = llm::BuiltInProvider::ChatGpt;
+mod constants;
+
+pub use constants::BUILT_IN_PROVIDER;

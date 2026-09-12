@@ -1,8 +1,9 @@
 use crate::{
-    AskUserRequest, AvailabilityReport, BoxFuture, ConversationMessage, InvokeSubagentRequest,
-    LlmError, LlmOptions, LlmResponse, ModelId, ModelInfo, ModelScope, PartialResponse,
-    ProviderCapabilities, ProviderId, QuestionAnswer, RunEvent, RunId, StopToken, SubagentOutcome,
-    ToolCall, ToolDefinition, ToolOutput, UserMessage,
+    AskUserRequest, AvailabilityReport, BoxFuture, ContextOptimizationOutcome,
+    ContextOptimizationRequest, ConversationMessage, InvokeSubagentRequest, LlmError, LlmOptions,
+    LlmResponse, ModelId, ModelInfo, ModelScope, PartialResponse, ProviderCapabilities, ProviderId,
+    QuestionAnswer, RunEvent, RunId, StopToken, SubagentOutcome, ToolCall, ToolDefinition,
+    ToolOutput, UserMessage,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -94,6 +95,17 @@ pub trait ProviderRunHost: Send + Sync {
         &self,
         request: InvokeSubagentRequest,
     ) -> BoxFuture<'_, Result<SubagentOutcome, LlmError>>;
+
+    fn optimize_context(
+        &self,
+        _context_optimization_request: ContextOptimizationRequest,
+    ) -> BoxFuture<'_, Result<ContextOptimizationOutcome, LlmError>> {
+        Box::pin(async move {
+            Err(LlmError::UnsupportedOption(
+                "context optimization is not supported by this host".into(),
+            ))
+        })
+    }
 }
 
 pub trait LlmProvider: Send + Sync {

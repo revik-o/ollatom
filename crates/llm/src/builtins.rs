@@ -26,6 +26,7 @@ pub fn built_in_tool_definition(name: &str) -> Option<ToolDefinition> {
 pub fn parse_ask_user_request(arguments: serde_json::Value) -> Result<AskUserRequest, LlmError> {
     parse_and_validate_tool_request(arguments)
 }
+
 pub fn parse_invoke_subagent_request(
     arguments: serde_json::Value,
 ) -> Result<InvokeSubagentRequest, LlmError> {
@@ -35,11 +36,13 @@ pub fn parse_invoke_subagent_request(
 trait ValidatedToolRequest: serde::de::DeserializeOwned {
     fn validate_request(&self) -> Result<(), LlmError>;
 }
+
 impl ValidatedToolRequest for AskUserRequest {
     fn validate_request(&self) -> Result<(), LlmError> {
         self.validate()
     }
 }
+
 impl ValidatedToolRequest for InvokeSubagentRequest {
     fn validate_request(&self) -> Result<(), LlmError> {
         self.validate()

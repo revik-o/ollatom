@@ -98,6 +98,7 @@ impl LlmRuntimeBuilder {
                     },
                 )
                 .is_some();
+
             if provider_was_already_registered {
                 return Err(LlmError::DuplicateProvider(provider_id));
             }

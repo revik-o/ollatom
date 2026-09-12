@@ -1,4 +1,5 @@
 use super::{
+    context_optimization::ContextOptimizer,
     host::{HostState, RunHost},
     interactions::InteractionHub,
 };
@@ -23,6 +24,7 @@ pub(super) struct RunHostDependencies {
     pub subagent_runner: Option<SharedSubagentRunner>,
     pub tool_authorizer: Option<Arc<dyn crate::ToolAuthorizer>>,
     pub parent_context: Vec<crate::ConversationMessage>,
+    pub context_optimizer: ContextOptimizer,
 }
 
 impl RunHost {
@@ -41,6 +43,7 @@ impl RunHost {
             subagent_runner: dependencies.subagent_runner,
             authorizer: dependencies.tool_authorizer,
             parent_context: dependencies.parent_context,
+            context_optimizer: dependencies.context_optimizer,
             state: Mutex::new(HostState::default()),
             execution: Mutex::new(()),
         }

@@ -1,3 +1,5 @@
 //! LM Studio provider integration.
 
-pub const BUILT_IN_PROVIDER: llm::BuiltInProvider = llm::BuiltInProvider::LmStudio;
+mod constants;
+
+pub use constants::BUILT_IN_PROVIDER;

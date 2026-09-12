@@ -1,7 +1,11 @@
+mod basic_tools;
 mod builtins;
 mod cancellation;
 mod content;
+mod context_optimization;
+mod context_optimization_selection;
 mod error;
+mod event_queue;
 mod events;
 mod ids;
 mod interaction;
@@ -9,6 +13,7 @@ mod metadata;
 mod options;
 mod outcome;
 mod policy;
+mod policy_access;
 mod policy_matching;
 mod provider;
 mod request;
@@ -16,9 +21,12 @@ mod runtime;
 mod schema;
 mod subagent;
 mod tools;
+mod types;
 
+pub use basic_tools::{BasicToolConfiguration, register_basic_tools};
 pub use cancellation::{StopHandle, StopToken};
 pub use content::{ContentBlock, ConversationMessage, ConversationRole, UserMessage};
+pub use context_optimization::{ContextOptimizationOutcome, ContextOptimizationRequest};
 pub use error::LlmError;
 pub use events::{
     EventCallback, EventCallbacks, RunEvent, RunEventSink, RunEventStream, SequencedEvent,
@@ -58,5 +66,4 @@ pub use tools::{
     AuthorizationGrant, Tool, ToolCall, ToolDefinition, ToolFailure, ToolOutput, ToolPlan,
     ToolRegistry,
 };
-
-pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
+pub use types::BoxFuture;

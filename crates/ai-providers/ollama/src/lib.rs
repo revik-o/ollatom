@@ -1,3 +1,22 @@
-//! Ollama provider integration.
+mod availability;
+mod constants;
+mod content;
+mod content_history;
+mod content_media;
+mod metadata;
+mod metadata_normalization;
+mod metadata_values;
+mod models;
+mod provider;
+mod provider_impl;
+mod request;
+mod run;
+mod run_context;
+mod run_request;
+mod streaming;
+mod streaming_tools;
+mod streaming_usage;
+mod transport;
 
-pub const BUILT_IN_PROVIDER: llm::BuiltInProvider = llm::BuiltInProvider::Ollama;
+pub use constants::{BUILT_IN_PROVIDER, DEFAULT_OLLAMA_ENDPOINT};
+pub use provider::{OllamaProvider, OllamaProviderBuilder};

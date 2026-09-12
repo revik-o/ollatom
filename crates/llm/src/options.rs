@@ -17,6 +17,7 @@ pub enum ReasoningEffort {
 
 impl FromStr for ReasoningEffort {
     type Err = crate::LlmError;
+
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         let effort_value = value.trim().to_ascii_lowercase().replace(['_', '-'], "");
 
@@ -67,14 +68,16 @@ pub enum ContextOverflowPolicy {
 pub struct ContextOptions {
     pub input_token_budget: Option<u32>,
     pub overflow_policy: Option<ContextOverflowPolicy>,
+    #[serde(default)]
+    pub optimization: bool,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct GenerationOptions {
     pub max_output_tokens: Option<u32>,
     pub temperature: Option<f32>,
-    pub top_p: Option<f32>,
-    pub top_k: Option<u32>,
+    pub max_token_choices: Option<u32>,
+    pub diversity_threshold: Option<f32>,
     pub repeat_penalty: Option<f32>,
     pub stop_sequences: Option<Vec<String>>,
 }

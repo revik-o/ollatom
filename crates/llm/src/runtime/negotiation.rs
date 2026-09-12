@@ -51,6 +51,7 @@ fn negotiate_reasoning_options(
 
     let token_budget_is_unsupported =
         options.reasoning.budget_tokens.is_some() && reasoning_is_unavailable;
+
     if token_budget_is_unsupported {
         handle_unsupported_option(options.handling, "reasoning token budget", warning_messages)?;
         options.reasoning.budget_tokens = None;
@@ -86,6 +87,7 @@ fn negotiate_generation_options(
         let option_is_configured = option_key.is_present(&options.generation);
         let option_is_unsupported =
             option_key.provider_support(provider_capabilities) == CapabilitySupport::Unsupported;
+
         if option_is_configured && option_is_unsupported {
             handle_unsupported_option(
                 options.handling,

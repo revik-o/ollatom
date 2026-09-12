@@ -44,6 +44,7 @@ impl InteractionHub {
                 interaction_id,
             )))
             .await;
+
         if let Err(error) = emit_result {
             self.remove_pending_interaction(interaction_id);
             return Err(error);

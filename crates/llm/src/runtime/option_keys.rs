@@ -7,8 +7,8 @@ use crate::{
 pub(super) enum GenerationOptionKey {
     MaximumOutputTokens,
     Temperature,
-    TopProbability,
-    TopCandidates,
+    DiversityThreshold,
+    MaximumTokenChoices,
     RepeatPenalty,
     StopSequences,
 }
@@ -16,8 +16,8 @@ pub(super) enum GenerationOptionKey {
 pub(super) const GENERATION_OPTION_KEYS: [GenerationOptionKey; 6] = [
     GenerationOptionKey::MaximumOutputTokens,
     GenerationOptionKey::Temperature,
-    GenerationOptionKey::TopProbability,
-    GenerationOptionKey::TopCandidates,
+    GenerationOptionKey::DiversityThreshold,
+    GenerationOptionKey::MaximumTokenChoices,
     GenerationOptionKey::RepeatPenalty,
     GenerationOptionKey::StopSequences,
 ];
@@ -27,8 +27,8 @@ impl GenerationOptionKey {
         match self {
             Self::MaximumOutputTokens => "max_output_tokens",
             Self::Temperature => "temperature",
-            Self::TopProbability => "top_p",
-            Self::TopCandidates => "top_k",
+            Self::DiversityThreshold => "diversity_threshold",
+            Self::MaximumTokenChoices => "max_token_choices",
             Self::RepeatPenalty => "repeat_penalty",
             Self::StopSequences => "stop_sequences",
         }
@@ -38,8 +38,8 @@ impl GenerationOptionKey {
         match self {
             Self::MaximumOutputTokens => options.max_output_tokens.is_some(),
             Self::Temperature => options.temperature.is_some(),
-            Self::TopProbability => options.top_p.is_some(),
-            Self::TopCandidates => options.top_k.is_some(),
+            Self::DiversityThreshold => options.diversity_threshold.is_some(),
+            Self::MaximumTokenChoices => options.max_token_choices.is_some(),
             Self::RepeatPenalty => options.repeat_penalty.is_some(),
             Self::StopSequences => options.stop_sequences.is_some(),
         }
@@ -57,8 +57,8 @@ impl GenerationOptionKey {
         match self {
             Self::MaximumOutputTokens => options.max_output_tokens = None,
             Self::Temperature => options.temperature = None,
-            Self::TopProbability => options.top_p = None,
-            Self::TopCandidates => options.top_k = None,
+            Self::DiversityThreshold => options.diversity_threshold = None,
+            Self::MaximumTokenChoices => options.max_token_choices = None,
             Self::RepeatPenalty => options.repeat_penalty = None,
             Self::StopSequences => options.stop_sequences = None,
         }

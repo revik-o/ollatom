@@ -1,3 +1,5 @@
 //! Google Gemini provider integration.
 
-pub const BUILT_IN_PROVIDER: llm::BuiltInProvider = llm::BuiltInProvider::Gemini;
+mod constants;
+
+pub use constants::BUILT_IN_PROVIDER;

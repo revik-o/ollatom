@@ -1,0 +1,1 @@
+Implement a TodoItem React component in the existing project. Inspect the existing source first, make the implementation, build the application, inspect every failure, and continue working in the same uninterrupted agent loop until the project builds successfully. Do not stop before the build succeeds.
