@@ -1,13 +1,3 @@
-use std::str::FromStr;
-
-#[test]
-fn openai_is_a_provider_alias_for_chatgpt() {
-    assert_eq!(
-        llm::ProviderId::from_str("openai").unwrap().as_str(),
-        "chatgpt"
-    );
-}
-
 #[test]
 fn fluent_request_builder_accepts_the_complete_developer_surface() {
     let _request = llm::Llm::init("ollama")

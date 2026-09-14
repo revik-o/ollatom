@@ -1,5 +1,7 @@
 use crate::LlmError;
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
+use std::fmt::Formatter;
 use std::str::FromStr;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -52,11 +54,7 @@ impl ProviderId {
             return Err(LlmError::InvalidProvider(value));
         }
 
-        Ok(Self(if value == "openai" {
-            "chatgpt".into()
-        } else {
-            value
-        }))
+        Ok(Self(value))
     }
 
     pub fn as_str(&self) -> &str {
@@ -85,8 +83,8 @@ impl<'de> Deserialize<'de> for ProviderId {
     }
 }
 
-impl std::fmt::Display for ProviderId {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for ProviderId {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(&self.0)
     }
 }
@@ -143,8 +141,8 @@ impl<'de> Deserialize<'de> for ModelId {
     }
 }
 
-impl std::fmt::Display for ModelId {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for ModelId {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(&self.0)
     }
 }

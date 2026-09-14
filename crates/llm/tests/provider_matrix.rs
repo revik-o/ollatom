@@ -151,12 +151,6 @@ fn opaque_provider_state_and_identifiers_round_trip_through_serde() {
         serde_json::from_str::<ContentBlock>(&encoded).unwrap(),
         block
     );
-    assert_eq!(
-        serde_json::from_str::<ProviderId>("\"openai\"")
-            .unwrap()
-            .as_str(),
-        "chatgpt"
-    );
     assert!(serde_json::from_str::<ModelId>("\"\"").is_err());
     let usage: Usage = serde_json::from_str("{}").unwrap();
     assert_eq!(usage.source, UsageSource::Unknown);

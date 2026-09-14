@@ -24,7 +24,7 @@ async fn configured_default_model_and_ordered_events_work() {
 }
 
 #[tokio::test]
-async fn cancellation_returns_partial_and_runtime_aliases_openai() {
+async fn cancellation_returns_partial_and_runtime_aliases_chatgpt() {
     let provider = ScriptedProvider::new(
         BuiltInProvider::ChatGpt,
         ProviderBehavior::WaitForCancellation,
@@ -33,7 +33,7 @@ async fn cancellation_returns_partial_and_runtime_aliases_openai() {
         .provider_with_default(provider, "gpt-test")
         .build()
         .unwrap();
-    let run = runtime.request("openai").user_message("hello").send();
+    let run = runtime.request("chatgpt").user_message("hello").send();
     let stop_handle = run.stop_handle();
     stop_handle.stop();
     let LlmRunOutcome::Cancelled(partial_response) = run.await.unwrap() else {
