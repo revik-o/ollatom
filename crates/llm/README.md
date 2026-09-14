@@ -4,8 +4,6 @@
 
 The public API supports an injected runtime and an optional process-global facade. Requests expose no tools by default. Providers own their native multi-round continuation and use `ProviderRunHost` for ordered events, complete tool-call batches, interactions, and subagents. Shared runtime services enforce limits, policy, sequential execution, duplicate call handling, cancellation, and event ordering.
 
-Every Rust source file in this crate is limited to 270 lines. `tests/source_structure.rs` enforces the limit recursively.
-
 ## Public API Overview
 
 ### 1. Runtime Initialization and Global Facade
