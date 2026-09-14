@@ -1,4 +1,7 @@
 use crate::{ModelId, ProviderId};
+use std::fmt::Display;
+use std::fmt::Formatter;
+use std::fmt::Result;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LlmError {
@@ -28,8 +31,8 @@ pub enum LlmError {
     Provider(String),
 }
 
-impl std::fmt::Display for LlmError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for LlmError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
         match self {
             Self::InvalidProvider(value) => write!(formatter, "invalid provider: {value}"),
             Self::InvalidModel(value) => write!(formatter, "invalid model: {value}"),
