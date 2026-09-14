@@ -43,10 +43,12 @@ impl std::fmt::Display for LlmError {
             Self::DuplicateProvider(provider_id) => {
                 write!(formatter, "provider is registered twice: {provider_id}")
             }
-            Self::ModelRequired(provider_id) => write!(
-                formatter,
-                "provider {provider_id} has no configured default model"
-            ),
+            Self::ModelRequired(provider_id) => {
+                write!(
+                    formatter,
+                    "provider {provider_id} has no configured default model"
+                )
+            }
             Self::ModelNotFound(model_id) => {
                 write!(formatter, "model was not found: {model_id}")
             }

@@ -14,6 +14,7 @@ toolchains once from the repository root:
 
 ```bash
 mise install
+mise exec -- rustup component add rustfmt
 ```
 
 The command wrappers automatically run inside the mise environment, so the
@@ -21,6 +22,10 @@ Rust, Cargo, Node.js, and npm versions always come from `mise.toml`. On Windows,
 replace `.sh` with `.bat`.
 
 ```bash
+# Format every Rust crate and application, or check formatting without changes
+./cli/fmt.sh
+./cli/fmt-check.sh
+
 # Build every app, or test every crate and app
 ./cli/build.sh
 ./cli/test.sh

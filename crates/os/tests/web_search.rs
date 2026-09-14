@@ -59,7 +59,9 @@ async fn response_size_is_rejected_before_the_declared_body_is_buffered() {
 
 #[tokio::test]
 async fn redirect_is_reported_without_following_an_unauthorized_host() {
-    let response = b"HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:9/private\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_vec();
+    let response =
+        b"HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:9/private\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            .to_vec();
     let (target_url, server_thread) = serve_single_http_response(response);
     let search_response = web_search(target_url).await;
     server_thread.join().expect("HTTP server should finish");

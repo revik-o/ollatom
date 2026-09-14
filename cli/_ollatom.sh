@@ -46,6 +46,13 @@ require_tui() {
     require_command cargo
 }
 
+format_rust() {
+    require_command cargo
+    require_command rustfmt
+    echo "==> Formatting Rust crates and applications${1:+ (check)}"
+    cargo fmt --all --manifest-path "$REPOSITORY_ROOT_DIRECTORY/Cargo.toml" "$@"
+}
+
 build_desktop() {
     require_desktop
     echo "==> Building desktop app"
@@ -122,6 +129,8 @@ test_tui() {
 }
 
 case "${1:-}" in
+    fmt-all) format_rust ;;
+    fmt-check) format_rust --check ;;
     build-all)
         build_desktop
         build_tui
@@ -140,7 +149,7 @@ case "${1:-}" in
     test-crates) test_crates ;;
     test-tui) test_tui ;;
     *)
-        echo "usage: $0 {build-all|build-desktop|build-tui|run-desktop|run-tui|test-all|test-desktop|test-desktop-e2e|test-crates|test-tui}" >&2
+        echo "usage: $0 {fmt-all|fmt-check|build-all|build-desktop|build-tui|run-desktop|run-tui|test-all|test-desktop|test-desktop-e2e|test-crates|test-tui}" >&2
         exit 2
         ;;
 esac

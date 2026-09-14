@@ -17,6 +17,8 @@ set "COMMAND_EXIT_CODE=%errorlevel%"
 exit /b %COMMAND_EXIT_CODE%
 
 :dispatch
+if /I "%~1"=="fmt-all" goto fmt_all
+if /I "%~1"=="fmt-check" goto fmt_check
 if /I "%~1"=="build-all" goto build_all
 if /I "%~1"=="build-desktop" goto build_desktop
 if /I "%~1"=="build-tui" goto build_tui
@@ -28,8 +30,29 @@ if /I "%~1"=="test-desktop-e2e" goto test_desktop_e2e
 if /I "%~1"=="test-crates" goto test_crates
 if /I "%~1"=="test-tui" goto test_tui
 
-echo Usage: %~nx0 ^{build-all^|build-desktop^|build-tui^|run-desktop^|run-tui^|test-all^|test-desktop^|test-desktop-e2e^|test-crates^|test-tui^} 1>&2
+echo Usage: %~nx0 ^{fmt-all^|fmt-check^|build-all^|build-desktop^|build-tui^|run-desktop^|run-tui^|test-all^|test-desktop^|test-desktop-e2e^|test-crates^|test-tui^} 1>&2
 exit /b 2
+
+:fmt_all
+call :format_rust
+exit /b %errorlevel%
+
+:fmt_check
+call :format_rust --check
+exit /b %errorlevel%
+
+:format_rust
+where cargo >nul 2>&1 || (
+    echo error: 'cargo' is required but was not found on PATH 1>&2
+    exit /b 1
+)
+where rustfmt >nul 2>&1 || (
+    echo error: 'rustfmt' is required but was not found on PATH 1>&2
+    exit /b 1
+)
+echo ==^> Formatting Rust crates and applications %*
+cargo fmt --all --manifest-path "%REPOSITORY_ROOT_DIRECTORY%\Cargo.toml" %*
+exit /b %errorlevel%
 
 :require_desktop_frontend
 where npm >nul 2>&1 || (

@@ -13,7 +13,9 @@ pub(crate) async fn insert_llm_action(
             "LLM action must contain at least one status event",
         ));
     }
+
     validate_action_status_event_sequence(&status_event_inputs)?;
+
     let sequence_number: i64 = sqlx::query_scalar(
         "SELECT COALESCE(MAX(sequence_number), 0) + 1 FROM llm_actions WHERE message_id = ?",
     )
@@ -21,9 +23,11 @@ pub(crate) async fn insert_llm_action(
     .fetch_one(&mut **database_transaction)
     .await
     .map_err(|source| database_operation_error("failed to allocate LLM action sequence", source))?;
+
     let llm_action_id = LlmActionId::new();
     let created_at = OffsetDateTime::now_utc();
     let created_at_text = format_timestamp(created_at)?;
+
     sqlx::query(
         "INSERT INTO llm_actions (id, message_id, sequence_number, action_kind, summary, created_at) VALUES (?, ?, ?, ?, ?, ?)",
     )
@@ -36,9 +40,11 @@ pub(crate) async fn insert_llm_action(
     .execute(&mut **database_transaction)
     .await
     .map_err(|source| database_operation_error("failed to insert LLM action", source))?;
+
     insert_action_details(database_transaction, llm_action_id, &details).await?;
 
     let mut status_events = Vec::with_capacity(status_event_inputs.len());
+
     for (position, status_event_input) in status_event_inputs.into_iter().enumerate() {
         status_events.push(
             insert_action_status_event(
@@ -144,14 +150,14 @@ pub(crate) async fn insert_tool_call_action_details(
     details: &ToolCallActionDetails,
 ) -> InfrastructureResult<()> {
     let arguments_json = serialize_json(&details.arguments)?;
-    sqlx::query(
-        "INSERT INTO tool_call_action_details (llm_action_id, tool_name, arguments_json) VALUES (?, ?, ?)",
-    )
-    .bind(llm_action_id.as_bytes().to_vec())
-    .bind(&details.tool_name)
-    .bind(arguments_json)
-    .execute(&mut **database_transaction)
-    .await
-    .map_err(|source| database_operation_error("failed to insert tool action details", source))?;
+
+    sqlx::query("INSERT INTO tool_call_action_details (llm_action_id, tool_name, arguments_json) VALUES (?, ?, ?)")
+        .bind(llm_action_id.as_bytes().to_vec())
+        .bind(&details.tool_name)
+        .bind(arguments_json)
+        .execute(&mut **database_transaction)
+        .await
+        .map_err(|source| database_operation_error("failed to insert tool action details", source))?;
+
     Ok(())
 }

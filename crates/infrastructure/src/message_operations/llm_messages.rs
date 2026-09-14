@@ -99,6 +99,7 @@ pub(crate) async fn finish_llm_message_unsuccessfully(
     let Some(message) = load_message_by_id(database_transaction, message_id).await? else {
         return Ok(None);
     };
+
     validate_in_progress_llm_message(&message)?;
     cancel_unfinished_actions(database_transaction, message_id).await?;
     update_llm_message_state(
@@ -108,6 +109,7 @@ pub(crate) async fn finish_llm_message_unsuccessfully(
         final_message_contents,
     )
     .await?;
+
     load_message_by_id(database_transaction, message_id).await
 }
 
@@ -125,6 +127,7 @@ pub(crate) async fn insert_llm_message(
         allocate_next_llm_response_round_number(database_transaction, user_message_id).await?;
     let created_at = OffsetDateTime::now_utc();
     let created_at_text = format_timestamp(created_at)?;
+
     sqlx::query(
         "INSERT INTO messages (id, chat_id, sequence_number, role, contents, user_revision_group_id, user_revision_number, llm_reply_to_user_message_id, llm_response_round_number, llm_message_state, validity, created_at, updated_at, deprecated_at) VALUES (?, ?, ?, 'llm', ?, NULL, NULL, ?, ?, ?, 'active', ?, NULL, NULL)",
     )
@@ -165,16 +168,15 @@ pub(crate) async fn update_llm_message_state(
     final_message_contents: String,
 ) -> InfrastructureResult<()> {
     let updated_at_text = format_timestamp(OffsetDateTime::now_utc())?;
-    sqlx::query(
-        "UPDATE messages SET contents = ?, llm_message_state = ?, updated_at = ? WHERE id = ? AND role = 'llm'",
-    )
-    .bind(final_message_contents)
-    .bind(llm_message_state_text(final_state))
-    .bind(updated_at_text)
-    .bind(message_id.as_bytes().to_vec())
-    .execute(&mut **database_transaction)
-    .await
-    .map_err(|source| database_operation_error("failed to update LLM message state", source))?;
+
+    sqlx::query("UPDATE messages SET contents = ?, llm_message_state = ?, updated_at = ? WHERE id = ? AND role = 'llm'")
+        .bind(final_message_contents)
+        .bind(llm_message_state_text(final_state))
+        .bind(updated_at_text)
+        .bind(message_id.as_bytes().to_vec())
+        .execute(&mut **database_transaction)
+        .await
+        .map_err(|source| database_operation_error("failed to update LLM message state", source))?;
 
     Ok(())
 }
