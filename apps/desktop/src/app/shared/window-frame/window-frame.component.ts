@@ -41,9 +41,14 @@ export class WindowFrameComponent implements AfterViewInit, OnDestroy {
     const frame = host.getBoundingClientRect();
     const regions = Array.from(host.querySelectorAll<HTMLElement>('[data-window-interactive]'))
       .map((element) => element.getBoundingClientRect())
-      .map((rect) => ({ x: rect.x - frame.x, y: rect.y - frame.y, width: rect.width, height: rect.height }));
+      .map((rect) => ({
+        x: rect.x - frame.x,
+        y: rect.y - frame.y,
+        width: rect.width,
+        height: rect.height,
+      }));
 
-    await this.osWindowService. setWindowInteractiveRegions(regions);
+    await this.osWindowService.setWindowInteractiveRegions(regions);
   }
 
   protected async resizeWindow(direction: WindowResizeDirection): Promise<void> {

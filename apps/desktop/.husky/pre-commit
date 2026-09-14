@@ -1,0 +1,7 @@
+cd apps/desktop || exit 1
+
+if command -v mise >/dev/null 2>&1; then
+  mise exec -- npm run format:staged
+else
+  npm run format:staged
+fi

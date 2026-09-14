@@ -53,7 +53,9 @@ export class LanguageService {
     let configuredLocale: unknown;
 
     try {
-      configuredLocale = await this.applicationConfig.readProperty(applicationLanguageConfigurationKey);
+      configuredLocale = await this.applicationConfig.readProperty(
+        applicationLanguageConfigurationKey,
+      );
     } catch {
       return;
     }

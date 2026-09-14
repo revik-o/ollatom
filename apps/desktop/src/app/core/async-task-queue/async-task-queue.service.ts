@@ -6,7 +6,7 @@ export class AsyncTaskQueueService {
   }
 
   public enqueue<T>(task: () => T | Promise<T>): Promise<T> {
-    const taskPromise = this.queue.then(() => task(),);
+    const taskPromise = this.queue.then(() => task());
     this.queue = taskPromise.then(this.emptyFunction, this.emptyFunction);
     return taskPromise;
   }

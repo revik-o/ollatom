@@ -1,0 +1,6 @@
+# Native code and generated Tauri files are outside the frontend formatting scope.
+/src-tauri/
+
+# Generated files (other build output is covered by .gitignore).
+/package-lock.json
+/.husky/_/

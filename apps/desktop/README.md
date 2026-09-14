@@ -3,10 +3,24 @@
 ## Usage
 
 ```bash
+npm ci
 npm run start
 npm run build
 npm run test
 ```
+
+## Code formatting
+
+Run these commands from `apps/desktop`:
+
+```bash
+npm run format        # Format the frontend code, configuration, and documentation
+npm run format:check  # Check formatting without changing files (also suitable for CI)
+```
+
+Prettier uses the rules in `.prettierrc`, including the Angular template parser.
+Native code, generated Tauri files, and the npm lockfile are excluded. Other
+generated output is excluded through `.gitignore`.
 
 ## Production builds
 

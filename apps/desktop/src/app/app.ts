@@ -8,4 +8,4 @@ import { WindowFrameComponent } from './shared/window-frame/window-frame.compone
   styleUrl: './app.css',
   templateUrl: './app.html',
 })
-export class App { }
+export class App {}

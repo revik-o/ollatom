@@ -6,9 +6,10 @@ const SPLASH_EXIT_ANIMATION = 'ollatom-splash-exit';
 const appRoot = () => document.querySelector('app-root');
 const splashElement = () => document.getElementById('app-splash');
 
-const waitRenderReadiness = () => new Promise<void>(
-  (resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-);
+const waitRenderReadiness = () =>
+  new Promise<void>((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+  );
 
 function finishSplash(): void {
   const root = appRoot();
@@ -85,7 +86,7 @@ function showStartupFailure(error: unknown): void {
 bootstrapApplication(App, appConfig)
   .then(async () => {
     await document.fonts?.ready;
-    await waitRenderReadiness()
+    await waitRenderReadiness();
     await dismissSplash();
   })
   .catch(showStartupFailure);

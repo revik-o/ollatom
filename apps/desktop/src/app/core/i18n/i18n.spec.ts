@@ -27,7 +27,9 @@ describe('I18nTxt', () => {
         {
           provide: ApplicationConfigService,
           useValue: {
-            readProperty: vi.fn().mockRejectedValue(new Error('configuration value does not exist')),
+            readProperty: vi
+              .fn()
+              .mockRejectedValue(new Error('configuration value does not exist')),
             addProperty: vi.fn().mockResolvedValue('success'),
           },
         },

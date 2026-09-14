@@ -1,5 +1,5 @@
-import { Messages } from "../../messages";
-import { pluralizeSlavic } from "./pluralize";
+import { Messages } from '../../messages';
+import { pluralizeSlavic } from './pluralize';
 
 export const ua = {
   common: {

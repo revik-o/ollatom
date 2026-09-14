@@ -8,12 +8,19 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "format:staged": "lint-staged --cwd .",
+    "prepare": "cd ../.. && husky apps/desktop/.husky",
     "e2e": "playwright test --config e2e/playwright.config.ts",
     "e2e:ui": "playwright test --config e2e/playwright.config.ts --ui",
     "e2e:install": "playwright install chromium",
     "tauri:build:linux": "tauri build --features wayland-blur",
     "tauri:build:macos:store": "tauri build --config src-tauri/tauri.macos-store.conf.json",
     "tauri:build:macos:direct": "tauri build --config src-tauri/tauri.macos-direct.conf.json --features macos-direct"
+  },
+  "lint-staged": {
+    "*.{js,cjs,mjs,jsx,ts,cts,mts,tsx,html,css,scss,json,jsonc,md,yaml,yml}": "prettier --write"
   },
   "private": true,
   "packageManager": "npm@12.0.1",
@@ -35,8 +42,10 @@
     "@angular/compiler-cli": "^22.1.0",
     "@playwright/test": "^1.62.1",
     "@tauri-apps/cli": "^2.11.4",
+    "husky": "9.1.7",
     "jsdom": "^28.0.0",
-    "prettier": "^3.8.1",
+    "lint-staged": "17.5.1",
+    "prettier": "3.9.6",
     "typescript": "~6.0.2",
     "vitest": "^4.0.8"
   }
