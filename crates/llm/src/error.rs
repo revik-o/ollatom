@@ -1,4 +1,5 @@
 use crate::{ModelId, ProviderId};
+use std::error::Error;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
@@ -94,4 +95,4 @@ impl Display for LlmError {
     }
 }
 
-impl std::error::Error for LlmError {}
+impl Error for LlmError {}
