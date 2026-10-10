@@ -1,8 +1,9 @@
 use llm::{
-    ContextOptions, ContextOverflowPolicy, GenerationOptions, LlmError, LlmOptions, LlmRunOutcome,
-    LocalRuntimeOptions, OptionHandlingMode, ReasoningEffort, RunLimits, TransportOptions,
+    ContextOptions, ContextOverflowPolicy, FinishReason, GenerationOptions, LlmError, LlmOptions,
+    LlmRunOutcome, LocalRuntimeOptions, OptionHandlingMode, ReasoningEffort, RunLimits,
+    TransportOptions,
 };
-use ollama_benchmark::BenchmarkArtifacts;
+use ollama_benchmark::{BenchmarkArtifacts, programming_toolchain_command_options};
 use std::{error::Error, sync::Arc, time::Duration};
 
 mod stages;
@@ -13,10 +14,12 @@ pub(crate) const AGENT_SYSTEM_PROMPT: &str = include_str!("../prompts/system.md"
 const STAGE_THREE_TASK_PROMPT: &str = include_str!("../prompts/stage-3.md");
 const STAGE_FOUR_TASK_PROMPT: &str = include_str!("../prompts/stage-4.md");
 const STAGE_FIVE_TASK_PROMPT: &str = include_str!("../prompts/stage-5.md");
-pub(crate) const AGENT_STAGE_PROMPTS: [(u8, &str); 3] = [
+const STAGE_SIX_TASK_PROMPT: &str = include_str!("../prompts/stage-6.md");
+pub(crate) const AGENT_STAGE_PROMPTS: [(u8, &str); 4] = [
     (3, STAGE_THREE_TASK_PROMPT),
     (4, STAGE_FOUR_TASK_PROMPT),
     (5, STAGE_FIVE_TASK_PROMPT),
+    (6, STAGE_SIX_TASK_PROMPT),
 ];
 pub(crate) const AVAILABLE_AGENT_TOOL_NAMES: [&str; 7] = [
     "list_files",
@@ -48,6 +51,9 @@ async fn main() -> BenchmarkResult<()> {
     let tool_registry = llm::register_basic_tools(
         llm::BasicToolConfiguration::new(artifacts.project_root())
             .command_timeout(AGENT_COMMAND_TIMEOUT)
+            .sandboxed_command_options(programming_toolchain_command_options(
+                os::SandboxNetworkPolicy::Allowed,
+            )?)
             .exclude_directory("node_modules")
             .exclude_directory("dist"),
     )?;
@@ -63,9 +69,31 @@ pub(crate) fn require_completed_outcome(
     stage_number: u8,
 ) -> BenchmarkResult<()> {
     match run_outcome {
-        Ok(LlmRunOutcome::Completed(_)) => Ok(()),
+        Ok(LlmRunOutcome::Completed(response))
+            if response
+                .assistant_rounds
+                .last()
+                .is_some_and(|assistant_round| {
+                    assistant_round.finish_reason == FinishReason::Stop
+                }) =>
+        {
+            Ok(())
+        }
+        Ok(LlmRunOutcome::Completed(response)) => {
+            let final_finish_reason = response
+                .assistant_rounds
+                .last()
+                .map(|assistant_round| assistant_round.finish_reason);
+            Err(format!(
+                "stage {stage_number} did not end with a normal stop (final finish reason: {final_finish_reason:?})"
+            )
+            .into())
+        }
         Ok(LlmRunOutcome::Cancelled(_)) => {
             Err(format!("stage {stage_number} LLM run was cancelled").into())
+        }
+        Ok(LlmRunOutcome::Failed(failed_run)) => {
+            Err(format!("stage {stage_number} LLM run failed: {}", failed_run.error).into())
         }
         Err(error) => Err(format!("stage {stage_number} LLM run failed: {error}").into()),
     }
@@ -101,6 +129,7 @@ pub(crate) fn benchmark_options() -> LlmOptions {
             connect_timeout_ms: Some(10_000),
             stream_idle_timeout_ms: Some(900_000),
             overall_timeout_ms: Some(3_600_000),
+            event_delivery_timeout_ms: None,
         },
         handling: OptionHandlingMode::BestEffort,
     }

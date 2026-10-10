@@ -15,7 +15,7 @@ pub use llm::{
     ContextOptions, ContextOverflowPolicy, ConversationMessage, ConversationRole, EventCallback,
     EventCallbacks, FilesystemAccess, FinishReason, GenerationOptions, HasUserMessage,
     InteractionId, InteractionReply, InteractionRequest, IntoModelId, IntoProviderId,
-    InvokeSubagentRequest, LLM, Llm, LlmError, LlmOptions, LlmProvider, LlmResponse, LlmRun,
+    InvokeSubagentRequest, Llm, LlmError, LlmOptions, LlmProvider, LlmResponse, LlmRun,
     LlmRunOutcome, LlmRuntime, LlmRuntimeBuilder, LocalOptionPhase, LocalRuntimeOptions,
     MissingUserMessage, ModelCapability, ModelId, ModelInfo, ModelScope, ModelState,
     NormalizedValue, OptionHandlingMode, PartialResponse, ProviderCapabilities, ProviderId,
@@ -23,9 +23,10 @@ pub use llm::{
     QuestionKind, ReasoningEffort, ReasoningOptions, RequestBuilder, RequiredCapability, RunEvent,
     RunEventSink, RunEventStream, RunId, RunLimits, RunPolicy, SequencedEvent, StopHandle,
     StopToken, SubagentOutcome, SubagentProfile, SubagentProfileId, SubagentProfileRegistry,
-    SubagentRunner, Tool, ToolAuthorizer, ToolCall, ToolDefinition, ToolEvent, ToolExecutionRecord,
-    ToolFailure, ToolOutput, ToolPlan, ToolRegistry, TransportOptions, TrustedFolder, Usage,
-    UsageSource, UserMessage, ValueProvenance, register_basic_tools,
+    SubagentRunner, Tool, ToolAuthorizationRequirement, ToolAuthorizer, ToolCall, ToolDefinition,
+    ToolEvent, ToolExecutionRecord, ToolFailure, ToolOutput, ToolPlan, ToolRegistry,
+    TransportOptions, TrustedFolder, Usage, UsageSource, UserMessage, ValueProvenance,
+    register_basic_tools,
 };
 pub use lm_studio;
 pub use ollama;

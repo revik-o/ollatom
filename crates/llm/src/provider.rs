@@ -3,7 +3,7 @@ use crate::{
     ContextOptimizationRequest, ConversationMessage, InvokeSubagentRequest, LlmError, LlmOptions,
     LlmResponse, ModelId, ModelInfo, ModelScope, PartialResponse, ProviderCapabilities, ProviderId,
     QuestionAnswer, RunEvent, RunId, StopToken, SubagentOutcome, ToolCall, ToolDefinition,
-    ToolOutput, UserMessage,
+    ToolOutput, TransportOptions, UserMessage,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -113,14 +113,23 @@ pub trait LlmProvider: Send + Sync {
 
     fn capabilities(&self) -> ProviderCapabilities;
 
-    fn availability(
-        &self,
-        model: Option<&ModelId>,
-    ) -> BoxFuture<'_, Result<AvailabilityReport, LlmError>>;
+    fn availability<'a>(
+        &'a self,
+        model: Option<&'a ModelId>,
+        transport: &'a TransportOptions,
+    ) -> BoxFuture<'a, Result<AvailabilityReport, LlmError>>;
 
-    fn list_models(&self, scope: ModelScope) -> BoxFuture<'_, Result<Vec<ModelInfo>, LlmError>>;
+    fn list_models<'a>(
+        &'a self,
+        scope: ModelScope,
+        transport: &'a TransportOptions,
+    ) -> BoxFuture<'a, Result<Vec<ModelInfo>, LlmError>>;
 
-    fn model_info(&self, model: &ModelId) -> BoxFuture<'_, Result<ModelInfo, LlmError>>;
+    fn model_info<'a>(
+        &'a self,
+        model: &'a ModelId,
+        transport: &'a TransportOptions,
+    ) -> BoxFuture<'a, Result<ModelInfo, LlmError>>;
 
     fn run(
         &self,

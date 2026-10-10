@@ -29,7 +29,7 @@ impl RunHost {
                 return Err(LlmError::LoopLimit("child subagent limit".into()));
             }
 
-            host_state.children += 1;
+            host_state.children = host_state.children.saturating_add(1);
         }
         let subagent_runner = self
             .subagent_runner
@@ -37,16 +37,19 @@ impl RunHost {
             .ok_or_else(|| LlmError::InvalidRequest("subagent runner is not configured".into()))?;
         let (child_stop_token, child_stop_handle) = crate::cancellation::stop_pair();
         let child_stop_guard = crate::cancellation::StopOnDrop::new(child_stop_handle);
+
         let inherited_context = if subagent_profile.allow_context {
             self.parent_context.clone()
         } else {
             Vec::new()
         };
+
         let remaining_depth = self
             .limits
             .subagent_depth
             .min(subagent_profile.max_depth)
             .saturating_sub(1);
+
         let subagent_future = subagent_runner.invoke(
             subagent_request,
             subagent_profile.clone(),
@@ -54,6 +57,7 @@ impl RunHost {
             child_stop_token,
             remaining_depth,
         );
+
         let subagent_outcome = tokio::select! {
             _ = self.stop.cancelled() => {
                 child_stop_guard.stop();

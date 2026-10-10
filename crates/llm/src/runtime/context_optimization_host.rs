@@ -1,14 +1,13 @@
 use crate::{
-    AskUserRequest, ContextOptimizationOutcome, ContextOptimizationRequest, InvokeSubagentRequest,
-    LlmError, ProviderRunHost, QuestionAnswer, RunEvent, StopToken, SubagentOutcome, ToolCall,
-    ToolOutput, Usage,
+    AskUserRequest, AssistantRound, ContextOptimizationOutcome, ContextOptimizationRequest,
+    FinishReason, InvokeSubagentRequest, LlmError, ProviderRunHost, QuestionAnswer, RunEvent,
+    StopToken, SubagentOutcome, ToolCall, ToolOutput, Usage,
 };
 use tokio::sync::Mutex;
 
 pub(super) struct ContextOptimizationProviderHost {
     stop_token: StopToken,
-    provider_round: Mutex<u16>,
-    streamed_text: Mutex<String>,
+    streamed_round: Mutex<AssistantRound>,
     latest_usage: Mutex<Usage>,
 }
 
@@ -16,8 +15,7 @@ impl ContextOptimizationProviderHost {
     pub(super) fn new(stop_token: StopToken) -> Self {
         Self {
             stop_token,
-            provider_round: Mutex::new(0),
-            streamed_text: Mutex::new(String::new()),
+            streamed_round: Mutex::new(AssistantRound::default()),
             latest_usage: Mutex::new(Usage::default()),
         }
     }
@@ -26,18 +24,49 @@ impl ContextOptimizationProviderHost {
         &self,
         context_optimization_response: &mut crate::LlmResponse,
     ) {
-        if context_optimization_response.text.is_empty() {
-            let streamed_text = self.streamed_text.lock().await;
+        let streamed_round = self.streamed_round.lock().await.clone();
+        let latest_usage = self.latest_usage.lock().await.clone();
+
+        if context_optimization_response.assistant_rounds.is_empty()
+            && (streamed_round.round_number != 0
+                || !streamed_round.text.is_empty()
+                || streamed_round.visible_reasoning.is_some())
+        {
+            let mut streamed_round = streamed_round;
+
+            if streamed_round.usage == Usage::default() {
+                streamed_round.usage = latest_usage.clone();
+            }
+
             context_optimization_response
-                .text
-                .clone_from(&streamed_text);
+                .assistant_rounds
+                .push(streamed_round);
+        } else if let Some(assistant_round) =
+            context_optimization_response.assistant_rounds.last_mut()
+        {
+            if assistant_round.text.is_empty() {
+                assistant_round.text = streamed_round.text;
+            }
+
+            if assistant_round.visible_reasoning.is_none() {
+                assistant_round.visible_reasoning = streamed_round.visible_reasoning;
+            }
+
+            if assistant_round.finish_reason == FinishReason::Unknown {
+                assistant_round.finish_reason = streamed_round.finish_reason;
+            }
+
+            if assistant_round.usage == Usage::default() {
+                assistant_round.usage = if streamed_round.usage == Usage::default() {
+                    latest_usage.clone()
+                } else {
+                    streamed_round.usage
+                };
+            }
         }
 
         if context_optimization_response.usage == Usage::default() {
-            let latest_usage = self.latest_usage.lock().await;
-            context_optimization_response
-                .usage
-                .clone_from(&latest_usage);
+            context_optimization_response.usage = latest_usage;
         }
     }
 }
@@ -51,12 +80,38 @@ impl ProviderRunHost for ContextOptimizationProviderHost {
 
             match event {
                 RunEvent::ResponseDelta(response_delta) => {
-                    self.streamed_text.lock().await.push_str(&response_delta);
+                    self.streamed_round
+                        .lock()
+                        .await
+                        .text
+                        .push_str(&response_delta);
+                }
+                RunEvent::ReasoningSummaryDelta(reasoning_delta) => {
+                    self.streamed_round
+                        .lock()
+                        .await
+                        .visible_reasoning
+                        .get_or_insert_with(String::new)
+                        .push_str(&reasoning_delta);
                 }
                 RunEvent::Usage(usage) => *self.latest_usage.lock().await = usage,
-                RunEvent::ReasoningSummaryDelta(_)
-                | RunEvent::ModelTraceDelta(_)
-                | RunEvent::Warning(_) => {}
+                RunEvent::ProviderRoundFinished {
+                    round,
+                    finish_reason,
+                    tool_calls,
+                    usage,
+                } => {
+                    let mut streamed_round = self.streamed_round.lock().await;
+                    if streamed_round.round_number != round {
+                        return Err(LlmError::ProviderProtocol(
+                            "context optimizer finished a round that was not started".into(),
+                        ));
+                    }
+                    streamed_round.finish_reason = finish_reason;
+                    streamed_round.tool_calls = tool_calls;
+                    streamed_round.usage = usage;
+                }
+                RunEvent::ModelTraceDelta(_) | RunEvent::Warning(_) => {}
                 RunEvent::Tool(_)
                 | RunEvent::InteractionRequested(_)
                 | RunEvent::ProviderRoundStarted { .. }
@@ -80,15 +135,18 @@ impl ProviderRunHost for ContextOptimizationProviderHost {
                 return Err(LlmError::Cancelled);
             }
 
-            let mut current_provider_round = self.provider_round.lock().await;
+            let mut streamed_round = self.streamed_round.lock().await;
 
-            if provider_round != 1 || *current_provider_round != 0 {
+            if provider_round != 1 || streamed_round.round_number != 0 {
                 return Err(LlmError::LoopLimit(
                     "context optimization permits exactly one provider round".into(),
                 ));
             }
 
-            *current_provider_round = provider_round;
+            *streamed_round = AssistantRound {
+                round_number: provider_round,
+                ..AssistantRound::default()
+            };
 
             Ok(())
         })

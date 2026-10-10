@@ -1,13 +1,18 @@
 [package]
 name = "ai-providers"
-version = "0.0.1"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
 
 [dependencies]
-llm = { path = "../llm" }
-chatgpt = { path = "chatgpt" }
-claude = { path = "claude" }
-gemini = { path = "gemini" }
-ollama = { path = "ollama" }
-llama-cpp = { path = "llama-cpp" }
-lm-studio = { path = "lm-studio" }
+llm = { version = "0.0.1", path = "../llm" }
+chatgpt = { version = "0.0.1", path = "chatgpt" }
+claude = { version = "0.0.1", path = "claude" }
+gemini = { version = "0.0.1", path = "gemini" }
+ollama = { version = "0.0.1", path = "ollama" }
+llama-cpp = { version = "0.0.1", path = "llama-cpp" }
+lm-studio = { version = "0.0.1", path = "lm-studio" }

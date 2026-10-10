@@ -5,15 +5,19 @@ pub(crate) async fn load_message_by_id(
     message_id: MessageId,
 ) -> InfrastructureResult<Option<Message>> {
     let query_text = format!("SELECT {MESSAGE_COLUMNS} FROM messages WHERE id = ?");
+
     let database_row = sqlx::query(AssertSqlSafe(query_text))
         .bind(message_id.as_bytes().to_vec())
         .fetch_optional(&mut **database_transaction)
         .await
         .map_err(|source| database_operation_error("failed to get message by ID", source))?;
+
     let Some(database_row) = database_row else {
         return Ok(None);
     };
+
     let attachments = load_attachments(database_transaction, message_id).await?;
+
     map_message_row(&database_row, attachments).map(Some)
 }
 
@@ -28,5 +32,6 @@ pub(crate) async fn load_attachments(
     .fetch_all(&mut **database_transaction)
     .await
     .map_err(|source| database_operation_error("failed to load message attachments", source))?;
+
     database_rows.iter().map(map_attachment_row).collect()
 }

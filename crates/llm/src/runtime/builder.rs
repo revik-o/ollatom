@@ -9,6 +9,7 @@ use std::{
     sync::{Arc, Mutex, atomic::AtomicU64},
 };
 
+#[derive(Default)]
 #[must_use]
 pub struct LlmRuntimeBuilder {
     providers: Vec<(Arc<dyn LlmProvider>, Option<ModelId>)>,
@@ -22,15 +23,7 @@ pub struct LlmRuntimeBuilder {
 
 impl LlmRuntimeBuilder {
     pub fn new() -> Self {
-        Self {
-            providers: Vec::new(),
-            tools: ToolRegistry::new(),
-            event_sink: None,
-            profiles: SubagentProfileRegistry::default(),
-            subagent_runner: None,
-            authorizer: None,
-            validation_error: None,
-        }
+        Self::default()
     }
 
     pub fn provider(mut self, provider: Arc<dyn LlmProvider>) -> Self {
@@ -123,11 +116,5 @@ impl LlmRuntimeBuilder {
         if self.validation_error.is_none() {
             self.validation_error = Some(error);
         }
-    }
-}
-
-impl Default for LlmRuntimeBuilder {
-    fn default() -> Self {
-        Self::new()
     }
 }

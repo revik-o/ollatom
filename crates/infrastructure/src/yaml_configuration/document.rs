@@ -25,6 +25,7 @@ pub(super) fn deserialize_configuration_document(
 ) -> Result<Value, YamlConfigurationError> {
     let configuration_document = deserialize_yaml_configuration(configuration_contents, file_path)?;
     validate_configuration_document_root(&configuration_document, file_path)?;
+
     Ok(configuration_document)
 }
 
@@ -32,9 +33,11 @@ pub(super) async fn read_configuration_document(
     file_pointer: &FilePointer,
 ) -> Result<Value, YamlConfigurationError> {
     let configuration_contents = file_pointer.read_text().await?;
+
     if configuration_contents.trim().is_empty() {
         return Ok(Value::Object(Map::new()));
     }
+
     deserialize_configuration_document(&configuration_contents, file_pointer.path())
 }
 
@@ -67,6 +70,7 @@ pub(super) fn validate_configuration_document_root(
     if configuration_document.is_null() || configuration_document.is_object() {
         return Ok(());
     }
+
     Err(YamlConfigurationError::YamlRootIsNotMapping {
         path: file_path.to_owned(),
     })
@@ -84,6 +88,7 @@ pub(super) fn validate_configuration_key(
             configuration_key: configuration_key.to_owned(),
         });
     }
+
     Ok(())
 }
 
@@ -97,16 +102,21 @@ pub(super) fn add_value_to_configuration_document(
     }
 
     let configuration_key_segments = configuration_key.split('.').collect::<Vec<_>>();
+
+    let (final_configuration_key_segment, parent_configuration_key_segments) =
+        configuration_key_segments
+            .split_last()
+            .expect("validated configuration keys always contain a segment");
+
     let mut current_configuration_value = configuration_document;
 
-    for configuration_key_segment in
-        &configuration_key_segments[..configuration_key_segments.len() - 1]
-    {
+    for configuration_key_segment in parent_configuration_key_segments {
         let current_configuration_mapping = current_configuration_value
             .as_object_mut()
             .ok_or_else(|| YamlConfigurationError::YamlConfigurationKeyConflict {
                 configuration_key: configuration_key.to_owned(),
             })?;
+
         current_configuration_value = current_configuration_mapping
             .entry((*configuration_key_segment).to_owned())
             .or_insert_with(|| Value::Object(Map::new()));
@@ -118,9 +128,6 @@ pub(super) fn add_value_to_configuration_document(
         }
     }
 
-    let final_configuration_key_segment = configuration_key_segments
-        .last()
-        .expect("validated configuration keys always contain a segment");
     current_configuration_value
         .as_object_mut()
         .ok_or_else(|| YamlConfigurationError::YamlConfigurationKeyConflict {

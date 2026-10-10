@@ -73,6 +73,6 @@ impl From<&str> for UserMessage {
 
 impl From<String> for UserMessage {
     fn from(value: String) -> Self {
-        Self::from(value.as_str())
+        Self::new([ContentBlock::text(value)])
     }
 }

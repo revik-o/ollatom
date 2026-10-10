@@ -1,13 +1,10 @@
 use crate::{
     InteractionId, InteractionReply, InteractionRequest, LlmError, RunEvent, StopToken,
-    events::EventDispatcher,
+    events::EventDispatcher, ids::allocate_monotonic_identifier,
 };
 use std::{
     collections::BTreeMap,
-    sync::{
-        Mutex,
-        atomic::{AtomicU64, Ordering},
-    },
+    sync::{Mutex, atomic::AtomicU64},
 };
 use tokio::sync::oneshot;
 
@@ -15,6 +12,19 @@ pub(crate) struct InteractionHub {
     next_id: AtomicU64,
     pending: Mutex<BTreeMap<InteractionId, oneshot::Sender<InteractionReply>>>,
 }
+
+struct PendingInteractionGuard<'hub> {
+    interaction_hub: &'hub InteractionHub,
+    interaction_id: InteractionId,
+}
+
+impl Drop for PendingInteractionGuard<'_> {
+    fn drop(&mut self) {
+        self.interaction_hub
+            .remove_pending_interaction(self.interaction_id);
+    }
+}
+
 impl InteractionHub {
     pub fn new() -> Self {
         Self {
@@ -32,29 +42,28 @@ impl InteractionHub {
     where
         CreateRequest: FnOnce(InteractionId) -> InteractionRequest,
     {
-        let interaction_id = InteractionId(self.next_id.fetch_add(1, Ordering::SeqCst));
+        let interaction_id =
+            InteractionId(allocate_monotonic_identifier(&self.next_id, "interaction")?);
         let (reply_sender, reply_receiver) = oneshot::channel();
+
         self.pending
             .lock()
             .map_err(|_| LlmError::ProviderProtocol("interaction registry lock poisoned".into()))?
             .insert(interaction_id, reply_sender);
 
-        let emit_result = event_dispatcher
+        let _pending_interaction_guard = PendingInteractionGuard {
+            interaction_hub: self,
+            interaction_id,
+        };
+
+        event_dispatcher
             .emit(RunEvent::InteractionRequested(create_request(
                 interaction_id,
             )))
-            .await;
-
-        if let Err(error) = emit_result {
-            self.remove_pending_interaction(interaction_id);
-            return Err(error);
-        }
+            .await?;
 
         tokio::select! {
-            _ = stop_token.cancelled() => {
-                self.remove_pending_interaction(interaction_id);
-                Err(LlmError::Cancelled)
-            }
+            _ = stop_token.cancelled() => Err(LlmError::Cancelled),
             reply = reply_receiver => reply.map_err(|_| {
                 LlmError::InteractionAlreadyResolved(interaction_id.0)
             }),

@@ -1,96 +1,81 @@
-use super::{BasicToolConfiguration, tool_support};
+use super::BasicToolConfiguration;
 use crate::ToolFailure;
-use filesystem::FilePointer;
+use filesystem::{AtomicCommitStatus, AtomicMetadataPolicy};
 use serde_json::{Value, json};
-use std::io;
 
-pub(super) async fn read_file(
+pub(super) async fn read_file_from_workspace(
     configuration: &BasicToolConfiguration,
     tool_arguments: &Value,
+    workspace_file: filesystem::WorkspaceFile,
 ) -> Result<Value, ToolFailure> {
-    let file_path = tool_support::resolve_path_argument(configuration, tool_arguments, "path")?;
-    let file_metadata = tokio::fs::metadata(&file_path)
-        .await
-        .map_err(input_output_failure)?;
-
-    if !file_metadata.is_file() || file_metadata.len() > configuration.maximum_file_size {
-        return Err(ToolFailure::InvalidArguments(
-            "path is not a supported regular file".into(),
-        ));
-    }
-
-    let file_content = FilePointer::from_path(file_path)
-        .read_text()
+    let file_content = workspace_file
+        .read_regular_file_text_bounded(configuration.maximum_file_size)
         .await
         .map_err(filesystem_operation_failure)?;
 
     Ok(json!({"tool": "read_file", "path": tool_arguments["path"], "content": file_content}))
 }
 
-pub(super) async fn write_file(
+pub(super) async fn write_file_from_workspace(
     configuration: &BasicToolConfiguration,
     tool_arguments: &Value,
+    workspace_file: filesystem::WorkspaceFile,
 ) -> Result<Value, ToolFailure> {
-    let file_path = tool_support::resolve_path_argument(configuration, tool_arguments, "path")?;
     let file_content = tool_arguments
         .get("content")
         .and_then(Value::as_str)
         .ok_or_else(|| ToolFailure::InvalidArguments("content must be a string".into()))?;
+
     let content_size = u64::try_from(file_content.len()).unwrap_or(u64::MAX);
 
     if content_size > configuration.maximum_file_size {
         return Err(ToolFailure::InvalidArguments("content is too large".into()));
     }
 
-    let parent_directory = file_path
-        .parent()
-        .ok_or_else(|| ToolFailure::InvalidArguments("path has no parent".into()))?;
-
-    tokio::fs::create_dir_all(parent_directory)
+    let commit = workspace_file
+        .prepare_atomic_write(
+            file_content.as_bytes().to_vec(),
+            AtomicMetadataPolicy::PreserveSupported,
+        )
         .await
-        .map_err(input_output_failure)?;
-
-    let file_pointer = FilePointer::from_path(file_path);
-
-    file_pointer
-        .write_text_atomically(file_content)
-        .await
+        .map_err(filesystem_operation_failure)?
+        .start_commit()
         .map_err(filesystem_operation_failure)?;
+
+    match commit.wait().await {
+        AtomicCommitStatus::Succeeded => {}
+        AtomicCommitStatus::Failed(error) => return Err(ToolFailure::Execution(error)),
+        AtomicCommitStatus::Pending => {
+            return Err(ToolFailure::Execution(
+                "atomic file write completion was disconnected".into(),
+            ));
+        }
+    }
 
     Ok(json!({"tool": "write_file", "path": tool_arguments["path"], "bytes": content_size}))
 }
 
-pub(super) async fn create_directory(
-    configuration: &BasicToolConfiguration,
+pub(super) async fn create_directory_from_workspace(
     tool_arguments: &Value,
+    workspace_directory: filesystem::WorkspaceFile,
 ) -> Result<Value, ToolFailure> {
-    let directory_path =
-        tool_support::resolve_path_argument(configuration, tool_arguments, "path")?;
-    let directory_name = directory_path
-        .file_name()
-        .ok_or_else(|| ToolFailure::InvalidArguments("path has no directory name".into()))?;
-    let parent_directory = directory_path
-        .parent()
-        .ok_or_else(|| ToolFailure::InvalidArguments("path has no parent directory".into()))?;
-
-    filesystem::create_folder(directory_name.to_string_lossy(), parent_directory)
+    workspace_directory
+        .create_directory_all()
         .await
         .map_err(filesystem_operation_failure)?;
 
     Ok(json!({"tool": "create_directory", "path": tool_arguments["path"]}))
 }
 
-pub(super) async fn rename_path(
-    configuration: &BasicToolConfiguration,
+pub(super) async fn rename_path_from_workspace(
     tool_arguments: &Value,
+    source_file: filesystem::WorkspaceFile,
+    destination_file: filesystem::WorkspaceFile,
 ) -> Result<Value, ToolFailure> {
-    let source_path = tool_support::resolve_path_argument(configuration, tool_arguments, "source")?;
-    let destination_path =
-        tool_support::resolve_path_argument(configuration, tool_arguments, "destination")?;
-
-    tokio::fs::rename(source_path, destination_path)
+    source_file
+        .rename_without_replacement(&destination_file)
         .await
-        .map_err(input_output_failure)?;
+        .map_err(filesystem_operation_failure)?;
 
     Ok(json!({
         "tool": "rename_path",
@@ -99,30 +84,16 @@ pub(super) async fn rename_path(
     }))
 }
 
-pub(super) async fn delete_path(
-    configuration: &BasicToolConfiguration,
+pub(super) async fn delete_path_from_workspace(
     tool_arguments: &Value,
+    workspace_entry: filesystem::WorkspaceFile,
 ) -> Result<Value, ToolFailure> {
-    let entry_path = tool_support::resolve_path_argument(configuration, tool_arguments, "path")?;
-    let entry_metadata = tokio::fs::symlink_metadata(&entry_path)
+    workspace_entry
+        .remove_entry()
         .await
-        .map_err(input_output_failure)?;
-
-    if entry_metadata.is_dir() {
-        tokio::fs::remove_dir_all(entry_path)
-            .await
-            .map_err(input_output_failure)?;
-    } else {
-        tokio::fs::remove_file(entry_path)
-            .await
-            .map_err(input_output_failure)?;
-    }
+        .map_err(filesystem_operation_failure)?;
 
     Ok(json!({"tool": "delete_path", "path": tool_arguments["path"]}))
-}
-
-fn input_output_failure(error: io::Error) -> ToolFailure {
-    ToolFailure::Execution(error.to_string())
 }
 
 fn filesystem_operation_failure(error: filesystem::FilesystemError) -> ToolFailure {

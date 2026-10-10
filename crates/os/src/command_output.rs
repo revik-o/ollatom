@@ -34,6 +34,7 @@ pub(super) fn spawn_output_reader(
                         output_destination,
                         &mut incomplete_utf8_bytes,
                     )?;
+
                     return Ok(());
                 }
 
@@ -78,6 +79,7 @@ fn decode_complete_utf8_output(incomplete_utf8_bytes: &mut Vec<u8>) -> String {
             Ok(valid_output) => {
                 decoded_output.push_str(valid_output);
                 incomplete_utf8_bytes.clear();
+
                 break;
             }
             Err(validation_error) => {
@@ -90,6 +92,7 @@ fn decode_complete_utf8_output(incomplete_utf8_bytes: &mut Vec<u8>) -> String {
                 let Some(invalid_byte_count) = validation_error.error_len() else {
                     break;
                 };
+
                 decoded_output.push('\u{FFFD}');
                 incomplete_utf8_bytes.drain(..invalid_byte_count);
             }

@@ -10,14 +10,14 @@ pub fn built_in_tool_definition(name: &str) -> Option<ToolDefinition> {
             description: "Ask the user one or more typed questions and wait for their answers."
                 .into(),
             input_schema: serde_json::json!({"type":"object","required":["questions"],"properties":{"questions":{"type":"array"}}}),
-            requires_authorization: false,
+            authorization_requirement: crate::ToolAuthorizationRequirement::CapabilityPolicy,
         }),
         INVOKE_SUBAGENT_TOOL_NAME => Some(ToolDefinition {
             name: INVOKE_SUBAGENT_TOOL_NAME.into(),
             description: "Invoke a developer-configured subagent profile for a bounded task."
                 .into(),
             input_schema: serde_json::json!({"type":"object","required":["task","profile"],"properties":{"task":{"type":"string"},"profile":{"type":"string"}}}),
-            requires_authorization: false,
+            authorization_requirement: crate::ToolAuthorizationRequirement::CapabilityPolicy,
         }),
         _ => None,
     }

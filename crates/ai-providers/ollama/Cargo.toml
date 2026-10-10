@@ -1,15 +1,24 @@
 [package]
 name = "ollama"
-version = "0.0.1"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
 
 [dependencies]
-llm = { path = "../../llm" }
-base64 = "0.22"
-futures-util = "0.3"
-mime_guess = "2"
-reqwest = { version = "0.13", default-features = false, features = ["json", "stream", "rustls"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-tokio = { version = "1", features = ["fs", "macros", "rt", "sync", "time"] }
-url = "2"
+filesystem = { version = "0.0.1", path = "../../filesystem" }
+llm = { version = "0.0.1", path = "../../llm" }
+base64.workspace = true
+futures-util.workspace = true
+mime_guess.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["fs", "macros", "rt", "sync", "time"] }
+url.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -40,16 +40,17 @@ pub(crate) async fn create_chat(
     let chat_id = ChatId::new();
     let created_at = OffsetDateTime::now_utc();
     let created_at_text = format_timestamp(created_at)?;
+
     sqlx::query(
         "INSERT INTO chats (id, project_id, name, llm_thinking_enabled, llm_context_optimization_enabled, cpu_usage_percentage, gpu_usage_percentage, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(chat_id.as_bytes().to_vec())
     .bind(project_id.as_bytes().to_vec())
     .bind(&chat_name)
-    .bind(initialization_parameters.llm_thinking_enabled)
-    .bind(initialization_parameters.llm_context_optimization_enabled)
-    .bind(initialization_parameters.cpu_usage_percentage as i64)
-    .bind(initialization_parameters.gpu_usage_percentage as i64)
+    .bind(initialization_parameters.large_language_model_thinking_enabled)
+    .bind(initialization_parameters.context_optimization_enabled)
+    .bind(i64::from(initialization_parameters.cpu_usage_percentage))
+    .bind(i64::from(initialization_parameters.gpu_usage_percentage))
     .bind(&created_at_text)
     .bind(&created_at_text)
     .execute(&mut **database_transaction)
@@ -60,11 +61,7 @@ pub(crate) async fn create_chat(
         id: chat_id,
         project_id,
         name: chat_name,
-        llm_thinking_enabled: initialization_parameters.llm_thinking_enabled,
-        llm_context_optimization_enabled: initialization_parameters
-            .llm_context_optimization_enabled,
-        cpu_usage_percentage: initialization_parameters.cpu_usage_percentage,
-        gpu_usage_percentage: initialization_parameters.gpu_usage_percentage,
+        execution_settings: initialization_parameters,
         created_at,
         updated_at: created_at,
     })
@@ -80,6 +77,7 @@ pub(crate) async fn get_chat_by_id(
         .fetch_optional(&mut **database_transaction)
         .await
         .map_err(|source| database_operation_error("failed to get chat by ID", source))?;
+
     database_row.as_ref().map(map_chat_row).transpose()
 }
 
@@ -97,21 +95,20 @@ pub(crate) async fn update_chat(
     }
 
     let chat_name = update_options.name.unwrap_or(existing_chat.name);
-    let llm_thinking_enabled = update_options
-        .llm_thinking_enabled
-        .unwrap_or(existing_chat.llm_thinking_enabled);
-    let llm_context_optimization_enabled = update_options
-        .llm_context_optimization_enabled
-        .unwrap_or(existing_chat.llm_context_optimization_enabled);
-    let cpu_usage_percentage = update_options
-        .cpu_usage_percentage
-        .unwrap_or(existing_chat.cpu_usage_percentage);
-    let gpu_usage_percentage = update_options
-        .gpu_usage_percentage
-        .unwrap_or(existing_chat.gpu_usage_percentage);
+    let execution_settings = update_options
+        .execution_settings
+        .apply_to(&existing_chat.execution_settings);
+
     validate_nonblank_value("chat name", &chat_name)?;
-    validate_usage_percentage("chat CPU usage percentage", cpu_usage_percentage)?;
-    validate_usage_percentage("chat GPU usage percentage", gpu_usage_percentage)?;
+    validate_usage_percentage(
+        "chat CPU usage percentage",
+        execution_settings.cpu_usage_percentage,
+    )?;
+    validate_usage_percentage(
+        "chat GPU usage percentage",
+        execution_settings.gpu_usage_percentage,
+    )?;
+
     let updated_at = OffsetDateTime::now_utc();
     let updated_at_text = format_timestamp(updated_at)?;
 
@@ -119,10 +116,10 @@ pub(crate) async fn update_chat(
         "UPDATE chats SET name = ?, llm_thinking_enabled = ?, llm_context_optimization_enabled = ?, cpu_usage_percentage = ?, gpu_usage_percentage = ?, updated_at = ? WHERE id = ?",
     )
     .bind(&chat_name)
-    .bind(llm_thinking_enabled)
-    .bind(llm_context_optimization_enabled)
-    .bind(cpu_usage_percentage as i64)
-    .bind(gpu_usage_percentage as i64)
+    .bind(execution_settings.large_language_model_thinking_enabled)
+    .bind(execution_settings.context_optimization_enabled)
+    .bind(i64::from(execution_settings.cpu_usage_percentage))
+    .bind(i64::from(execution_settings.gpu_usage_percentage))
     .bind(&updated_at_text)
     .bind(update_options.chat_id.as_bytes().to_vec())
     .execute(&mut **database_transaction)
@@ -133,10 +130,7 @@ pub(crate) async fn update_chat(
         id: update_options.chat_id,
         project_id: existing_chat.project_id,
         name: chat_name,
-        llm_thinking_enabled,
-        llm_context_optimization_enabled,
-        cpu_usage_percentage,
-        gpu_usage_percentage,
+        execution_settings,
         created_at: existing_chat.created_at,
         updated_at,
     }))
@@ -149,6 +143,7 @@ pub(crate) async fn delete_chat_by_id(
     let Some(chat) = get_chat_by_id(database_transaction, chat_id).await? else {
         return Ok(None);
     };
+
     sqlx::query("DELETE FROM chats WHERE id = ?")
         .bind(chat_id.as_bytes().to_vec())
         .execute(&mut **database_transaction)

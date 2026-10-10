@@ -1,6 +1,5 @@
 use super::host::RunHost;
-use crate::{LlmError, ToolCall, ToolFailure, ToolOutput};
-
+use crate::{LlmError, RunEvent, ToolCall, ToolEvent, ToolFailure, ToolOutput};
 impl RunHost {
     pub(super) async fn validate_tool_round(
         &self,
@@ -9,6 +8,15 @@ impl RunHost {
     ) -> Result<(), LlmError> {
         if self.stop.is_stopped() {
             return Err(LlmError::Cancelled);
+        }
+
+        if tool_calls
+            .iter()
+            .any(|tool_call| tool_call.id.trim().is_empty())
+        {
+            return Err(LlmError::ToolProtocol(
+                "tool call ID must be non-empty".into(),
+            ));
         }
 
         let mut host_state = self.state.lock().await;
@@ -26,13 +34,57 @@ impl RunHost {
             return Err(LlmError::LoopLimit("tool calls per round".into()));
         }
 
-        let projected_total_calls = host_state.total_calls.saturating_add(tool_call_count);
+        let projected_total_calls = host_state
+            .total_calls
+            .checked_add(tool_call_count)
+            .ok_or_else(|| LlmError::LoopLimit("total tool calls".into()))?;
 
         if projected_total_calls > self.limits.total_tool_calls {
             return Err(LlmError::LoopLimit("total tool calls".into()));
         }
 
-        host_state.total_calls += tool_call_count;
+        host_state.total_calls = projected_total_calls;
+
+        Ok(())
+    }
+
+    pub(super) async fn preflight_tool_round(
+        &self,
+        tool_calls: &[ToolCall],
+    ) -> Result<(), LlmError> {
+        for tool_call in tool_calls {
+            self.ensure_active()?;
+
+            if self.cached_tool_output(tool_call).await?.is_some() {
+                continue;
+            }
+
+            if crate::builtins::built_in_tool_definition(&tool_call.name).is_some() {
+                if !self.is_tool_selected(&tool_call.name) {
+                    return Err(LlmError::ToolProtocol(format!(
+                        "unadvertised tool {}",
+                        tool_call.name
+                    )));
+                }
+                continue;
+            }
+
+            if !self.is_tool_selected(&tool_call.name) {
+                return Err(LlmError::ToolProtocol(format!(
+                    "unadvertised tool {}",
+                    tool_call.name
+                )));
+            }
+
+            let Some(tool) = self.tools.get(&tool_call.name) else {
+                return Err(LlmError::ToolProtocol(format!(
+                    "unknown tool {}",
+                    tool_call.name
+                )));
+            };
+
+            let _ = tool;
+        }
 
         Ok(())
     }
@@ -41,11 +93,10 @@ impl RunHost {
         &self,
         tool_call: ToolCall,
     ) -> Result<ToolOutput, LlmError> {
-        if self.stop.is_stopped() {
-            return Err(LlmError::Cancelled);
-        }
+        self.ensure_active()?;
 
         if let Some(cached_output) = self.cached_tool_output(&tool_call).await? {
+            self.emit_undelivered_finished_event(&tool_call).await?;
             return Ok(cached_output);
         }
 
@@ -66,10 +117,9 @@ impl RunHost {
                 tool_call.name
             )));
         };
-        let definition = tool.definition();
-
-        let argument_validation =
-            crate::tools::validate_arguments(&definition.input_schema, &tool_call.arguments);
+        let argument_validation = self
+            .tools
+            .validate_arguments(&tool_call.name, &tool_call.arguments);
 
         if let Err(failure) = argument_validation {
             return self.finish_tool_failure(&tool_call, failure).await;
@@ -88,6 +138,7 @@ impl RunHost {
         }
 
         self.emit_tool_planned(&tool_call).await?;
+
         let (tool_token, tool_stop) = crate::cancellation::stop_pair();
         let tool_stop = crate::cancellation::StopOnDrop::new(tool_stop);
         let authorization_grant = match self.authorize(&tool_plan, tool_token).await? {
@@ -99,18 +150,34 @@ impl RunHost {
             }
         };
 
+        self.ensure_active()?;
         self.emit_tool_started(&tool_call).await?;
 
-        let timeout = tool_plan
+        let requested_timeout = tool_plan
             .timeout
             .unwrap_or_else(|| std::time::Duration::from_millis(self.limits.tool_timeout_ms));
+
+        let timeout = self
+            .overall_deadline
+            .and_then(|deadline| deadline.checked_duration_since(std::time::Instant::now()))
+            .map_or(requested_timeout, |remaining| {
+                requested_timeout.min(remaining)
+            });
+
         let tool_output = tokio::select! {
             _ = self.stop.cancelled() => {
                 tool_stop.stop();
+
+                let _ = self.events.emit(RunEvent::Tool(ToolEvent::Cancelled {
+                    call_id: tool_call.id.clone(),
+                    reason: "run cancelled".into(),
+                })).await;
+
                 return Err(LlmError::Cancelled);
             },
             _ = tokio::time::sleep(timeout) => {
                 tool_stop.stop();
+
                 ToolOutput::failure(
                     tool_call.id.clone(),
                     ToolFailure::Timeout(format!("tool exceeded {timeout:?}")),

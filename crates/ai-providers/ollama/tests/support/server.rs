@@ -114,7 +114,10 @@ fn read_request(connection: &mut TcpStream) -> CapturedRequest {
         .expect("test request headers should be UTF-8");
     let content_length = content_length(&headers);
 
-    while request_bytes.len() < header_end + content_length {
+    let body_end = header_end
+        .checked_add(content_length)
+        .expect("test request body length should fit in usize");
+    while request_bytes.len() < body_end {
         let mut request_buffer = [0_u8; 4096];
         let bytes_read = connection
             .read(&mut request_buffer)
@@ -125,7 +128,7 @@ fn read_request(connection: &mut TcpStream) -> CapturedRequest {
     CapturedRequest {
         request_line: headers.lines().next().unwrap_or_default().to_owned(),
         headers,
-        body: String::from_utf8(request_bytes[header_end..header_end + content_length].to_vec())
+        body: String::from_utf8(request_bytes[header_end..body_end].to_vec())
             .expect("test request body should be UTF-8"),
     }
 }
@@ -134,7 +137,11 @@ fn find_header_end(request_bytes: &[u8]) -> Option<usize> {
     request_bytes
         .windows(4)
         .position(|window| window == b"\r\n\r\n")
-        .map(|position| position + 4)
+        .map(|position| {
+            position
+                .checked_add(4)
+                .expect("header marker position should fit in usize")
+        })
 }
 
 fn content_length(headers: &str) -> usize {

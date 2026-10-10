@@ -9,7 +9,7 @@ impl<State> RequestBuilder<State> {
             .runtime()?
             .provider_registration(&provider_id)?
             .provider
-            .list_models(ModelScope::All)
+            .list_models(ModelScope::All, &self.data.options.transport)
             .await?;
 
         for model_information in &models {
@@ -24,10 +24,6 @@ impl<State> RequestBuilder<State> {
         Ok(models)
     }
 
-    pub async fn get_all_models(self) -> Result<Vec<ModelInfo>, LlmError> {
-        self.list_models().await
-    }
-
     pub async fn get_info(self) -> Result<ModelInfo, LlmError> {
         self.validate()?;
 
@@ -35,7 +31,10 @@ impl<State> RequestBuilder<State> {
         let (registration, model_id) = self
             .runtime()?
             .resolve_selected_or_default_model(&provider_id, self.data.model.as_ref())?;
-        let model_information = registration.provider.model_info(&model_id).await?;
+        let model_information = registration
+            .provider
+            .model_info(&model_id, &self.data.options.transport)
+            .await?;
 
         if model_information.provider != provider_id || model_information.id != model_id {
             return Err(LlmError::ProviderProtocol(
@@ -50,12 +49,17 @@ impl<State> RequestBuilder<State> {
         self.validate()?;
         let provider_id = self.provider_id()?.clone();
         let registration = self.runtime()?.provider_registration(&provider_id)?;
+
         let selected_model = self
             .data
             .model
             .as_ref()
             .or(registration.default_model.as_ref());
-        let mut availability_report = registration.provider.availability(selected_model).await?;
+
+        let mut availability_report = registration
+            .provider
+            .availability(selected_model, &self.data.options.transport)
+            .await?;
 
         if availability_report.provider != provider_id {
             return Err(LlmError::ProviderProtocol(

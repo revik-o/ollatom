@@ -1,12 +1,31 @@
-use super::metadata::{NativeModelTag, NativeRunningModel};
-use llm::{CapabilitySupport, ModelCapability, ModelScope, ProviderCapabilities, ReasoningEffort};
+use super::metadata::NativeModelListEntry;
+use llm::{CapabilitySupport, ModelCapability, ModelScope, ProviderCapabilities};
 use serde_json::Value;
 use std::collections::BTreeSet;
 
 pub(super) fn model_info_value<'a>(model_info: &'a Value, suffix: &str) -> Option<&'a Value> {
-    model_info.as_object()?.iter().find_map(|(key, value)| {
-        (key == suffix || key.ends_with(&format!(".{suffix}"))).then_some(value)
-    })
+    let model_information = model_info.as_object()?;
+
+    if let Some(exact_value) = model_information.get(suffix) {
+        return Some(exact_value);
+    }
+
+    if let Some(preferred_architecture) = model_information
+        .get("general.architecture")
+        .and_then(Value::as_str)
+        && let Some(preferred_value) =
+            model_information.get(&format!("{preferred_architecture}.{suffix}"))
+    {
+        return Some(preferred_value);
+    }
+
+    let mut suffix_matches = model_information
+        .iter()
+        .filter_map(|(key, value)| key.ends_with(&format!(".{suffix}")).then_some(value));
+
+    let unique_match = suffix_matches.next()?;
+
+    suffix_matches.next().is_none().then_some(unique_match)
 }
 
 pub(super) fn derive_owner_from_model_id(model_id: &str) -> Option<String> {
@@ -23,12 +42,12 @@ pub(super) fn derive_owner_from_model_id(model_id: &str) -> Option<String> {
 }
 
 pub(super) fn native_model_is_remote(
-    model_tag: Option<&NativeModelTag>,
-    running_model: Option<&NativeRunningModel>,
+    model_tag: Option<&NativeModelListEntry>,
+    running_model: Option<&NativeModelListEntry>,
 ) -> bool {
     [
-        model_tag.map(NativeModelTag::raw_value),
-        running_model.map(NativeRunningModel::raw_value),
+        model_tag.map(NativeModelListEntry::raw_value),
+        running_model.map(NativeModelListEntry::raw_value),
     ]
     .into_iter()
     .flatten()
@@ -96,10 +115,10 @@ pub(super) fn first_string<'a>(
 fn parse_parameter_count(value: &str) -> Option<u64> {
     let normalized = value.trim().to_ascii_uppercase().replace(',', "");
     let (numeric_text, multiplier) = match normalized.chars().last() {
-        Some('T') => (&normalized[..normalized.len() - 1], 1_000_000_000_000_u128),
-        Some('B') => (&normalized[..normalized.len() - 1], 1_000_000_000_u128),
-        Some('M') => (&normalized[..normalized.len() - 1], 1_000_000_u128),
-        Some('K') => (&normalized[..normalized.len() - 1], 1_000_u128),
+        Some('T') => (normalized.strip_suffix('T')?, 1_000_000_000_000_u128),
+        Some('B') => (normalized.strip_suffix('B')?, 1_000_000_000_u128),
+        Some('M') => (normalized.strip_suffix('M')?, 1_000_000_u128),
+        Some('K') => (normalized.strip_suffix('K')?, 1_000_u128),
         Some(_) => (normalized.as_str(), 1_u128),
         None => return None,
     };
@@ -123,7 +142,9 @@ fn parse_scaled_parameter_count(numeric_text: &str, multiplier: u128) -> Option<
     } else {
         integer_text.parse::<u128>().ok()?
     };
+
     let scaled_integer = integer_value.checked_mul(multiplier)?;
+
     let scaled_fraction = match fractional_text {
         Some("") | None => 0,
         Some(fractional_text) => {
@@ -132,8 +153,8 @@ fn parse_scaled_parameter_count(numeric_text: &str, multiplier: u128) -> Option<
             let fractional_scale = 10_u128.checked_pow(fractional_digit_count)?;
             fractional_value
                 .checked_mul(multiplier)?
-                .checked_add(fractional_scale / 2)?
-                / fractional_scale
+                .checked_add(fractional_scale.checked_div(2)?)?
+                .checked_div(fractional_scale)?
         }
     };
 
@@ -187,16 +208,5 @@ pub(super) fn apply_model_capabilities(capabilities: &mut ProviderCapabilities, 
         capabilities
             .features
             .insert(ModelCapability::Reasoning, CapabilitySupport::Supported);
-
-        for effort in [
-            ReasoningEffort::Low,
-            ReasoningEffort::Medium,
-            ReasoningEffort::High,
-            ReasoningEffort::Max,
-        ] {
-            capabilities
-                .reasoning_efforts
-                .insert(effort, CapabilitySupport::Supported);
-        }
     }
 }

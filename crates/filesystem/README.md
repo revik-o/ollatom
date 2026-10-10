@@ -1,6 +1,6 @@
 # Filesystem
 
-The filesystem crate provides asynchronous, safe, and ergonomic utilities for interacting with files and directories. It handles path validation, atomic writes, and common I/O operations through a simplified abstraction over `tokio::fs` and `atomic-write-file`.
+The filesystem crate provides asynchronous utilities for capability-scoped files and directories, bounded reads, path validation, and atomic writes.
 
 Every file and directory creation validates entry names to ensure they consist of exactly one normal path component, preventing accidental directory traversal or invalid paths.
 
@@ -51,7 +51,13 @@ file.write_bytes_atomically(b"Safe bytes").await?;
 // Access underlying path
 let path = file.path();
 ```
-**Description:** `FilePointer` provides a chainable, asynchronous API for file interactions. Standard reads, writes, and appends use `tokio::fs`. The atomic write operations use `atomic-write-file` within a `tokio::task::spawn_blocking` pool to ensure that the file is not corrupted if the process is interrupted or crashes during a write.
+**Description:** `FilePointer` provides a compatibility API for ambient paths. Its writes, appends, bounded reads, and atomic replacements delegate to the descriptor-relative workspace implementation and reject destination symbolic links.
+
+For security-sensitive operations, open a `WorkspaceDirectory` once and derive `WorkspaceFile` values from validated relative paths. Workspace operations retain directory handles, reject absolute paths, parent traversal, and symbolic-link traversal, and never resolve an approved operation from an ambient absolute path again.
+
+`read_regular_file_bytes_bounded` and `read_regular_file_text_bounded` open a file once without following links, require a regular file, and read at most one byte beyond the configured limit. `rename_without_replacement` never destroys an existing destination and supports regular files.
+
+Atomic writes have separate prepare and commit phases. Dropping `PreparedAtomicWrite` removes its private temporary file. After `start_commit`, the operation continues independently of the waiting task and `AtomicCommitHandle::wait` reports its definitive result. `ContentOnly` replaces content, `PreserveSupported` preserves the metadata supported by this implementation, and `RequirePreserved` fails closed where the complete security metadata set cannot be preserved and verified.
 
 ### 4. Errors (`FilesystemError`)
 

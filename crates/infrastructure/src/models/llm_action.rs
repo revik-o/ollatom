@@ -43,6 +43,50 @@ pub enum LlmActionDetails {
     ToolCall(ToolCallActionDetails),
 }
 
+impl LlmActionDetails {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        match self {
+            Self::FileChange(details) => {
+                if details.source_path.trim().is_empty() {
+                    return Err("file-change source path must not be blank");
+                }
+
+                if details.operation == FileChangeOperation::Rename
+                    && details
+                        .destination_path
+                        .as_deref()
+                        .is_none_or(|path| path.trim().is_empty())
+                {
+                    return Err("rename destination path must not be blank");
+                }
+
+                if !details.metadata.is_object() {
+                    return Err("file-change metadata must be an object");
+                }
+            }
+            Self::Command(details) => {
+                if details.command_text.trim().is_empty() {
+                    return Err("command text must not be blank");
+                }
+
+                if details.working_directory.trim().is_empty() {
+                    return Err("command working directory must not be blank");
+                }
+            }
+            Self::ToolCall(details) => {
+                if details.tool_name.trim().is_empty() {
+                    return Err("tool name must not be blank");
+                }
+
+                if !details.arguments.is_object() {
+                    return Err("tool arguments must be an object");
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum LlmActionStatus {
     Pending,
@@ -65,9 +109,17 @@ pub struct LlmActionStatusEventInput {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct LlmActionInitialStatus {
+    pub status: LlmActionStatus,
+    pub payload: Option<Value>,
+    pub occurred_at: OffsetDateTime,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct LlmActionInput {
     pub summary: Option<String>,
     pub details: LlmActionDetails,
+    pub initial_status: LlmActionStatusEventInput,
     pub status_events: Vec<LlmActionStatusEventInput>,
 }
 
@@ -88,6 +140,7 @@ pub struct LlmAction {
     pub sequence_number: u32,
     pub summary: Option<String>,
     pub details: LlmActionDetails,
+    pub initial_status: LlmActionInitialStatus,
     pub status_events: Vec<LlmActionStatusEvent>,
     pub created_at: OffsetDateTime,
 }

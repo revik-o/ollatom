@@ -36,26 +36,36 @@ let run = Llm::init(BuiltInProvider::Ollama)
     .system_prompt("You are a helpful assistant.")
     .tools(["read_file", "ask_user"])
     .user_message("Inspect the project")
-    .send();
+    .send()?;
 
 let run_id = run.id();
 
 match run.await? {
     LlmRunOutcome::Completed(response) => {
-        println!("Response: {}", response.text);
-        if let Some(reasoning) = response.visible_reasoning {
-            println!("Reasoning: {}", reasoning);
+        for assistant_round in &response.assistant_rounds {
+            println!("Round {}: {}", assistant_round.round_number, assistant_round.text);
+            if let Some(reasoning) = &assistant_round.visible_reasoning {
+                println!("Reasoning: {}", reasoning);
+            }
         }
-        println!("Tokens used: {}", response.usage.total_tokens_including_children());
+        println!("Tokens used: {}", response.usage.total_tokens_including_children()?);
     },
     LlmRunOutcome::Cancelled(partial) => {
-        println!("Run cancelled. Partial response: {}", partial.text);
+        println!("Run cancelled after {} assistant rounds.", partial.assistant_rounds.len());
+    }
+    LlmRunOutcome::Failed(failed) => {
+        println!("Run failed: {}", failed.error);
+        println!("Preserved {} assistant rounds.", failed.partial_response.assistant_rounds.len());
     }
 }
 ```
-**Description:** Demonstrates how to build an LLM request using the global facade. You can specify the target provider, model, system prompt, and allowed tools. Calling `.send()` starts the execution asynchronously, returning an `LlmRun`. Awaiting the `LlmRun` yields the final `LlmRunOutcome` which contains either the completed response and token usage or a cancelled partial response.
+**Description:** Demonstrates how to build an LLM request using the global facade. You can specify the target provider, model, system prompt, and allowed tools. Calling `.send()` validates that a Tokio runtime is available, starts execution immediately, and returns `Result<LlmRun, LlmError>`. Awaiting the `LlmRun` yields the final `LlmRunOutcome`: a completed response, a cancelled partial response, or a `FailedRun` with its error and preserved assistant rounds. Each assistant round retains its own text, reasoning, tool calls, finish reason, and usage. `FailedRun.terminal_event_delivered` reports whether the terminal event reached the dispatcher and configured sink.
 
-### 3. Event Streaming and Policy
+### 3. Transport Deadlines
+
+`TransportOptions.overall_timeout_ms` sets the run deadline. `event_delivery_timeout_ms` bounds a single event-sink write and time spent waiting for the event dispatcher; it defaults to 5,000 ms. Each event operation uses the shorter of that value and the remaining run deadline. A zero timeout is rejected. Timeouts after provider startup produce `FailedRun` and retain available partial output and completed tool records.
+
+### 4. Event Streaming and Policy
 
 ```rust
 use llm::{Llm, BuiltInProvider, RunEvent, AllowedPermissions};
@@ -66,7 +76,7 @@ let mut run = Llm::init(BuiltInProvider::Ollama)
     .trusted_folders([PathBuf::from("/path/to/project")])
     .allowed(AllowedPermissions::ALL_FILESYSTEM_ACCESS)
     .stream_approval_requests()
-    .send();
+    .send()?;
 
 let mut stream = run.take_event_stream().expect("stream available");
 
@@ -83,12 +93,12 @@ let outcome = run.await?;
 ```
 **Description:** `LlmRun` provides an event stream to observe the execution in real time. This is useful for streaming text deltas to a user interface, observing tool execution states, and tracking usage metrics. Additionally, this shows configuring `RunPolicy` parameters like `trusted_folders` and `AllowedPermissions` to constrain what tools can do during execution.
 
-### 4. Custom Tools
+### 5. Custom Tools
 
 ```rust
 use llm::{
     Tool, ToolDefinition, ToolCall, ToolPlan, ToolOutput, ToolFailure,
-    AuthorizationGrant, BoxFuture,
+    AuthorizationGrant, BoxFuture, ToolAuthorizationRequirement,
 };
 use serde_json::json;
 
@@ -106,7 +116,7 @@ impl Tool for GreeterTool {
                 },
                 "required": ["name"]
             }),
-            requires_authorization: false,
+            authorization_requirement: ToolAuthorizationRequirement::CapabilityPolicy,
         }
     }
 
@@ -132,3 +142,8 @@ impl Tool for GreeterTool {
 }
 ```
 **Description:** Demonstrates implementing the `Tool` trait to create custom capabilities for the LLM. Tools define their own JSON schema for arguments, a `plan` phase for normalization and capability checking, and an `execute` phase for the actual logic.
+
+`ToolOutput` is a tagged enum with `Success { call_id, content }` and
+`Failure { call_id, error }` variants. A result cannot carry both success
+content and a failure. `append_tool_round_to_history` validates one output per
+unique tool call and appends results in call order.

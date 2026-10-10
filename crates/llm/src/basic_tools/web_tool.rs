@@ -46,10 +46,16 @@ impl Tool for WebSearchTool {
     fn execute(
         &self,
         tool_plan: ToolPlan,
-        _authorization_grant: AuthorizationGrant,
+        authorization_grant: AuthorizationGrant,
     ) -> BoxFuture<'static, Result<ToolOutput, ToolFailure>> {
         Box::pin(async move {
             let search_query = parse_search_query(&tool_plan.normalized_arguments)?;
+            let network_host = search_target_host(search_query)
+                .map_err(|error| ToolFailure::InvalidArguments(error.to_string()))?;
+
+            authorization_grant
+                .claim_capabilities(&[RequiredCapability::Network { host: network_host }])?;
+
             let web_search_response = web_search(search_query.to_owned()).await;
             let filtered_text = web_search_response
                 .filter_html_code()

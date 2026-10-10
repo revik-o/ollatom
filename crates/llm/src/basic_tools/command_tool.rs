@@ -3,9 +3,9 @@ use crate::{
     AuthorizationGrant, BoxFuture, FilesystemAccess, RequiredCapability, Tool, ToolCall,
     ToolDefinition, ToolFailure, ToolOutput, ToolPlan,
 };
-use os::{execute_command_in_directory, parse_command};
+use os::execute_command_in_directory_with_arguments_and_options;
 use serde_json::{Value, json};
-use std::sync::Arc;
+use std::{ffi::OsString, sync::Arc};
 
 #[derive(Clone)]
 pub(super) struct CommandExecutionTool {
@@ -20,8 +20,15 @@ impl CommandExecutionTool {
             definition: tool_support::create_tool_definition(
                 "execute_command",
                 "Run a non-interactive command in the configured working directory.",
-                json!({"command": {"type": "string", "minLength": 1}}),
-                &["command"],
+                json!({
+                    "program": {"type": "string", "minLength": 1},
+                    "arguments": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "default": []
+                    }
+                }),
+                &["program"],
             ),
         }
     }
@@ -34,23 +41,21 @@ impl Tool for CommandExecutionTool {
 
     fn plan(&self, tool_call: &ToolCall) -> Result<ToolPlan, ToolFailure> {
         tool_support::validate_tool_call(&self.definition, tool_call)?;
-
-        let command_text = parse_command_text(&tool_call.arguments)?;
-        let command_invocation = parse_command(command_text)
-            .map_err(|error| ToolFailure::InvalidArguments(error.to_string()))?;
+        let (program, arguments) = parse_command_arguments(&tool_call.arguments)?;
+        let normalized_arguments = json!({
+            "program": program,
+            "arguments": arguments,
+        });
 
         Ok(tool_support::create_tool_plan(
             tool_call,
-            tool_call.arguments.clone(),
+            normalized_arguments,
             vec![
                 tool_support::filesystem_capability(
                     self.configuration.root_directory().to_owned(),
                     FilesystemAccess::Modify,
                 ),
-                RequiredCapability::Command {
-                    program: command_invocation.program,
-                    arguments: command_invocation.arguments,
-                },
+                RequiredCapability::Command { program, arguments },
             ],
             Some(self.configuration.command_timeout),
         ))
@@ -64,10 +69,27 @@ impl Tool for CommandExecutionTool {
         let configuration = self.configuration.clone();
 
         Box::pin(async move {
-            let command_text = parse_command_text(&tool_plan.normalized_arguments)?;
-            let command_entity =
-                execute_command_in_directory(configuration.root_directory(), command_text)
-                    .map_err(|error| ToolFailure::Execution(error.to_string()))?;
+            let (program, arguments) = parse_command_arguments(&tool_plan.normalized_arguments)?;
+
+            authorization_grant.claim_capabilities(&[
+                RequiredCapability::Filesystem {
+                    path: configuration.root_directory().to_owned(),
+                    access: FilesystemAccess::Modify,
+                },
+                RequiredCapability::Command {
+                    program: program.clone(),
+                    arguments: arguments.clone(),
+                },
+            ])?;
+
+            let command_entity = execute_command_in_directory_with_arguments_and_options(
+                configuration.root_directory(),
+                OsString::from(program),
+                arguments.into_iter().map(OsString::from),
+                configuration.command_options.clone(),
+            )
+            .map_err(|error| ToolFailure::Execution(error.to_string()))?;
+
             let mut command_entity = Box::pin(command_entity);
 
             tokio::select! {
@@ -84,9 +106,30 @@ impl Tool for CommandExecutionTool {
     }
 }
 
-fn parse_command_text(tool_arguments: &Value) -> Result<&str, ToolFailure> {
-    tool_arguments
-        .get("command")
+fn parse_command_arguments(tool_arguments: &Value) -> Result<(String, Vec<String>), ToolFailure> {
+    let program = tool_arguments
+        .get("program")
         .and_then(Value::as_str)
-        .ok_or_else(|| ToolFailure::InvalidArguments("command must be a string".into()))
+        .filter(|program| !program.trim().is_empty())
+        .ok_or_else(|| ToolFailure::InvalidArguments("program must be a string".into()))?
+        .to_owned();
+
+    let arguments = tool_arguments
+        .get("arguments")
+        .map_or(Ok(Vec::new()), |arguments| {
+            arguments
+                .as_array()
+                .ok_or_else(|| ToolFailure::InvalidArguments("arguments must be an array".into()))?
+                .iter()
+                .map(|argument| {
+                    argument.as_str().map(str::to_owned).ok_or_else(|| {
+                        ToolFailure::InvalidArguments(
+                            "every command argument must be a string".into(),
+                        )
+                    })
+                })
+                .collect()
+        })?;
+
+    Ok((program, arguments))
 }

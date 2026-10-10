@@ -1,25 +1,20 @@
 use super::LlmRuntime;
-use crate::{LlmError, RunPolicy, ToolDefinition};
+use crate::{LlmError, ToolDefinition};
 use std::collections::BTreeSet;
 
 pub(super) fn validate_policy(
     definitions: &[ToolDefinition],
-    policy: &RunPolicy,
-    has_interaction_callback: bool,
+    has_approval_path: bool,
 ) -> Result<(), LlmError> {
-    let privileged = definitions
-        .iter()
-        .any(|definition| definition.requires_authorization);
-    let broad = policy.permissions().contains(crate::ALL_FILESYSTEM_ACCESS)
-        && policy.permissions().contains(crate::ALL_USER_COMMANDS);
-    let can_request_approval =
-        policy.approval().is_some() || policy.streams_approvals() || has_interaction_callback;
-    let rejects_untrusted_tools = policy.denies_untrusted();
-    let lacks_authorization_path = !broad && !can_request_approval && !rejects_untrusted_tools;
+    let requires_explicit_user_approval = definitions.iter().any(|definition| {
+        definition
+            .authorization_requirement
+            .requires_explicit_user_approval()
+    });
 
-    if privileged && lacks_authorization_path {
+    if requires_explicit_user_approval && !has_approval_path {
         return Err(LlmError::InvalidRequest(
-            "privileged tools require approval, broad authorization, or deny_untrusted".into(),
+            "tools requiring explicit user approval need a configured approval path".into(),
         ));
     }
 

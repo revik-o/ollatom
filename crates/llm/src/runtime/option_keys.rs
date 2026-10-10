@@ -86,7 +86,7 @@ impl LocalRuntimeOptionKey {
             Self::ContextSize => "context_size",
             Self::EvaluationBatchSize => "evaluation_batch_size",
             Self::ThreadCount => "threads",
-            Self::KeepAlive => "keep_alive",
+            Self::KeepAlive => "keep_alive_seconds",
         }
     }
 

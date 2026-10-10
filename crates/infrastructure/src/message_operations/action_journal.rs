@@ -10,11 +10,13 @@ pub(crate) async fn add_llm_action_to_message(
     let Some(message) = load_message_by_id(database_transaction, message_id).await? else {
         return Err(invalid_message_operation("LLM message does not exist"));
     };
+
     let MessageRoleMetadata::Llm(llm_message_metadata) = message.role_metadata else {
         return Err(invalid_message_operation(
             "actions can only be added to an LLM message",
         ));
     };
+
     if llm_message_metadata.llm_message_state != LlmMessageState::InProgress
         || message.validity != MessageValidity::Active
     {
@@ -28,7 +30,8 @@ pub(crate) async fn add_llm_action_to_message(
         message_id,
         summary,
         action_details,
-        vec![initial_status_event],
+        initial_status_event,
+        Vec::new(),
     )
     .await
 }
@@ -46,27 +49,67 @@ pub(crate) async fn append_llm_action_status_event(
     .await
     .map_err(|source| database_operation_error("failed to read latest action status", source))?;
 
-    let Some(latest_event_row) = latest_event_row else {
-        return Err(InfrastructureError::new(
-            InfrastructureErrorKind::InvalidEntityReference,
-            format!("LLM action '{llm_action_id}' does not exist"),
-        ));
+    let (latest_sequence_number, latest_status_text) = match latest_event_row {
+        Some(latest_event_row) => {
+            let latest_sequence_number: i64 =
+                latest_event_row
+                    .try_get("sequence_number")
+                    .map_err(|source| {
+                        database_operation_error("failed to decode action sequence", source)
+                    })?;
+
+            let latest_status_text: String =
+                latest_event_row.try_get("status").map_err(|source| {
+                    database_operation_error("failed to decode action status", source)
+                })?;
+
+            (latest_sequence_number, latest_status_text)
+        }
+        None => {
+            let initial_status_text: Option<String> =
+                sqlx::query_scalar("SELECT initial_status FROM llm_actions WHERE id = ?")
+                    .bind(llm_action_id.as_bytes().to_vec())
+                    .fetch_optional(&mut **database_transaction)
+                    .await
+                    .map_err(|source| {
+                        database_operation_error("failed to read initial action status", source)
+                    })?;
+
+            let Some(initial_status_text) = initial_status_text else {
+                return Err(InfrastructureError::new(
+                    InfrastructureErrorKind::InvalidEntityReference,
+                    format!("LLM action '{llm_action_id}' does not exist"),
+                ));
+            };
+
+            (1, initial_status_text)
+        }
     };
-    let latest_sequence_number: i64 = latest_event_row
-        .try_get("sequence_number")
-        .map_err(|source| database_operation_error("failed to decode action sequence", source))?;
-    let latest_status_text: String = latest_event_row
-        .try_get("status")
-        .map_err(|source| database_operation_error("failed to decode action status", source))?;
     let latest_status = parse_action_status(&latest_status_text)?;
     validate_action_status_transition(latest_status, status_event_input.status)?;
+    let next_sequence_number = next_action_status_sequence_number(latest_sequence_number)?;
+
     insert_action_status_event(
         database_transaction,
         llm_action_id,
-        (latest_sequence_number + 1) as u32,
+        next_sequence_number,
         status_event_input,
     )
     .await
+}
+
+pub(crate) fn next_action_status_sequence_number(
+    latest_sequence_number: i64,
+) -> InfrastructureResult<u32> {
+    latest_sequence_number
+        .checked_add(1)
+        .and_then(|sequence_number| u32::try_from(sequence_number).ok())
+        .ok_or_else(|| {
+            InfrastructureError::new(
+                InfrastructureErrorKind::CorruptDatabaseValue,
+                "next action status sequence exceeds the u32 range",
+            )
+        })
 }
 
 pub(crate) async fn insert_action_status_event(
@@ -83,12 +126,13 @@ pub(crate) async fn insert_action_status_event(
         .as_ref()
         .map(serialize_json)
         .transpose()?;
+
     sqlx::query(
         "INSERT INTO action_status_events (id, llm_action_id, sequence_number, status, payload_json, occurred_at) VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(status_event_id.as_bytes().to_vec())
     .bind(llm_action_id.as_bytes().to_vec())
-    .bind(sequence_number as i64)
+    .bind(i64::from(sequence_number))
     .bind(action_status_text(status_event_input.status))
     .bind(payload_json)
     .bind(&occurred_at_text)
@@ -111,7 +155,7 @@ pub(crate) async fn ensure_all_actions_are_terminal(
     message_id: MessageId,
 ) -> InfrastructureResult<()> {
     let unfinished_action_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM llm_actions AS action WHERE action.message_id = ? AND NOT EXISTS (SELECT 1 FROM action_status_events AS status_event WHERE status_event.llm_action_id = action.id AND status_event.sequence_number = (SELECT MAX(latest_status_event.sequence_number) FROM action_status_events AS latest_status_event WHERE latest_status_event.llm_action_id = action.id) AND status_event.status IN ('succeeded', 'failed', 'cancelled'))",
+        "SELECT COUNT(*) FROM llm_actions AS action WHERE action.message_id = ? AND COALESCE((SELECT status_event.status FROM action_status_events AS status_event WHERE status_event.llm_action_id = action.id ORDER BY status_event.sequence_number DESC LIMIT 1), action.initial_status) NOT IN ('succeeded', 'failed', 'cancelled')",
     )
     .bind(message_id.as_bytes().to_vec())
     .fetch_one(&mut **database_transaction)
@@ -132,24 +176,51 @@ pub(crate) async fn cancel_unfinished_actions(
     message_id: MessageId,
 ) -> InfrastructureResult<()> {
     let action_rows = sqlx::query(
-        "SELECT action.id, status_event.status FROM llm_actions AS action JOIN action_status_events AS status_event ON status_event.llm_action_id = action.id WHERE action.message_id = ? AND status_event.sequence_number = (SELECT MAX(latest_status_event.sequence_number) FROM action_status_events AS latest_status_event WHERE latest_status_event.llm_action_id = action.id)",
+        "SELECT action.id, COALESCE((SELECT status_event.status FROM action_status_events AS status_event WHERE status_event.llm_action_id = action.id ORDER BY status_event.sequence_number DESC LIMIT 1), action.initial_status) AS status FROM llm_actions AS action WHERE action.message_id = ?",
     )
     .bind(message_id.as_bytes().to_vec())
     .fetch_all(&mut **database_transaction)
     .await
     .map_err(|source| database_operation_error("failed to read unfinished actions", source))?;
 
+    cancel_action_rows(database_transaction, action_rows).await
+}
+
+pub(crate) async fn cancel_unfinished_actions_in_active_suffix(
+    database_transaction: &mut Transaction<'static, Sqlite>,
+    chat_id: ChatId,
+    first_sequence_number: u32,
+) -> InfrastructureResult<()> {
+    let action_rows = sqlx::query(
+        "SELECT action.id, COALESCE((SELECT status_event.status FROM action_status_events AS status_event WHERE status_event.llm_action_id = action.id ORDER BY status_event.sequence_number DESC LIMIT 1), action.initial_status) AS status FROM messages AS message JOIN llm_actions AS action ON action.message_id = message.id WHERE message.chat_id = ? AND message.sequence_number >= ? AND message.validity = 'active' AND message.role = 'llm' AND message.llm_message_state = 'in_progress'",
+    )
+    .bind(chat_id.as_bytes().to_vec())
+    .bind(i64::from(first_sequence_number))
+    .fetch_all(&mut **database_transaction)
+    .await
+    .map_err(|source| database_operation_error("failed to read unfinished suffix actions", source))?;
+
+    cancel_action_rows(database_transaction, action_rows).await
+}
+
+async fn cancel_action_rows(
+    database_transaction: &mut Transaction<'static, Sqlite>,
+    action_rows: Vec<sqlx::sqlite::SqliteRow>,
+) -> InfrastructureResult<()> {
     for action_row in action_rows {
         let status_text: String = action_row
             .try_get("status")
             .map_err(|source| database_operation_error("failed to decode action status", source))?;
+
         let status = parse_action_status(&status_text)?;
+
         if !status.is_terminal() {
             let action_identifier_bytes: Vec<u8> = action_row
                 .try_get("id")
                 .map_err(|source| database_operation_error("failed to decode action ID", source))?;
             let action_id =
                 LlmActionId::from(crate::database::parse_uuid(action_identifier_bytes)?);
+
             append_llm_action_status_event(
                 database_transaction,
                 action_id,

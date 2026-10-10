@@ -13,8 +13,12 @@ impl Tool for EchoTool {
         ToolDefinition {
             name: "echo".into(),
             description: "echo".into(),
-            input_schema: serde_json::json!({"type":"object","required":["value"]}),
-            requires_authorization: false,
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {"value": {"type": "string"}},
+                "required": ["value"]
+            }),
+            authorization_requirement: ToolAuthorizationRequirement::CapabilityPolicy,
         }
     }
 
@@ -23,6 +27,7 @@ impl Tool for EchoTool {
             call: call.clone(),
             normalized_arguments: call.arguments.clone(),
             required_capabilities: vec![],
+            filesystem_capability: None,
             timeout: None,
         })
     }

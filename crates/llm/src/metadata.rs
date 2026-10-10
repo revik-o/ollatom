@@ -38,6 +38,7 @@ impl<T> Default for NormalizedValue<T> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ModelCapability {
+    ChatCompletion,
     Streaming,
     Tools,
     Images,

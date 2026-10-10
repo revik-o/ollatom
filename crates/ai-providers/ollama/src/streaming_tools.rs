@@ -1,21 +1,18 @@
-use super::content::{NativeFunctionCall, NativeToolCall};
+use super::content::{NativeFunctionCall, NativeToolCall, ToolArgumentAssembly};
 use llm::{LlmError, ToolCall};
 use serde_json::{Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub(super) fn merge_native_tool_calls(
-    native_tool_call_values: &[Value],
+    native_tool_calls: &[NativeToolCall],
     accumulated_tool_calls: &mut BTreeMap<usize, NativeToolCall>,
 ) -> Result<(), LlmError> {
-    for (fallback_call_index, native_tool_call_value) in native_tool_call_values.iter().enumerate()
-    {
-        let native_tool_call: NativeToolCall =
-            serde_json::from_value(native_tool_call_value.clone())
-                .map_err(|_| LlmError::ProviderProtocol("invalid Ollama tool call".into()))?;
+    for (fallback_call_index, native_tool_call) in native_tool_calls.iter().enumerate() {
         let tool_call_index = native_tool_call
             .function
             .index
             .unwrap_or(fallback_call_index);
+
         let accumulated_tool_call = accumulated_tool_calls
             .entry(tool_call_index)
             .or_insert_with(|| NativeToolCall {
@@ -23,39 +20,61 @@ pub(super) fn merge_native_tool_calls(
                 function: NativeFunctionCall {
                     index: Some(tool_call_index),
                     name: native_tool_call.function.name.clone(),
-                    arguments: Value::Object(Map::new()),
+                    arguments: ToolArgumentAssembly::Uninitialized,
                 },
             });
 
         if native_tool_call.id.is_some() {
-            accumulated_tool_call.id = native_tool_call.id;
+            accumulated_tool_call.id.clone_from(&native_tool_call.id);
         }
 
         if !native_tool_call.function.name.is_empty() {
-            accumulated_tool_call.function.name = native_tool_call.function.name;
+            accumulated_tool_call
+                .function
+                .name
+                .clone_from(&native_tool_call.function.name);
         }
 
-        accumulated_tool_call.function.arguments = merge_arguments(
-            &accumulated_tool_call.function.arguments,
-            &native_tool_call.function.arguments,
+        merge_arguments(
+            &mut accumulated_tool_call.function.arguments,
+            native_tool_call.function.arguments.clone(),
         )?;
     }
 
     Ok(())
 }
 
-fn merge_arguments(current: &Value, next: &Value) -> Result<Value, LlmError> {
-    if next.is_object() {
-        return Ok(next.clone());
+fn merge_arguments(
+    current: &mut ToolArgumentAssembly,
+    next: ToolArgumentAssembly,
+) -> Result<(), LlmError> {
+    match (current, next) {
+        (current @ ToolArgumentAssembly::Uninitialized, next) => {
+            *current = next;
+            Ok(())
+        }
+        (
+            ToolArgumentAssembly::StringFragments(current_fragments),
+            ToolArgumentAssembly::StringFragments(next_fragments),
+        ) => {
+            current_fragments.push_str(&next_fragments);
+            Ok(())
+        }
+        (
+            ToolArgumentAssembly::CompleteObject(current_object),
+            ToolArgumentAssembly::CompleteObject(next_object),
+        ) if current_object.is_empty() => {
+            *current_object = next_object;
+            Ok(())
+        }
+        (
+            ToolArgumentAssembly::CompleteObject(current_object),
+            ToolArgumentAssembly::CompleteObject(next_object),
+        ) if current_object == &next_object => Ok(()),
+        _ => Err(LlmError::ProviderProtocol(
+            "Ollama tool arguments changed representation during streaming".into(),
+        )),
     }
-
-    if let Some(next_string) = next.as_str() {
-        let current_string = current.as_str().unwrap_or_default();
-        let combined = format!("{current_string}{next_string}");
-        return serde_json::from_str(&combined).or(Ok(Value::String(combined)));
-    }
-
-    Ok(next.clone())
 }
 
 pub(super) fn normalize_tool_call(
@@ -82,23 +101,19 @@ pub(super) fn normalize_tool_call(
 
         while observed_call_identifiers.contains(&tool_call_identifier) {
             tool_call_identifier = format!("{base_identifier}-{collision_suffix}");
-            collision_suffix += 1;
+            collision_suffix = collision_suffix.checked_add(1).ok_or_else(|| {
+                LlmError::ProviderProtocol("Ollama tool-call identifier collision overflow".into())
+            })?;
         }
     }
 
     observed_call_identifiers.insert(tool_call_identifier.clone());
 
-    let tool_arguments = if native_tool_call.function.arguments.is_string() {
-        serde_json::from_str(
-            native_tool_call
-                .function
-                .arguments
-                .as_str()
-                .unwrap_or_default(),
-        )
-        .map_err(|_| LlmError::InvalidToolArguments(native_tool_call.function.name.clone()))?
-    } else {
-        native_tool_call.function.arguments
+    let tool_arguments = match native_tool_call.function.arguments {
+        ToolArgumentAssembly::StringFragments(arguments) => serde_json::from_str(&arguments)
+            .map_err(|_| LlmError::InvalidToolArguments(native_tool_call.function.name.clone()))?,
+        ToolArgumentAssembly::CompleteObject(arguments) => Value::Object(arguments),
+        ToolArgumentAssembly::Uninitialized => Value::Object(Map::new()),
     };
 
     if !tool_arguments.is_object() {

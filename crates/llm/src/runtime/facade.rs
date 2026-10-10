@@ -6,8 +6,6 @@ static GLOBAL_RUNTIME: OnceLock<Arc<LlmRuntime>> = OnceLock::new();
 
 pub struct Llm;
 
-pub type LLM = Llm;
-
 impl Llm {
     pub fn install_global(runtime: impl Into<Arc<LlmRuntime>>) -> Result<(), LlmError> {
         GLOBAL_RUNTIME

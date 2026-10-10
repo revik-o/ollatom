@@ -86,19 +86,31 @@ impl ContextOptimizer {
         let summary_response = self
             .summarize(&preserved_history[active_goal_index], &compacted_history)
             .await?;
-        let summary_text = summary_response.text.trim();
+
+        let summary_text = summary_response
+            .assistant_rounds
+            .first()
+            .map(|assistant_round| assistant_round.text.trim())
+            .unwrap_or_default();
+
+        let summary_usage = summary_response.usage.clone();
 
         if summary_text.is_empty() {
             return Ok(ContextOptimizationOutcome {
                 model_visible_history: preserved_history.clone(),
                 preserved_history,
-                usage: summary_response.usage,
+                usage: summary_usage,
                 optimized: false,
             });
         }
 
+        let retained_history_length = preserved_history
+            .len()
+            .saturating_sub(compacted_history.len());
+
         let mut model_visible_history =
-            Vec::with_capacity(preserved_history.len() - compacted_history.len() + 1);
+            Vec::with_capacity(retained_history_length.saturating_add(1));
+
         model_visible_history.push(ConversationMessage {
             role: ConversationRole::Assistant,
             content: vec![ContentBlock::text(format!(
@@ -111,7 +123,7 @@ impl ContextOptimizer {
         Ok(ContextOptimizationOutcome {
             model_visible_history,
             preserved_history,
-            usage: summary_response.usage,
+            usage: summary_usage,
             optimized: true,
         })
     }
@@ -130,9 +142,11 @@ impl ContextOptimizer {
         optimization_options.context.overflow_policy = Some(ContextOverflowPolicy::Error);
         optimization_options.reasoning.effort = ReasoningEffort::Auto;
         optimization_options.reasoning.budget_tokens = None;
+
         let context_optimization_host = Arc::new(ContextOptimizationProviderHost::new(
             self.stop_token.clone(),
         ));
+
         let context_optimization_provider_request = ProviderRunRequest {
             run_id: self.run_id,
             provider: self.provider_id.clone(),
@@ -146,6 +160,7 @@ impl ContextOptimizer {
             tools: Vec::new(),
             limits: optimization_run_limits(),
         };
+
         let context_optimization_provider_outcome = self
             .provider
             .run(
@@ -166,6 +181,24 @@ impl ContextOptimizer {
                 context_optimization_host
                     .complete_response(&mut response)
                     .await;
+
+                if response.assistant_rounds.len() != 1 {
+                    return Err(LlmError::ProviderProtocol(
+                        "context optimization must return exactly one assistant round".into(),
+                    ));
+                }
+
+                let assistant_round = &response.assistant_rounds[0];
+
+                if assistant_round.finish_reason != crate::FinishReason::Stop
+                    || !assistant_round.tool_calls.is_empty()
+                    || !response.tool_executions.is_empty()
+                {
+                    return Err(LlmError::ProviderProtocol(
+                        "context optimization must finish normally without tool calls".into(),
+                    ));
+                }
+
                 Ok(response)
             }
             ProviderRunOutcome::Cancelled(_partial_response) => Err(LlmError::Cancelled),

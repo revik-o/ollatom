@@ -7,4 +7,6 @@ pub(super) use project::{
     create_project, delete_project_by_id, get_project_by_id, get_project_by_name,
     get_project_by_path, update_project,
 };
-pub(super) use settings::{set_boolean_entity_value, set_usage_entity_value};
+pub(super) use settings::{
+    BooleanEntitySetting, UsageEntitySetting, set_boolean_entity_value, set_usage_entity_value,
+};

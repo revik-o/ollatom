@@ -13,6 +13,7 @@ pub struct LlmRun {
     pub(crate) event_stream: Option<RunEventStream>,
     pub(crate) finished: bool,
     pub(crate) detached: bool,
+    pub(crate) _execution_task: tokio::task::JoinHandle<()>,
 }
 
 impl LlmRun {
@@ -35,9 +36,11 @@ impl LlmRun {
     pub fn detach(mut self) -> Result<RunId, LlmError> {
         let handle = tokio::runtime::Handle::try_current()
             .map_err(|_| LlmError::InvalidRequest("detach requires a Tokio runtime".into()))?;
+
         self.detached = true;
 
         let run_id = self.id;
+
         handle.spawn(async move {
             let _ = (&mut self).await;
         });

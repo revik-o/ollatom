@@ -3,6 +3,24 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::str::FromStr;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+pub(crate) fn allocate_monotonic_identifier(
+    next_identifier: &AtomicU64,
+    identifier_kind: &str,
+) -> Result<u64, LlmError> {
+    next_identifier
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current_identifier| {
+            if current_identifier == 0 {
+                None
+            } else if current_identifier == u64::MAX {
+                Some(0)
+            } else {
+                current_identifier.checked_add(1)
+            }
+        })
+        .map_err(|_| LlmError::IdentifierExhausted(identifier_kind.to_owned()))
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum BuiltInProvider {

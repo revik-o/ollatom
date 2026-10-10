@@ -4,6 +4,7 @@ use crate::{LlmError, LlmRunOutcome, RunEvent};
 pub(crate) fn terminal_event_for(result: &Result<LlmRunOutcome, LlmError>) -> RunEvent {
     match result {
         Ok(LlmRunOutcome::Completed(_)) => RunEvent::Completed,
+        Ok(LlmRunOutcome::Failed(failed_run)) => RunEvent::Failed(failed_run.error.to_string()),
         Ok(LlmRunOutcome::Cancelled(_)) | Err(LlmError::Cancelled) => RunEvent::Cancelled,
         Err(error) => RunEvent::Failed(error.to_string()),
     }

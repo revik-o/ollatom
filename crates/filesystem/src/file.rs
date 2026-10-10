@@ -1,9 +1,6 @@
 use crate::FilesystemError;
-use atomic_write_file::AtomicWriteFile;
-use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use tokio::fs::{self, OpenOptions};
-use tokio::io::AsyncWriteExt;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FilePointer {
@@ -25,6 +22,40 @@ impl FilePointer {
             .map_err(|source| FilesystemError::from_input_output_operation(&self.path, source))
     }
 
+    pub async fn read_bytes_bounded(
+        &self,
+        maximum_byte_count: u64,
+    ) -> Result<Vec<u8>, FilesystemError> {
+        let parent_path = self.path.parent().unwrap_or_else(|| Path::new("."));
+
+        let file_name =
+            self.path
+                .file_name()
+                .ok_or_else(|| FilesystemError::InvalidWorkspaceRelativePath {
+                    path: self.path.clone(),
+                })?;
+
+        crate::WorkspaceDirectory::open(parent_path)
+            .await?
+            .file(Path::new(file_name))?
+            .read_regular_file_bytes_bounded(maximum_byte_count)
+            .await
+    }
+
+    pub async fn read_text_bounded(
+        &self,
+        maximum_byte_count: u64,
+    ) -> Result<String, FilesystemError> {
+        let bytes = self.read_bytes_bounded(maximum_byte_count).await?;
+
+        String::from_utf8(bytes).map_err(|source| {
+            FilesystemError::from_input_output_operation(
+                &self.path,
+                std::io::Error::new(std::io::ErrorKind::InvalidData, source),
+            )
+        })
+    }
+
     pub async fn read_text(&self) -> Result<String, FilesystemError> {
         fs::read_to_string(&self.path)
             .await
@@ -32,9 +63,11 @@ impl FilePointer {
     }
 
     pub async fn write_bytes(&self, contents: &[u8]) -> Result<&Self, FilesystemError> {
-        fs::write(&self.path, contents)
-            .await
-            .map_err(|source| FilesystemError::from_input_output_operation(&self.path, source))?;
+        workspace_file(&self.path)
+            .await?
+            .write_regular_file_bytes(contents.to_vec())
+            .await?;
+
         Ok(self)
     }
 
@@ -59,18 +92,10 @@ impl FilePointer {
     }
 
     pub async fn append_bytes(&self, contents: &[u8]) -> Result<&Self, FilesystemError> {
-        let mut file = OpenOptions::new()
-            .append(true)
-            .open(&self.path)
-            .await
-            .map_err(|source| FilesystemError::from_input_output_operation(&self.path, source))?;
-
-        file.write_all(contents)
-            .await
-            .map_err(|source| FilesystemError::from_input_output_operation(&self.path, source))?;
-        file.flush()
-            .await
-            .map_err(|source| FilesystemError::from_input_output_operation(&self.path, source))?;
+        workspace_file(&self.path)
+            .await?
+            .append_regular_file_bytes(contents.to_vec())
+            .await?;
 
         Ok(self)
     }
@@ -99,19 +124,38 @@ pub async fn create_file(
 ) -> Result<FilePointer, FilesystemError> {
     let directory_path = directory_path.as_ref();
 
+    let file_path = create_entry_path(file_name.as_ref(), directory_path)?;
+
     fs::create_dir_all(directory_path)
         .await
         .map_err(|source| FilesystemError::from_input_output_operation(directory_path, source))?;
 
-    let file_path = create_entry_path(file_name.as_ref(), directory_path)?;
+    let mut options = OpenOptions::new();
+    options.create(true).write(true).truncate(false);
 
-    OpenOptions::new()
-        .create(true)
-        .read(true)
-        .write(true)
-        .truncate(false)
+    #[cfg(unix)]
+    options
+        .mode(0o600)
+        .custom_flags(nix::fcntl::OFlag::O_NOFOLLOW.bits());
+    #[cfg(windows)]
+    options
+        .access_mode(
+            crate::permissions::windows_file_access::FILE_GENERIC_WRITE
+                | crate::permissions::windows_file_access::FILE_READ_ATTRIBUTES
+                | crate::permissions::windows_file_access::READ_CONTROL
+                | crate::permissions::windows_file_access::WRITE_DAC,
+        )
+        .share_mode(crate::permissions::windows_file_access::FILE_SHARE_NONE)
+        .custom_flags(crate::permissions::windows_file_attribute::OPEN_REPARSE_POINT);
+
+    let file = options
         .open(&file_path)
         .await
+        .map_err(|source| FilesystemError::from_input_output_operation(&file_path, source))?;
+
+    let mut file = file.into_std().await;
+
+    crate::permissions::restrict_open_file_to_current_user(&mut file)
         .map_err(|source| FilesystemError::from_input_output_operation(&file_path, source))?;
 
     Ok(FilePointer { path: file_path })
@@ -142,19 +186,31 @@ async fn write_file_atomically(
     contents: impl Into<Vec<u8>>,
 ) -> Result<(), FilesystemError> {
     let file_path = file_path.as_ref().to_owned();
-    let filesystem_operation_path = file_path.clone();
     let contents = contents.into();
+    let commit = workspace_file(&file_path)
+        .await?
+        .prepare_atomic_write(contents, crate::AtomicMetadataPolicy::PreserveSupported)
+        .await?
+        .start_commit()?;
 
-    tokio::task::spawn_blocking(move || -> Result<(), std::io::Error> {
-        let mut atomic_file = AtomicWriteFile::open(&filesystem_operation_path)?;
-        atomic_file.write_all(&contents)?;
-        atomic_file.commit()?;
-        Ok(())
-    })
-    .await
-    .map_err(|source| FilesystemError::FilesystemOperationTaskFailed {
-        path: file_path.clone(),
-        source,
-    })?
-    .map_err(|source| FilesystemError::from_input_output_operation(file_path, source))
+    match commit.wait().await {
+        crate::AtomicCommitStatus::Succeeded => Ok(()),
+        crate::AtomicCommitStatus::Pending => unreachable!(),
+        crate::AtomicCommitStatus::Failed(message) => Err(
+            FilesystemError::from_input_output_operation(file_path, std::io::Error::other(message)),
+        ),
+    }
+}
+
+async fn workspace_file(path: &Path) -> Result<crate::WorkspaceFile, FilesystemError> {
+    let parent_path = path.parent().unwrap_or_else(|| Path::new("."));
+    let file_name =
+        path.file_name()
+            .ok_or_else(|| FilesystemError::InvalidWorkspaceRelativePath {
+                path: path.to_owned(),
+            })?;
+
+    crate::WorkspaceDirectory::open(parent_path)
+        .await?
+        .file(Path::new(file_name))
 }

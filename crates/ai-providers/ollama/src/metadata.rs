@@ -6,21 +6,24 @@ use super::{
     metadata_values::{apply_model_capabilities, native_capabilities, parse_parameter_value},
 };
 use llm::{
-    CapabilitySupport, LocalOptionPhase, ModelCapability, ModelId, ModelInfo, ProviderCapabilities,
-    ProviderId, ReasoningEffort,
+    CapabilitySupport, ModelCapability, ModelId, ModelInfo, ProviderCapabilities, ProviderId,
+    ReasoningEffort,
 };
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 
-#[derive(Clone, Debug, Default, Deserialize)]
-pub(super) struct NativeModelTagsResponse {
-    #[serde(default)]
-    pub(super) models: Vec<NativeModelTag>,
+mod capabilities;
+
+pub(super) use capabilities::provider_capabilities;
+
+#[derive(Clone, Debug, Deserialize)]
+pub(super) struct NativeModelListResponse {
+    pub(super) models: Vec<NativeModelListEntry>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub(super) struct NativeModelTag {
+pub(super) struct NativeModelListEntry {
     pub(super) name: String,
     #[serde(default)]
     pub(super) model: Option<String>,
@@ -28,28 +31,7 @@ pub(super) struct NativeModelTag {
     additional_fields: Value,
 }
 
-impl NativeModelTag {
-    pub(super) fn raw_value(&self) -> Value {
-        native_model_raw_value(&self.name, self.model.as_deref(), &self.additional_fields)
-    }
-}
-
-#[derive(Clone, Debug, Default, Deserialize)]
-pub(super) struct NativeRunningModelsResponse {
-    #[serde(default)]
-    pub(super) models: Vec<NativeRunningModel>,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub(super) struct NativeRunningModel {
-    pub(super) name: String,
-    #[serde(default)]
-    pub(super) model: Option<String>,
-    #[serde(flatten)]
-    additional_fields: Value,
-}
-
-impl NativeRunningModel {
+impl NativeModelListEntry {
     pub(super) fn raw_value(&self) -> Value {
         native_model_raw_value(&self.name, self.model.as_deref(), &self.additional_fields)
     }
@@ -61,6 +43,7 @@ fn native_model_raw_value(
     additional_fields: &Value,
 ) -> Value {
     let mut native_model = additional_fields.as_object().cloned().unwrap_or_default();
+
     native_model.insert("name".into(), json!(model_name));
 
     if let Some(canonical_model_name) = canonical_model_name {
@@ -70,91 +53,43 @@ fn native_model_raw_value(
     Value::Object(native_model)
 }
 
-pub(super) fn provider_capabilities() -> ProviderCapabilities {
-    let features = BTreeMap::from([
-        (ModelCapability::Streaming, CapabilitySupport::Supported),
-        (ModelCapability::Tools, CapabilitySupport::Unknown),
-        (ModelCapability::Images, CapabilitySupport::Unknown),
-        (ModelCapability::Audio, CapabilitySupport::Unknown),
-        (ModelCapability::Reasoning, CapabilitySupport::Unknown),
-        (ModelCapability::Files, CapabilitySupport::Unsupported),
-        (
-            ModelCapability::StructuredOutput,
-            CapabilitySupport::Unsupported,
-        ),
-    ]);
-    let reasoning_efforts = BTreeMap::from([
-        (ReasoningEffort::Auto, CapabilitySupport::Supported),
-        (ReasoningEffort::None, CapabilitySupport::Supported),
-        (ReasoningEffort::Minimal, CapabilitySupport::Unsupported),
-        (ReasoningEffort::Low, CapabilitySupport::Unknown),
-        (ReasoningEffort::Medium, CapabilitySupport::Unknown),
-        (ReasoningEffort::High, CapabilitySupport::Unknown),
-        (ReasoningEffort::ExtraHigh, CapabilitySupport::Unsupported),
-        (ReasoningEffort::Max, CapabilitySupport::Unknown),
-    ]);
-    let generation_options = supported_options([
-        "max_output_tokens",
-        "temperature",
-        "diversity_threshold",
-        "max_token_choices",
-        "repeat_penalty",
-        "stop_sequences",
-    ]);
-    let local_runtime_options = supported_options([
-        "context_size",
-        "evaluation_batch_size",
-        "threads",
-        "keep_alive",
-        "keep_alive_seconds",
-    ]);
-    let local_option_phases = [
-        "context_size",
-        "evaluation_batch_size",
-        "threads",
-        "keep_alive",
-        "keep_alive_seconds",
-    ]
-    .into_iter()
-    .map(|name| (name.to_string(), LocalOptionPhase::PerRequest))
-    .collect();
-
-    ProviderCapabilities {
-        features,
-        reasoning_efforts,
-        generation_options,
-        local_runtime_options,
-        local_option_phases,
-    }
-}
-
-fn supported_options<const COUNT: usize>(
-    names: [&str; COUNT],
-) -> BTreeMap<String, CapabilitySupport> {
-    names
-        .into_iter()
-        .map(|name| (name.to_string(), CapabilitySupport::Supported))
-        .collect()
-}
-
 pub(super) fn create_model_info(
     model_identifier: ModelId,
-    model_tag: Option<&NativeModelTag>,
+    model_tag: Option<&NativeModelListEntry>,
     model_details: Option<Value>,
-    running_model: Option<&NativeRunningModel>,
+    running_model: Option<&NativeModelListEntry>,
     provider_identifier: &ProviderId,
 ) -> ModelInfo {
-    let model_tag_value = model_tag.map(NativeModelTag::raw_value);
-    let running_model_value = running_model.map(NativeRunningModel::raw_value);
+    let model_tag_value = model_tag.map(NativeModelListEntry::raw_value);
+    let running_model_value = running_model.map(NativeModelListEntry::raw_value);
     let model_details_value = model_details.unwrap_or(Value::Null);
+
     let sources = ModelInformationSources::new(
         &model_details_value,
         model_tag_value.as_ref(),
         running_model_value.as_ref(),
     );
+
     let native_model_capabilities = sources.native_capabilities();
     let mut capabilities = provider_capabilities();
+
     apply_model_capabilities(&mut capabilities, &native_model_capabilities);
+    apply_exact_reasoning_efforts(&mut capabilities, &model_details_value);
+
+    if sources.model_details.get("capabilities").is_some() {
+        capabilities.features.insert(
+            ModelCapability::ChatCompletion,
+            if native_model_capabilities
+                .iter()
+                .any(|capability| capability.eq_ignore_ascii_case("completion"))
+            {
+                CapabilitySupport::Supported
+            } else {
+                CapabilitySupport::Unsupported
+            },
+        );
+    }
+
     let parameter_count = sources
         .details
         .and_then(|value| value.get("parameter_size"))
@@ -181,6 +116,48 @@ pub(super) fn create_model_info(
             parameter_count,
             &native_model_capabilities,
         ),
+    }
+}
+
+fn apply_exact_reasoning_efforts(capabilities: &mut ProviderCapabilities, model_details: &Value) {
+    let Some(thinking_metadata) = model_details.get("thinking") else {
+        return;
+    };
+
+    let mut supported_values = thinking_metadata
+        .get("values")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+
+    if let Some(default_value) = thinking_metadata.get("default") {
+        supported_values.push(default_value);
+    }
+
+    for supported_value in supported_values {
+        let reasoning_effort = match supported_value {
+            Value::Bool(false) => Some(ReasoningEffort::None),
+            Value::Bool(true) => Some(ReasoningEffort::Auto),
+            Value::String(value) => match value.to_ascii_lowercase().as_str() {
+                "auto" => Some(ReasoningEffort::Auto),
+                "none" | "false" => Some(ReasoningEffort::None),
+                "minimal" => Some(ReasoningEffort::Minimal),
+                "low" => Some(ReasoningEffort::Low),
+                "medium" => Some(ReasoningEffort::Medium),
+                "high" => Some(ReasoningEffort::High),
+                "xhigh" | "extra_high" => Some(ReasoningEffort::ExtraHigh),
+                "max" => Some(ReasoningEffort::Max),
+                _ => None,
+            },
+            _ => None,
+        };
+
+        if let Some(reasoning_effort) = reasoning_effort {
+            capabilities
+                .reasoning_efforts
+                .insert(reasoning_effort, CapabilitySupport::Supported);
+        }
     }
 }
 
@@ -222,6 +199,7 @@ fn create_provider_metadata(
     native_capabilities: &[String],
 ) -> BTreeMap<String, Value> {
     let mut native_metadata = Map::new();
+
     native_metadata.insert("show".into(), model_details);
 
     if let Some(model_tag) = model_tag {

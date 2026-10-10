@@ -1,86 +1,40 @@
 use os::{CommandError, execute_command};
-use std::{path::PathBuf, time::Duration};
+#[cfg(any(unix, windows))]
+use os::{
+    CommandInvocation, SandboxNetworkPolicy, execute_sandboxed_command, prepare_sandboxed_command,
+};
+#[cfg(unix)]
+use std::{
+    collections::BTreeMap, ffi::OsString, path::PathBuf, process::Command as ProcessCommand,
+    sync::OnceLock, time::Duration,
+};
+#[cfg(windows)]
+use std::{collections::BTreeMap, ffi::OsString, path::PathBuf, time::Duration};
 
-#[tokio::test]
-async fn command_entity_captures_standard_output_and_errors() {
-    let command_entity = execute_command("sh -c 'printf output; printf error >&2'").unwrap();
-    let outcome = command_entity.await.unwrap();
-    assert!(outcome.succeeded);
-    assert_eq!(outcome.terminal_logs(), outcome.get_terminal_logs());
-    assert_eq!(outcome.get_terminal_logs().standard_output, "output");
-    assert_eq!(outcome.get_terminal_logs().standard_error, "error");
-}
-
-#[tokio::test]
-async fn command_entity_can_be_terminated() {
-    let command_entity = execute_command("sleep 30").unwrap();
-    command_entity.terminate().unwrap();
-    let outcome = command_entity.await.unwrap();
-    assert!(outcome.terminated);
-    assert!(!outcome.succeeded);
-}
-
-#[tokio::test]
-async fn command_entity_exposes_logs_before_completion() {
-    let command_entity = execute_command("sh -c 'printf start; sleep 1; printf end'").unwrap();
-
-    for _ in 0..20 {
-        if command_entity
-            .get_terminal_logs()
-            .standard_output
-            .contains("start")
-        {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(10)).await;
-    }
-    assert!(
-        command_entity
-            .get_terminal_logs()
-            .standard_output
-            .contains("start")
-    );
-    command_entity.terminate().unwrap();
-    let outcome = command_entity.await.unwrap();
-    assert!(outcome.terminated);
-}
-
-#[tokio::test]
-async fn termination_is_not_reported_after_natural_completion() {
-    let command_entity = execute_command("true").unwrap();
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    command_entity.terminate().unwrap();
-    let outcome = command_entity.await.unwrap();
-    assert!(outcome.succeeded);
-    assert!(!outcome.terminated);
+#[cfg(unix)]
+#[cfg(unix)]
+async fn file_appears_within(file_path: &std::path::Path, timeout: Duration) -> bool {
+    wait_for_condition(timeout, || file_path.exists()).await
 }
 
 #[cfg(unix)]
-#[tokio::test]
-async fn termination_stops_descendant_processes() {
-    let completion_marker = unique_completion_marker();
-    let script = format!(
-        "(sleep 2; printf survived > {}) & wait",
-        shlex::try_quote(&completion_marker.to_string_lossy()).unwrap()
-    );
-    let command = shlex::try_join(["sh", "-c", &script]).unwrap();
-    let command_entity = execute_command(command).unwrap();
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    command_entity.terminate().unwrap();
-    let outcome = command_entity.await.unwrap();
-    assert!(outcome.terminated);
-    tokio::time::sleep(Duration::from_secs(3)).await;
-    assert!(!completion_marker.exists());
+async fn wait_for_condition<Condition>(timeout: Duration, mut condition: Condition) -> bool
+where
+    Condition: FnMut() -> bool,
+{
+    tokio::time::timeout(timeout, async {
+        loop {
+            if condition() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .is_ok()
 }
 
-#[test]
-fn command_parser_rejects_unclosed_quotes() {
-    assert!(matches!(
-        execute_command("sh -c 'unterminated"),
-        Err(CommandError::InvalidCommand)
-    ));
-}
-
+#[cfg(unix)]
 fn unique_completion_marker() -> PathBuf {
     let unique_suffix = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -91,3 +45,33 @@ fn unique_completion_marker() -> PathBuf {
         std::process::id()
     ))
 }
+
+#[cfg(unix)]
+fn sandbox_backend_can_launch() -> bool {
+    static BACKEND_CAN_LAUNCH: OnceLock<bool> = OnceLock::new();
+    *BACKEND_CAN_LAUNCH.get_or_init(|| {
+        #[cfg(target_os = "linux")]
+        let probe_result = ProcessCommand::new("/usr/bin/bwrap")
+            .args([
+                "--unshare-all",
+                "--proc",
+                "/proc",
+                "--dev",
+                "/dev",
+                "/usr/bin/true",
+            ])
+            .output();
+
+        #[cfg(target_os = "macos")]
+        let probe_result = ProcessCommand::new("/usr/bin/sandbox-exec")
+            .args(["-p", "(version 1) (allow default)", "/usr/bin/true"])
+            .output();
+
+        probe_result.is_ok_and(|output| output.status.success())
+    })
+}
+
+#[path = "command/process_lifecycle.rs"]
+mod process_lifecycle;
+#[path = "command/sandbox_and_platform.rs"]
+mod sandbox_and_platform;

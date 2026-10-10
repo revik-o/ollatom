@@ -7,7 +7,11 @@ use crate::{
     RunId, RunLimits, RunPolicy, StopToken, SubagentProfileRegistry, ToolRegistry,
     events::EventDispatcher, interaction::InteractionCallback, subagent::SharedSubagentRunner,
 };
-use std::{collections::BTreeSet, sync::Arc};
+use std::{
+    collections::BTreeSet,
+    sync::{Arc, atomic::AtomicBool},
+    time::Instant,
+};
 use tokio::sync::Mutex;
 
 pub(super) struct RunHostDependencies {
@@ -18,6 +22,7 @@ pub(super) struct RunHostDependencies {
     pub policy: RunPolicy,
     pub stop_token: StopToken,
     pub limits: RunLimits,
+    pub overall_deadline: Option<Instant>,
     pub interaction_hub: Arc<InteractionHub>,
     pub interaction_callback: Option<InteractionCallback>,
     pub subagent_profiles: Arc<SubagentProfileRegistry>,
@@ -37,6 +42,7 @@ impl RunHost {
             policy: dependencies.policy,
             stop: dependencies.stop_token,
             limits: dependencies.limits,
+            overall_deadline: dependencies.overall_deadline,
             interactions: dependencies.interaction_hub,
             interaction_callback: dependencies.interaction_callback,
             profiles: dependencies.subagent_profiles,
@@ -46,6 +52,7 @@ impl RunHost {
             context_optimizer: dependencies.context_optimizer,
             state: Mutex::new(HostState::default()),
             execution: Mutex::new(()),
+            finalized: AtomicBool::new(false),
         }
     }
 }

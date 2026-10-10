@@ -127,6 +127,7 @@ pub struct ApprovalRequest {
     pub tool_name: String,
     pub call_id: String,
     pub capabilities: Vec<RequiredCapability>,
+    pub normalized_arguments: serde_json::Value,
     pub summary: String,
 }
 

@@ -71,7 +71,7 @@ pub struct AttachmentInput {
 pub struct Message {
     pub id: MessageId,
     pub chat_id: ChatId,
-    pub sequence_number: u64,
+    pub sequence_number: u32,
     pub contents: String,
     pub attachments: Vec<Attachment>,
     pub role_metadata: MessageRoleMetadata,
@@ -87,5 +87,11 @@ impl Message {
             MessageRoleMetadata::User(_) => MessageRole::User,
             MessageRoleMetadata::Llm(_) => MessageRole::Llm,
         }
+    }
+}
+
+impl From<&Message> for MessageId {
+    fn from(message: &Message) -> Self {
+        message.id
     }
 }

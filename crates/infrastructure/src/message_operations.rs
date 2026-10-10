@@ -1,12 +1,11 @@
 use crate::database::{database_operation_error, format_timestamp, validate_nonblank_value};
 use crate::mapping::{map_attachment_row, map_message_row, serialize_json};
 use crate::{
-    Attachment, AttachmentId, AttachmentInput, ChatId, CommandActionDetails, FileChangeDetails,
-    FileChangeOperation, InfrastructureError, InfrastructureErrorKind, InfrastructureResult,
-    LlmAction, LlmActionDetails, LlmActionId, LlmActionInput, LlmActionStatus,
-    LlmActionStatusEvent, LlmActionStatusEventId, LlmActionStatusEventInput, LlmMessageState,
-    Message, MessageId, MessageRoleMetadata, MessageValidity, ToolCallActionDetails,
-    UserMessageMetadata,
+    Attachment, AttachmentId, AttachmentInput, ChatId, FileChangeOperation, InfrastructureError,
+    InfrastructureErrorKind, InfrastructureResult, LlmAction, LlmActionDetails, LlmActionId,
+    LlmActionInitialStatus, LlmActionInput, LlmActionStatus, LlmActionStatusEvent,
+    LlmActionStatusEventId, LlmActionStatusEventInput, LlmMessageState, Message, MessageId,
+    MessageRoleMetadata, MessageValidity, UserMessageMetadata,
 };
 use sqlx::{AssertSqlSafe, Row, Sqlite, Transaction};
 use time::OffsetDateTime;
@@ -14,7 +13,7 @@ use time::OffsetDateTime;
 const MESSAGE_COLUMNS: &str = "id, chat_id, sequence_number, role, contents, user_revision_group_id, user_revision_number, llm_reply_to_user_message_id, llm_response_round_number, llm_message_state, validity, created_at, updated_at, deprecated_at";
 
 mod action_details;
-mod action_journal;
+pub(crate) mod action_journal;
 mod attachments;
 mod llm_messages;
 mod loading;

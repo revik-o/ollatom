@@ -22,6 +22,7 @@ mod request_validation;
 mod state;
 
 pub use builder::LlmRuntimeBuilder;
-pub use facade::{LLM, Llm};
+pub use facade::Llm;
 pub use state::LlmRuntime;
+
 pub(crate) use state::{ProviderRegistration, RuntimeInner};

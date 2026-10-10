@@ -25,7 +25,7 @@ fn oldest_retained_tool_round_start_index(
     minimum_start_index: usize,
 ) -> Option<usize> {
     let mut oldest_retained_start_index = None;
-    let mut retained_tool_round_count = 0;
+    let mut retained_tool_round_count: usize = 0;
 
     for message_index in (minimum_start_index..history.len()).rev() {
         if !message_contains_tool_call(&history[message_index]) {
@@ -33,7 +33,7 @@ fn oldest_retained_tool_round_start_index(
         }
 
         oldest_retained_start_index = Some(message_index);
-        retained_tool_round_count += 1;
+        retained_tool_round_count = retained_tool_round_count.saturating_add(1);
 
         if retained_tool_round_count == RECENT_TOOL_ROUND_COUNT {
             break;

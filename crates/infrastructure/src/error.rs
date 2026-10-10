@@ -1,6 +1,8 @@
+use std::error::Error;
 use std::fmt::{Display, Formatter};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum InfrastructureErrorKind {
     InvalidDatabaseFilePath,
     DatabaseParentDirectoryDoesNotExist,
@@ -10,19 +12,21 @@ pub enum InfrastructureErrorKind {
     DatabaseMigrationFailed,
     DatabaseOperationFailed,
     DatabaseConstraintViolation,
+    CorruptDatabaseValue,
     EntityValidationFailed,
+    InvalidProjectPath,
     InvalidEntityReference,
     InvalidMessageOperation,
     InvalidLlmActionStatusTransition,
     TransactionWasMarkedAsFailed,
     DatabaseActionAndRollbackFailed,
-    InvalidSqlBuilderOperation,
 }
 
 #[derive(Debug)]
 pub struct InfrastructureError {
     kind: InfrastructureErrorKind,
     message: String,
+    source: Option<Box<dyn Error + Send + Sync>>,
 }
 
 impl InfrastructureError {
@@ -38,15 +42,20 @@ impl InfrastructureError {
         Self {
             kind,
             message: message.into(),
+            source: None,
         }
     }
 
     pub(crate) fn from_database_error(
         kind: InfrastructureErrorKind,
         operation: &str,
-        source: impl Display,
+        source: impl Error + Send + Sync + 'static,
     ) -> Self {
-        Self::new(kind, format!("{operation}: {source}"))
+        Self {
+            kind,
+            message: format!("{operation}: {source}"),
+            source: Some(Box::new(source)),
+        }
     }
 }
 
@@ -56,6 +65,12 @@ impl Display for InfrastructureError {
     }
 }
 
-impl std::error::Error for InfrastructureError {}
+impl Error for InfrastructureError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        self.source
+            .as_deref()
+            .map(|source| source as &(dyn Error + 'static))
+    }
+}
 
 pub type InfrastructureResult<ReturnValue> = Result<ReturnValue, InfrastructureError>;

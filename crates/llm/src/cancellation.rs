@@ -1,4 +1,12 @@
+use std::{future::Future, time::Duration};
 use tokio::sync::watch;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ControlledFutureOutcome<OutputValue> {
+    Completed(OutputValue),
+    Cancelled,
+    TimedOut,
+}
 
 #[derive(Clone, Debug)]
 pub struct StopToken {
@@ -26,6 +34,38 @@ impl StopToken {
             if *receiver.borrow() {
                 return;
             }
+        }
+    }
+
+    pub async fn run_until_cancelled<OutputValue, Operation>(
+        &self,
+        operation: Operation,
+    ) -> ControlledFutureOutcome<OutputValue>
+    where
+        Operation: Future<Output = OutputValue>,
+    {
+        tokio::pin!(operation);
+        tokio::select! {
+            biased;
+            () = self.cancelled() => ControlledFutureOutcome::Cancelled,
+            output_value = &mut operation => ControlledFutureOutcome::Completed(output_value),
+        }
+    }
+
+    pub async fn run_until_cancelled_or_timeout<OutputValue, Operation>(
+        &self,
+        timeout_duration: Duration,
+        operation: Operation,
+    ) -> ControlledFutureOutcome<OutputValue>
+    where
+        Operation: Future<Output = OutputValue>,
+    {
+        tokio::pin!(operation);
+        tokio::select! {
+            biased;
+            () = self.cancelled() => ControlledFutureOutcome::Cancelled,
+            () = tokio::time::sleep(timeout_duration) => ControlledFutureOutcome::TimedOut,
+            output_value = &mut operation => ControlledFutureOutcome::Completed(output_value),
         }
     }
 }

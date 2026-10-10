@@ -1,169 +1,76 @@
-use super::YamlConfigurationError;
-use super::document::{
-    deserialize_configuration_document, deserialize_yaml_configuration,
-    read_configuration_document, serialize_configuration_document, serialize_yaml_configuration,
-    validate_configuration_key,
-};
-use super::worker::{YamlConfigurationCommand, start_yaml_configuration_worker};
-use filesystem::create_file;
-use serde::{Serialize, de::DeserializeOwned};
+use filesystem::FilePointer;
 use serde_json::Value;
-use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
-use tokio::sync::{mpsc, oneshot};
+use std::collections::{BTreeMap, HashMap};
+use std::marker::PhantomData;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use tokio::sync::{Mutex as AsyncMutex, watch};
 
-const YAML_CONFIGURATION_COMMAND_QUEUE_CAPACITY: usize = 64;
+pub(crate) mod commit;
+mod coordinator;
+mod factory;
+mod file;
+mod json;
+mod typed;
 
-#[derive(Clone, Debug)]
-pub struct YamlConfigurationStore {
-    file_path: PathBuf,
-    command_sender: mpsc::Sender<YamlConfigurationCommand>,
+pub use factory::{create_json_configuration_store, create_typed_yaml_file};
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct ConfigurationCommitIdentifier(u64);
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ConfigurationCommitStatus {
+    Pending,
+    Succeeded,
+    Failed(String),
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct ConfigurationCommitRegistry {
+    statuses:
+        Mutex<HashMap<ConfigurationCommitIdentifier, watch::Receiver<ConfigurationCommitStatus>>>,
 }
 
 #[derive(Debug)]
-pub struct YamlConfigurationUpdate {
-    configuration_store: YamlConfigurationStore,
+struct ConfigurationCoordinator {
+    mutation_lock: Arc<AsyncMutex<()>>,
+    commit_registry: Arc<ConfigurationCommitRegistry>,
+}
+#[derive(Clone, Debug)]
+struct ConfigurationFile {
+    file_pointer: FilePointer,
+    file_path: PathBuf,
+    lock_file_path: PathBuf,
+    coordinator: Arc<ConfigurationCoordinator>,
+}
+
+#[derive(Clone, Debug)]
+pub struct JsonConfigurationStore {
+    file: ConfigurationFile,
+}
+
+pub struct TypedYamlFile<Configuration> {
+    file: ConfigurationFile,
+    configuration_marker: PhantomData<Configuration>,
+}
+
+impl<Configuration> Clone for TypedYamlFile<Configuration> {
+    fn clone(&self) -> Self {
+        Self {
+            file: self.file.clone(),
+            configuration_marker: PhantomData,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct JsonConfigurationUpdate {
+    configuration_store: JsonConfigurationStore,
     parameters: BTreeMap<String, Value>,
 }
 
-impl YamlConfigurationStore {
-    pub fn file_path(&self) -> &Path {
-        &self.file_path
-    }
-
-    pub fn create_update(&self) -> YamlConfigurationUpdate {
-        YamlConfigurationUpdate {
-            configuration_store: self.clone(),
-            parameters: BTreeMap::new(),
-        }
-    }
-
-    pub fn add_parameter(
-        self,
-        configuration_key: impl Into<String>,
-        configuration_value: impl Into<Value>,
-    ) -> Result<YamlConfigurationUpdate, YamlConfigurationError> {
-        YamlConfigurationUpdate {
-            configuration_store: self,
-            parameters: BTreeMap::new(),
-        }
-        .add_parameter(configuration_key, configuration_value)
-    }
-
-    pub async fn read_parameter(
-        &self,
-        configuration_key: &str,
-    ) -> Result<Option<Value>, YamlConfigurationError> {
-        validate_configuration_key(configuration_key)?;
-        let configuration_key = configuration_key.to_owned();
-        self.send_command_and_receive_result(|result_sender| {
-            YamlConfigurationCommand::ReadParameter {
-                configuration_key,
-                result_sender,
-            }
-        })
-        .await
-    }
-
-    pub async fn read_yaml_configuration<Configuration>(
-        &self,
-    ) -> Result<Configuration, YamlConfigurationError>
-    where
-        Configuration: DeserializeOwned,
-    {
-        let configuration_document = self
-            .send_command_and_receive_result(|result_sender| {
-                YamlConfigurationCommand::ReadConfigurationDocument { result_sender }
-            })
-            .await?;
-        let configuration_contents =
-            serialize_configuration_document(&configuration_document, self.file_path.as_path())?;
-        deserialize_yaml_configuration(&configuration_contents, self.file_path.as_path())
-    }
-
-    pub async fn write_yaml_configuration<Configuration>(
-        &self,
-        configuration: &Configuration,
-    ) -> Result<&Self, YamlConfigurationError>
-    where
-        Configuration: Serialize,
-    {
-        let configuration_contents = serialize_yaml_configuration(configuration, &self.file_path)?;
-        let configuration_document =
-            deserialize_configuration_document(&configuration_contents, &self.file_path)?;
-        self.send_command_and_receive_result(|result_sender| {
-            YamlConfigurationCommand::ReplaceConfigurationDocument {
-                configuration_document,
-                result_sender,
-            }
-        })
-        .await?;
-        Ok(self)
-    }
-
-    async fn send_command_and_receive_result<ResultValue>(
-        &self,
-        create_command: impl FnOnce(
-            oneshot::Sender<Result<ResultValue, YamlConfigurationError>>,
-        ) -> YamlConfigurationCommand,
-    ) -> Result<ResultValue, YamlConfigurationError> {
-        let (result_sender, result_receiver) = oneshot::channel();
-        self.command_sender
-            .send(create_command(result_sender))
-            .await
-            .map_err(
-                |_| YamlConfigurationError::YamlConfigurationWorkerUnavailable {
-                    path: self.file_path.clone(),
-                },
-            )?;
-        result_receiver.await.map_err(|_| {
-            YamlConfigurationError::YamlConfigurationWorkerUnavailable {
-                path: self.file_path.clone(),
-            }
-        })?
-    }
-}
-
-impl YamlConfigurationUpdate {
-    pub fn add_parameter(
-        mut self,
-        configuration_key: impl Into<String>,
-        configuration_value: impl Into<Value>,
-    ) -> Result<Self, YamlConfigurationError> {
-        let configuration_key = configuration_key.into();
-        validate_configuration_key(&configuration_key)?;
-        self.parameters
-            .insert(configuration_key, configuration_value.into());
-        Ok(self)
-    }
-
-    pub async fn commit(self) -> Result<YamlConfigurationStore, YamlConfigurationError> {
-        let configuration_store = self.configuration_store;
-        configuration_store
-            .send_command_and_receive_result(|result_sender| {
-                YamlConfigurationCommand::CommitParameters {
-                    parameters: self.parameters,
-                    result_sender,
-                }
-            })
-            .await?;
-        Ok(configuration_store)
-    }
-}
-
-pub async fn create_yaml_configuration_file(
-    file_name: impl AsRef<str>,
-    directory_path: impl AsRef<Path>,
-) -> Result<YamlConfigurationStore, YamlConfigurationError> {
-    let file_pointer = create_file(file_name, directory_path).await?;
-    let file_path = file_pointer.path().to_owned();
-    let configuration_document = read_configuration_document(&file_pointer).await?;
-    let (command_sender, command_receiver) =
-        mpsc::channel(YAML_CONFIGURATION_COMMAND_QUEUE_CAPACITY);
-    start_yaml_configuration_worker(file_pointer, configuration_document, command_receiver);
-
-    Ok(YamlConfigurationStore {
-        file_path,
-        command_sender,
-    })
+pub struct ConfigurationCommitHandle {
+    operation_identifier: ConfigurationCommitIdentifier,
+    completion_receiver: watch::Receiver<ConfigurationCommitStatus>,
+    coordinator: Arc<ConfigurationCoordinator>,
 }

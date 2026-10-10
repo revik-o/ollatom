@@ -1,23 +1,28 @@
 use super::{
-    metadata::{NativeModelTag, create_model_info},
+    metadata::{NativeModelListEntry, create_model_info},
     metadata_values::{model_matches_scope, native_model_is_remote},
     provider::OllamaProvider,
 };
-use llm::{LlmError, ModelId, ModelInfo, ModelScope};
+use llm::{LlmError, ModelId, ModelInfo, ModelScope, TransportOptions};
 use std::collections::{BTreeSet, HashMap};
 
 pub(super) async fn list(
     provider: &OllamaProvider,
     scope: ModelScope,
+    transport: &TransportOptions,
 ) -> Result<Vec<ModelInfo>, LlmError> {
-    let model_tags = provider.fetch_model_tags().await?;
-    let running_models = provider.fetch_running_models().await?;
+    let (model_tags, running_models) = tokio::try_join!(
+        provider.fetch_model_tags(transport),
+        provider.fetch_running_models(transport),
+    )?;
+
     let running_by_name = index_running_models(&running_models);
     let mut model_information = Vec::with_capacity(model_tags.len());
     let mut known_model_names = BTreeSet::new();
 
     for model_tag in model_tags {
         let model_identifier = ModelId::new(model_tag.name.clone())?;
+
         known_model_names.insert(model_tag.name.clone());
 
         if let Some(canonical_model_identifier) = model_tag.model.as_deref() {
@@ -25,6 +30,10 @@ pub(super) async fn list(
         }
 
         let running_model = find_running_model(&model_tag, &running_by_name);
+
+        if !native_model_supports_chat(&model_tag) {
+            continue;
+        }
 
         if !model_matches_scope(
             scope,
@@ -50,25 +59,25 @@ pub(super) async fn list(
         provider,
         scope,
     )?;
+
     model_information.sort_by(|left, right| left.id.cmp(&right.id));
+
     Ok(model_information)
 }
 
 pub(super) async fn info(
     provider: &OllamaProvider,
     selected_model: ModelId,
+    transport: &TransportOptions,
 ) -> Result<ModelInfo, LlmError> {
-    let model_details = provider.fetch_model_details(&selected_model, true).await?;
-    let model_tags = provider.fetch_model_tags().await?;
-    let running_models = provider.fetch_running_models().await?;
-    let model_tag = model_tags.into_iter().find(|model_tag| {
-        model_tag.name == selected_model.as_str()
-            || model_tag.model.as_deref() == Some(selected_model.as_str())
-    });
-    let running_model = running_models.into_iter().find(|running_model| {
-        running_model.name == selected_model.as_str()
-            || running_model.model.as_deref() == Some(selected_model.as_str())
-    });
+    let (model_details, model_tags, running_models) = tokio::try_join!(
+        provider.fetch_model_details(&selected_model, false, transport),
+        provider.fetch_model_tags(transport),
+        provider.fetch_running_models(transport),
+    )?;
+
+    let model_tag = select_model_entry(&model_tags, &selected_model)?.cloned();
+    let running_model = select_model_entry(&running_models, &selected_model)?.cloned();
 
     Ok(create_model_info(
         selected_model,
@@ -79,9 +88,44 @@ pub(super) async fn info(
     ))
 }
 
-fn index_running_models<'a>(
-    running_models: &'a [super::metadata::NativeRunningModel],
-) -> HashMap<&'a str, &'a super::metadata::NativeRunningModel> {
+fn select_model_entry<'a>(
+    model_entries: &'a [NativeModelListEntry],
+    selected_model: &ModelId,
+) -> Result<Option<&'a NativeModelListEntry>, LlmError> {
+    let exact_matches = model_entries
+        .iter()
+        .filter(|model_entry| model_entry.name == selected_model.as_str())
+        .collect::<Vec<_>>();
+
+    if exact_matches.len() > 1 {
+        return Err(LlmError::InvalidRequest(format!(
+            "ambiguous exact Ollama model name {}",
+            selected_model.as_str()
+        )));
+    }
+
+    if let Some(exact_match) = exact_matches.into_iter().next() {
+        return Ok(Some(exact_match));
+    }
+
+    let canonical_matches = model_entries
+        .iter()
+        .filter(|model_entry| model_entry.model.as_deref() == Some(selected_model.as_str()))
+        .collect::<Vec<_>>();
+
+    match canonical_matches.as_slice() {
+        [] => Ok(None),
+        [canonical_match] => Ok(Some(*canonical_match)),
+        _ => Err(LlmError::InvalidRequest(format!(
+            "ambiguous canonical Ollama model name {}",
+            selected_model.as_str()
+        ))),
+    }
+}
+
+fn index_running_models(
+    running_models: &[NativeModelListEntry],
+) -> HashMap<&str, &NativeModelListEntry> {
     let mut running_by_name = HashMap::new();
 
     for running_model in running_models {
@@ -96,9 +140,9 @@ fn index_running_models<'a>(
 }
 
 fn find_running_model<'a>(
-    model_tag: &NativeModelTag,
-    running_by_name: &HashMap<&'a str, &'a super::metadata::NativeRunningModel>,
-) -> Option<&'a super::metadata::NativeRunningModel> {
+    model_tag: &NativeModelListEntry,
+    running_by_name: &HashMap<&'a str, &'a NativeModelListEntry>,
+) -> Option<&'a NativeModelListEntry> {
     running_by_name
         .get(model_tag.name.as_str())
         .copied()
@@ -113,7 +157,7 @@ fn find_running_model<'a>(
 
 fn append_unlisted_running_models(
     model_information: &mut Vec<ModelInfo>,
-    running_models: &[super::metadata::NativeRunningModel],
+    running_models: &[NativeModelListEntry],
     known_model_names: &BTreeSet<String>,
     provider: &OllamaProvider,
     scope: ModelScope,
@@ -129,6 +173,10 @@ fn append_unlisted_running_models(
         }
 
         let model_identifier = ModelId::new(running_model.name.clone())?;
+
+        if !native_model_supports_chat(running_model) {
+            continue;
+        }
 
         if !model_matches_scope(
             scope,
@@ -148,4 +196,19 @@ fn append_unlisted_running_models(
     }
 
     Ok(())
+}
+
+pub(crate) fn native_model_supports_chat(model: &NativeModelListEntry) -> bool {
+    let raw_model = model.raw_value();
+    let Some(capabilities) = raw_model.get("capabilities") else {
+        return true;
+    };
+    let Some(capabilities) = capabilities.as_array() else {
+        return false;
+    };
+    capabilities.iter().any(|capability| {
+        capability
+            .as_str()
+            .is_some_and(|value| value.eq_ignore_ascii_case("completion"))
+    })
 }

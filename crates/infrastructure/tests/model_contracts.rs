@@ -40,20 +40,19 @@ fn defaults_builders_roles_and_action_models_round_trip() {
         100
     );
 
+    let execution_settings_update = ExecutionSettingsUpdate::default()
+        .with_large_language_model_thinking_enabled(true)
+        .with_context_optimization_enabled(true)
+        .with_cpu_usage_percentage(75)
+        .with_gpu_usage_percentage(65);
     let project_id = ProjectId::new();
     let project_update = ProjectUpdateOptions::new(project_id)
         .with_name("updated")
         .with_path("/updated")
-        .with_llm_thinking_enabled(true)
-        .with_llm_context_optimization_enabled(true)
-        .with_cpu_usage_percentage(75)
-        .with_gpu_usage_percentage(65);
+        .with_execution_settings(execution_settings_update.clone());
     let chat_update = ChatUpdateOptions::new(ChatId::new())
         .with_name("updated chat")
-        .with_llm_thinking_enabled(true)
-        .with_llm_context_optimization_enabled(true)
-        .with_cpu_usage_percentage(55)
-        .with_gpu_usage_percentage(45);
+        .with_execution_settings(execution_settings_update);
     let timestamp = OffsetDateTime::now_utc();
     let user_message = Message {
         id: MessageId::new(),
@@ -92,8 +91,9 @@ fn defaults_builders_roles_and_action_models_round_trip() {
     };
     assert_eq!(llm_message.role(), MessageRole::Llm);
 
+    let action_identifier = LlmActionId::new();
     let action = LlmAction {
-        id: LlmActionId::new(),
+        id: action_identifier,
         message_id: llm_message.id,
         sequence_number: 1,
         summary: Some("command".to_owned()),
@@ -102,10 +102,15 @@ fn defaults_builders_roles_and_action_models_round_trip() {
             working_directory: "/tmp".to_owned(),
             environment: BTreeMap::new(),
         }),
+        initial_status: LlmActionInitialStatus {
+            status: LlmActionStatus::Pending,
+            payload: None,
+            occurred_at: timestamp,
+        },
         status_events: vec![LlmActionStatusEvent {
             id: LlmActionStatusEventId::new(),
-            llm_action_id: LlmActionId::new(),
-            sequence_number: 1,
+            llm_action_id: action_identifier,
+            sequence_number: 2,
             status: LlmActionStatus::Succeeded,
             payload: Some(json!({"exit_code": 0})),
             occurred_at: timestamp,

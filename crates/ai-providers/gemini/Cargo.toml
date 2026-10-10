@@ -1,7 +1,12 @@
 [package]
 name = "gemini"
-version = "0.0.1"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
 
 [dependencies]
-llm = { path = "../../llm" }
+llm = { version = "0.0.1", path = "../../llm" }

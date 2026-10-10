@@ -1,11 +1,13 @@
 use std::{collections::BTreeSet, path::PathBuf, time::Duration};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 #[must_use]
 pub struct BasicToolConfiguration {
     pub(super) root_directory: PathBuf,
+    pub(super) workspace_directory: Option<filesystem::WorkspaceDirectory>,
     pub(super) maximum_file_size: u64,
     pub(super) command_timeout: Duration,
+    pub(super) command_options: os::SandboxedCommandOptions,
     pub(super) excluded_directory_names: BTreeSet<String>,
 }
 
@@ -13,8 +15,10 @@ impl BasicToolConfiguration {
     pub fn new(root_directory: impl Into<PathBuf>) -> Self {
         Self {
             root_directory: root_directory.into(),
+            workspace_directory: None,
             maximum_file_size: 4 * 1024 * 1024,
             command_timeout: Duration::from_mins(15),
+            command_options: os::SandboxedCommandOptions::default(),
             excluded_directory_names: BTreeSet::new(),
         }
     }
@@ -34,6 +38,14 @@ impl BasicToolConfiguration {
         self
     }
 
+    pub fn sandboxed_command_options(
+        mut self,
+        command_options: os::SandboxedCommandOptions,
+    ) -> Self {
+        self.command_options = command_options;
+        self
+    }
+
     pub fn exclude_directory(mut self, directory_name: impl Into<String>) -> Self {
         self.excluded_directory_names.insert(directory_name.into());
         self
@@ -41,6 +53,12 @@ impl BasicToolConfiguration {
 
     pub(super) fn excluded_directory_names(&self) -> &BTreeSet<String> {
         &self.excluded_directory_names
+    }
+
+    pub(super) fn workspace_directory(&self) -> &filesystem::WorkspaceDirectory {
+        self.workspace_directory
+            .as_ref()
+            .expect("basic tool configuration must be initialized during registration")
     }
 
     pub(super) fn validate(&self) -> Result<(), crate::LlmError> {
@@ -59,6 +77,18 @@ impl BasicToolConfiguration {
         if self.command_timeout.is_zero() {
             return Err(crate::LlmError::InvalidRequest(
                 "basic tool command timeout must be greater than zero".into(),
+            ));
+        }
+
+        if self
+            .command_options
+            .executable_search_directories
+            .iter()
+            .chain(self.command_options.additional_read_only_directories.iter())
+            .any(|directory| !directory.is_absolute() || !directory.is_dir())
+        {
+            return Err(crate::LlmError::InvalidRequest(
+                "sandbox command directories must be absolute existing directories".into(),
             ));
         }
 

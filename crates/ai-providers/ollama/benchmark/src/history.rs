@@ -1,5 +1,6 @@
 use llm::{
-    ContentBlock, ConversationMessage, ConversationRole, RunEvent, ToolCall, ToolEvent, ToolOutput,
+    ContentBlock, ConversationMessage, ConversationRole, LlmError, RunEvent, ToolCall, ToolEvent,
+    ToolOutput, append_tool_round_to_history,
 };
 
 #[derive(Default)]
@@ -18,9 +19,9 @@ struct ProviderRoundHistory {
 }
 
 impl ConversationHistoryRecorder {
-    pub fn record(&mut self, event: &RunEvent) {
+    pub fn record(&mut self, event: &RunEvent) -> Result<(), LlmError> {
         match event {
-            RunEvent::ProviderRoundStarted { .. } => self.start_next_provider_round(),
+            RunEvent::ProviderRoundStarted { .. } => self.start_next_provider_round()?,
             RunEvent::ResponseDelta(response_delta) => {
                 self.current_round.started = true;
                 self.current_round.response_text.push_str(response_delta);
@@ -41,65 +42,47 @@ impl ConversationHistoryRecorder {
             }
             _ => {}
         }
+
+        Ok(())
     }
 
-    #[must_use]
-    pub fn into_conversation_history(mut self, stage_prompt: &str) -> Vec<ConversationMessage> {
-        self.finish_current_provider_round();
-        let mut conversation_history = Vec::with_capacity(self.completed_rounds.len() + 1);
+    pub fn into_conversation_history(
+        mut self,
+        stage_prompt: &str,
+    ) -> Result<Vec<ConversationMessage>, LlmError> {
+        self.finish_current_provider_round()?;
+        let mut conversation_history = Vec::with_capacity(self.completed_rounds.len());
+        conversation_history.reserve(1);
         conversation_history.push(ConversationMessage {
             role: ConversationRole::User,
             content: vec![ContentBlock::text(stage_prompt)],
         });
+
         conversation_history.append(&mut self.completed_rounds);
 
-        conversation_history
+        Ok(conversation_history)
     }
 
-    fn start_next_provider_round(&mut self) {
-        self.finish_current_provider_round();
+    fn start_next_provider_round(&mut self) -> Result<(), LlmError> {
+        self.finish_current_provider_round()?;
         self.current_round.started = true;
+
+        Ok(())
     }
 
-    fn finish_current_provider_round(&mut self) {
+    fn finish_current_provider_round(&mut self) -> Result<(), LlmError> {
         if !self.current_round.started {
-            return;
+            return Ok(());
         }
 
         let completed_round = std::mem::take(&mut self.current_round);
-        let mut assistant_content = Vec::with_capacity(completed_round.tool_calls.len() + 1);
 
-        if !completed_round.response_text.is_empty() {
-            assistant_content.push(ContentBlock::text(completed_round.response_text));
-        }
-
-        if !completed_round.reasoning_summary.is_empty() {
-            assistant_content.push(ContentBlock::ReasoningSummary {
-                text: completed_round.reasoning_summary,
-            });
-        }
-
-        assistant_content.extend(
-            completed_round
-                .tool_calls
-                .into_iter()
-                .map(|call| ContentBlock::ToolCall { call }),
-        );
-
-        if !assistant_content.is_empty() {
-            self.completed_rounds.push(ConversationMessage {
-                role: ConversationRole::Assistant,
-                content: assistant_content,
-            });
-        }
-
-        for tool_output in completed_round.tool_outputs {
-            self.completed_rounds.push(ConversationMessage {
-                role: ConversationRole::Tool,
-                content: vec![ContentBlock::ToolResult {
-                    output: tool_output,
-                }],
-            });
-        }
+        append_tool_round_to_history(
+            &mut self.completed_rounds,
+            completed_round.response_text,
+            Some(completed_round.reasoning_summary),
+            completed_round.tool_calls,
+            completed_round.tool_outputs,
+        )
     }
 }

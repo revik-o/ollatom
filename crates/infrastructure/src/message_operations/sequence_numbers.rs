@@ -3,7 +3,7 @@ use super::*;
 pub(crate) async fn allocate_next_active_message_sequence_number(
     database_transaction: &mut Transaction<'static, Sqlite>,
     chat_id: ChatId,
-) -> InfrastructureResult<u64> {
+) -> InfrastructureResult<u32> {
     let sequence_number: i64 = sqlx::query_scalar(
         "SELECT COALESCE(MAX(sequence_number), 0) + 1 FROM messages WHERE chat_id = ? AND validity = 'active'",
     )
@@ -12,7 +12,12 @@ pub(crate) async fn allocate_next_active_message_sequence_number(
     .await
     .map_err(|source| database_operation_error("failed to allocate message sequence", source))?;
 
-    Ok(sequence_number as u64)
+    u32::try_from(sequence_number).map_err(|source| {
+        InfrastructureError::new(
+            InfrastructureErrorKind::CorruptDatabaseValue,
+            format!("allocated message sequence is outside the u32 range: {source}"),
+        )
+    })
 }
 
 pub(crate) async fn allocate_next_llm_response_round_number(
@@ -27,5 +32,10 @@ pub(crate) async fn allocate_next_llm_response_round_number(
     .await
     .map_err(|source| database_operation_error("failed to allocate LLM response round", source))?;
 
-    Ok(response_round_number as u32)
+    u32::try_from(response_round_number).map_err(|source| {
+        InfrastructureError::new(
+            InfrastructureErrorKind::CorruptDatabaseValue,
+            format!("allocated LLM response round is outside the u32 range: {source}"),
+        )
+    })
 }

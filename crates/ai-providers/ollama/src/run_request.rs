@@ -1,14 +1,13 @@
 use super::{
     content::{NativeMessage, NativeTool},
-    content_history::append_round_history,
     provider::OllamaProvider,
     request::context_pressure_reached,
-    streaming::RoundResult,
     transport::response_error,
 };
 use llm::{
-    ContextOptimizationRequest, ConversationMessage, ConversationRole, LlmError, ProviderRunHost,
-    ProviderRunRequest, StopToken, ToolCall, ToolOutput,
+    AssistantRound, ContextOptimizationRequest, ConversationMessage, ConversationRole, LlmError,
+    ProviderRunHost, ProviderRunRequest, StopToken, ToolCall, ToolOutput,
+    append_tool_round_to_history,
 };
 use reqwest::{Method, Response};
 use serde_json::{Map, Value, json};
@@ -103,17 +102,21 @@ impl ConversationHistory {
 
     pub(super) fn append_round(
         &mut self,
-        round_result: &RoundResult,
+        assistant_round: &AssistantRound,
         tool_calls: &[ToolCall],
         tool_outputs: &[ToolOutput],
     ) -> Result<(), LlmError> {
-        append_round_history(&mut self.preserved, round_result, tool_calls, tool_outputs)?;
-        append_round_history(
-            &mut self.model_visible,
-            round_result,
-            tool_calls,
-            tool_outputs,
-        )
+        let preserved_history_length = self.preserved.len();
+        append_tool_round_to_history(
+            &mut self.preserved,
+            assistant_round.text.clone(),
+            assistant_round.visible_reasoning.clone(),
+            tool_calls.to_vec(),
+            tool_outputs.to_vec(),
+        )?;
+        self.model_visible
+            .extend_from_slice(&self.preserved[preserved_history_length..]);
+        Ok(())
     }
 }
 
@@ -156,5 +159,6 @@ pub(super) async fn optimize_context_if_needed(
     }
 
     conversation_history.model_visible = optimization_outcome.model_visible_history;
+
     Ok(true)
 }

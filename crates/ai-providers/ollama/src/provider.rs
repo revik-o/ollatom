@@ -1,6 +1,12 @@
 use crate::{BUILT_IN_PROVIDER, DEFAULT_OLLAMA_ENDPOINT};
-use reqwest::Client;
-use std::{env, fmt::Formatter, time::Duration};
+use reqwest::{Client, redirect::Policy};
+use std::{
+    collections::BTreeMap,
+    env,
+    fmt::Formatter,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use url::Url;
 
 const DEFAULT_DISCOVERY_TIMEOUT: Duration = Duration::from_secs(10);
@@ -10,6 +16,7 @@ pub struct OllamaProvider {
     pub(super) endpoint: Url,
     pub(super) bearer_token: Option<String>,
     pub(super) client: Client,
+    pub(super) clients_by_connection_timeout: Arc<Mutex<BTreeMap<Duration, Client>>>,
     pub(super) discovery_timeout: Duration,
     pub(super) provider_identifier: llm::ProviderId,
 }
@@ -78,6 +85,7 @@ impl OllamaProvider {
         builder.bearer_token = env::var("OLLAMA_API_KEY")
             .ok()
             .filter(|value| !value.is_empty());
+
         builder.build()
     }
 
@@ -119,6 +127,7 @@ impl OllamaProviderBuilder {
         let endpoint = super::transport::normalize_endpoint(self.endpoint)?;
         let client = Client::builder()
             .connect_timeout(self.discovery_timeout)
+            .redirect(Policy::none())
             .build()
             .map_err(|error| llm::LlmError::InvalidRequest(error.to_string()))?;
 
@@ -126,6 +135,7 @@ impl OllamaProviderBuilder {
             endpoint,
             bearer_token: self.bearer_token.filter(|value| !value.is_empty()),
             client,
+            clients_by_connection_timeout: Arc::new(Mutex::new(BTreeMap::new())),
             discovery_timeout: self.discovery_timeout,
             provider_identifier: llm::ProviderId::from(BUILT_IN_PROVIDER),
         })

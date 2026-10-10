@@ -2,6 +2,7 @@ use super::{availability, metadata::provider_capabilities, models, provider::Oll
 use llm::{
     AvailabilityReport, BoxFuture, LlmError, LlmProvider, ModelId, ModelInfo, ModelScope,
     ProviderCapabilities, ProviderRunHost, ProviderRunOutcome, ProviderRunRequest, StopToken,
+    TransportOptions,
 };
 use std::sync::Arc;
 
@@ -14,19 +15,28 @@ impl LlmProvider for OllamaProvider {
         provider_capabilities()
     }
 
-    fn availability(
-        &self,
-        model: Option<&ModelId>,
-    ) -> BoxFuture<'_, Result<AvailabilityReport, LlmError>> {
-        Box::pin(availability::report(self, model.cloned()))
+    fn availability<'a>(
+        &'a self,
+        model: Option<&'a ModelId>,
+        transport: &'a TransportOptions,
+    ) -> BoxFuture<'a, Result<AvailabilityReport, LlmError>> {
+        Box::pin(availability::report(self, model.cloned(), transport))
     }
 
-    fn list_models(&self, scope: ModelScope) -> BoxFuture<'_, Result<Vec<ModelInfo>, LlmError>> {
-        Box::pin(models::list(self, scope))
+    fn list_models<'a>(
+        &'a self,
+        scope: ModelScope,
+        transport: &'a TransportOptions,
+    ) -> BoxFuture<'a, Result<Vec<ModelInfo>, LlmError>> {
+        Box::pin(models::list(self, scope, transport))
     }
 
-    fn model_info(&self, selected: &ModelId) -> BoxFuture<'_, Result<ModelInfo, LlmError>> {
-        Box::pin(models::info(self, selected.clone()))
+    fn model_info<'a>(
+        &'a self,
+        selected: &'a ModelId,
+        transport: &'a TransportOptions,
+    ) -> BoxFuture<'a, Result<ModelInfo, LlmError>> {
+        Box::pin(models::info(self, selected.clone(), transport))
     }
 
     fn run(

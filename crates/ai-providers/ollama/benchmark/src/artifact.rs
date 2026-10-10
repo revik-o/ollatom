@@ -15,7 +15,7 @@ const OWNERSHIP_MARKER_CONTENT: &str = "ollama-benchmark-owned-v1\n";
 pub struct BenchmarkArtifacts {
     project_root: PathBuf,
     ownership_marker: PathBuf,
-    stage_logs: [PathBuf; 5],
+    stage_logs: [PathBuf; 6],
 }
 
 impl BenchmarkArtifacts {
@@ -25,6 +25,7 @@ impl BenchmarkArtifacts {
             .parent()
             .ok_or_else(|| io::Error::other("executable has no parent"))?
             .to_path_buf();
+
         Ok(Self::from_directory(executable_directory))
     }
 
@@ -33,7 +34,8 @@ impl BenchmarkArtifacts {
         let project_root = executable_directory.join(PROJECT_DIRECTORY_NAME);
         let ownership_marker = executable_directory.join(OWNERSHIP_MARKER_FILE_NAME);
         let stage_logs = std::array::from_fn(|index| {
-            executable_directory.join(format!("stage-{}.log", index + 1))
+            let stage_number = index.checked_add(1).expect("stage index must be bounded");
+            executable_directory.join(format!("stage-{stage_number}.log"))
         });
 
         Self {
@@ -70,6 +72,7 @@ impl BenchmarkArtifacts {
             .checked_sub(1)
             .map(usize::from)
             .ok_or_else(invalid_stage_number_error)?;
+
         self.stage_logs
             .get(stage_index)
             .map(PathBuf::as_path)
@@ -101,6 +104,7 @@ impl BenchmarkArtifacts {
             let _ = fs::remove_dir(&self.project_root);
             return Err(error);
         }
+
         Ok(())
     }
 
@@ -153,6 +157,7 @@ impl BenchmarkArtifacts {
                 "benchmark project path is not a regular directory",
             ));
         }
+
         Ok(())
     }
 
@@ -183,14 +188,12 @@ impl BenchmarkArtifacts {
 
     fn require_marker_file(&self) -> io::Result<()> {
         let metadata = fs::symlink_metadata(&self.ownership_marker).map_err(|error| {
-            if error.kind() == ErrorKind::NotFound {
-                io::Error::new(
+            (error.kind() == ErrorKind::NotFound)
+                .then_some(io::Error::new(
                     ErrorKind::PermissionDenied,
                     "benchmark project is not owned by this benchmark",
-                )
-            } else {
-                error
-            }
+                ))
+                .unwrap_or(error)
         })?;
 
         if metadata.file_type().is_symlink() || !metadata.is_file() {
@@ -216,6 +219,7 @@ impl BenchmarkArtifacts {
             let _ = fs::remove_file(&temporary_marker);
             return Err(error);
         }
+
         Ok(())
     }
 
@@ -224,6 +228,7 @@ impl BenchmarkArtifacts {
             .create_new(true)
             .write(true)
             .open(temporary_marker)?;
+
         marker_file.write_all(OWNERSHIP_MARKER_CONTENT.as_bytes())?;
         marker_file.sync_all()
     }
@@ -233,6 +238,7 @@ impl BenchmarkArtifacts {
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_nanos();
+
         self.ownership_marker.with_extension(format!(
             "benchmark-owned.{}.{timestamp}.tmp",
             std::process::id()
@@ -241,8 +247,5 @@ impl BenchmarkArtifacts {
 }
 
 fn invalid_stage_number_error() -> io::Error {
-    io::Error::new(
-        ErrorKind::InvalidInput,
-        "stage must be between one and five",
-    )
+    io::Error::new(ErrorKind::InvalidInput, "stage must be between one and six")
 }

@@ -6,7 +6,9 @@ impl RunHost {
         &self,
         tool_call: ToolCall,
     ) -> Result<ToolOutput, LlmError> {
+        self.ensure_active()?;
         self.emit_tool_planned(&tool_call).await?;
+        self.ensure_active()?;
         self.emit_tool_started(&tool_call).await?;
 
         let output_content = match tool_call.name.as_str() {

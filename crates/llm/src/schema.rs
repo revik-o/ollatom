@@ -1,215 +1,215 @@
-use crate::ToolFailure;
 use serde_json::Value;
+use std::collections::BTreeSet;
 
-pub(crate) fn validate_definition(schema: &Value, path: &str) -> Result<(), String> {
-    let object = schema
-        .as_object()
-        .ok_or_else(|| format!("{path} must be an object"))?;
+const MAXIMUM_SCHEMA_BYTES: usize = 256 * 1024;
+pub(crate) const MAXIMUM_SCHEMA_DEPTH: usize = 64;
+const DRAFT_2020_12_SCHEMA_URI: &str = "https://json-schema.org/draft/2020-12/schema";
 
-    if let Some(kind) = object.get("type") {
-        let kind = kind
-            .as_str()
-            .ok_or_else(|| format!("{path}.type must be a string"))?;
+const SINGLE_SCHEMA_KEYWORDS: &[&str] = &[
+    "additionalProperties",
+    "contains",
+    "contentSchema",
+    "else",
+    "if",
+    "items",
+    "not",
+    "propertyNames",
+    "then",
+    "unevaluatedItems",
+    "unevaluatedProperties",
+];
 
-        if !is_supported_type(kind) {
-            return Err(format!("{path}.type contains unsupported type {kind}"));
-        }
-    }
+const SCHEMA_MAP_KEYWORDS: &[&str] = &[
+    "$defs",
+    "definitions",
+    "dependentSchemas",
+    "patternProperties",
+    "properties",
+];
 
-    if let Some(required) = object.get("required") {
-        let required = required
-            .as_array()
-            .ok_or_else(|| format!("{path}.required must be an array"))?;
+const SCHEMA_ARRAY_KEYWORDS: &[&str] = &["allOf", "anyOf", "oneOf", "prefixItems"];
 
-        if required.iter().any(|value| !value.is_string()) {
-            return Err(format!("{path}.required entries must be strings"));
-        }
-    }
+pub(crate) fn validate_schema_contract(schema: &Value) -> Result<(), String> {
+    serialized_schema_byte_count(schema)?;
 
-    if let Some(properties) = object.get("properties") {
-        let properties = properties
-            .as_object()
-            .ok_or_else(|| format!("{path}.properties must be an object"))?;
-
-        for (name, child) in properties {
-            validate_definition(child, &format!("{path}.properties.{name}"))?;
-        }
-    }
-
-    if let Some(items) = object.get("items") {
-        validate_definition(items, &format!("{path}.items"))?;
-    }
-
-    if object.get("enum").is_some_and(|value| !value.is_array()) {
-        return Err(format!("{path}.enum must be an array"));
-    }
-
-    Ok(())
+    validate_schema_node(schema, "$", 0)
 }
 
-pub(crate) fn validate(schema: &Value, value: &Value, path: &str) -> Result<(), ToolFailure> {
-    let enum_rejects_value = schema
-        .get("enum")
-        .and_then(Value::as_array)
-        .is_some_and(|choices| !choices.contains(value));
+fn serialized_schema_byte_count(schema: &Value) -> Result<usize, String> {
+    let mut pending_values = vec![schema];
+    let mut byte_count = 0_usize;
 
-    if enum_rejects_value {
-        return invalid_arguments(path, "value is not in the allowed enum");
-    }
+    while let Some(value) = pending_values.pop() {
+        match value {
+            Value::Null => add_schema_bytes(&mut byte_count, 4)?,
+            Value::Bool(false) => add_schema_bytes(&mut byte_count, 5)?,
+            Value::Bool(true) => add_schema_bytes(&mut byte_count, 4)?,
+            Value::Number(number) => add_schema_bytes(&mut byte_count, number.to_string().len())?,
+            Value::String(string) => {
+                let serialized_string = serde_json::to_string(string)
+                    .map_err(|error| format!("schema string could not be serialized: {error}"))?;
+                add_schema_bytes(&mut byte_count, serialized_string.len())?;
+            }
+            Value::Array(values) => {
+                add_schema_bytes(
+                    &mut byte_count,
+                    serialized_container_overhead(values.len())?,
+                )?;
+                pending_values.extend(values.iter());
+            }
+            Value::Object(values) => {
+                add_schema_bytes(
+                    &mut byte_count,
+                    serialized_container_overhead(values.len())?,
+                )?;
 
-    if let Some(kind) = schema.get("type").and_then(Value::as_str) {
-        let valid = match kind {
-            "object" => value.is_object(),
-            "array" => value.is_array(),
-            "string" => value.is_string(),
-            "number" => value.is_number(),
-            "integer" => value.as_i64().is_some() || value.as_u64().is_some(),
-            "boolean" => value.is_boolean(),
-            "null" => value.is_null(),
-            _ => false,
-        };
-
-        if !valid {
-            return invalid_arguments(path, &format!("expected {kind}"));
-        }
-    }
-
-    if let Some(object) = value.as_object() {
-        validate_object(schema, object, path)?;
-    }
-
-    if let Some(array) = value.as_array() {
-        validate_array(schema, array, path)?;
-    }
-
-    if let Some(string) = value.as_str() {
-        validate_string(schema, string, path)?;
-    }
-
-    if let Some(number) = value.as_f64() {
-        validate_number(schema, number, path)?;
-    }
-
-    Ok(())
-}
-
-fn validate_object(
-    schema: &Value,
-    object: &serde_json::Map<String, Value>,
-    path: &str,
-) -> Result<(), ToolFailure> {
-    if let Some(required) = schema.get("required").and_then(Value::as_array) {
-        for property in required.iter().filter_map(Value::as_str) {
-            if !object.contains_key(property) {
-                return invalid_arguments(path, &format!("missing required property {property}"));
+                for (key, child_value) in values {
+                    let serialized_key = serde_json::to_string(key).map_err(|error| {
+                        format!("schema property name could not be serialized: {error}")
+                    })?;
+                    add_schema_bytes(
+                        &mut byte_count,
+                        serialized_key
+                            .len()
+                            .checked_add(1)
+                            .ok_or_else(schema_size_overflow_error)?,
+                    )?;
+                    pending_values.push(child_value);
+                }
             }
         }
     }
+
+    Ok(byte_count)
+}
+
+pub(crate) fn serialized_container_overhead(entry_count: usize) -> Result<usize, String> {
+    2_usize
+        .checked_add(entry_count.saturating_sub(1))
+        .ok_or_else(schema_size_overflow_error)
+}
+
+fn schema_size_overflow_error() -> String {
+    "schema exceeds the 256 KiB size limit".to_string()
+}
+
+fn add_schema_bytes(byte_count: &mut usize, additional_bytes: usize) -> Result<(), String> {
+    *byte_count = byte_count
+        .checked_add(additional_bytes)
+        .filter(|updated_byte_count| *updated_byte_count <= MAXIMUM_SCHEMA_BYTES)
+        .ok_or_else(schema_size_overflow_error)?;
+
+    Ok(())
+}
+
+fn validate_schema_node(schema: &Value, path: &str, depth: usize) -> Result<(), String> {
+    if depth > MAXIMUM_SCHEMA_DEPTH {
+        return Err("schema exceeds the maximum nesting depth".into());
+    }
+
+    let Some(object) = schema.as_object() else {
+        return Ok(());
+    };
+
+    if object.contains_key("$ref") || object.contains_key("$dynamicRef") {
+        return Err(format!(
+            "{path} uses external and dynamic schema references, which are not supported"
+        ));
+    }
+
+    validate_schema_dialect(object, path)?;
+    validate_required_properties(object, path)?;
+
+    for keyword in SINGLE_SCHEMA_KEYWORDS {
+        if let Some(child_schema) = object.get(*keyword) {
+            validate_schema_node(
+                child_schema,
+                &format!("{path}.{keyword}"),
+                next_schema_depth(depth)?,
+            )?;
+        }
+    }
+
+    for keyword in SCHEMA_MAP_KEYWORDS {
+        if let Some(child_schemas) = object.get(*keyword).and_then(Value::as_object) {
+            for (name, child_schema) in child_schemas {
+                validate_schema_node(
+                    child_schema,
+                    &format!("{path}.{keyword}.{name}"),
+                    next_schema_depth(depth)?,
+                )?;
+            }
+        }
+    }
+
+    for keyword in SCHEMA_ARRAY_KEYWORDS {
+        if let Some(child_schemas) = object.get(*keyword).and_then(Value::as_array) {
+            for (index, child_schema) in child_schemas.iter().enumerate() {
+                validate_schema_node(
+                    child_schema,
+                    &format!("{path}.{keyword}[{index}]"),
+                    next_schema_depth(depth)?,
+                )?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub(crate) fn next_schema_depth(depth: usize) -> Result<usize, String> {
+    depth
+        .checked_add(1)
+        .filter(|next_depth| *next_depth <= MAXIMUM_SCHEMA_DEPTH)
+        .ok_or_else(|| "schema exceeds the maximum nesting depth".to_string())
+}
+
+fn validate_schema_dialect(
+    schema: &serde_json::Map<String, Value>,
+    path: &str,
+) -> Result<(), String> {
+    if let Some(schema_uri) = schema.get("$schema")
+        && schema_uri.as_str() != Some(DRAFT_2020_12_SCHEMA_URI)
+    {
+        return Err(format!(
+            "{path} declares an unsupported JSON Schema dialect"
+        ));
+    }
+
+    if schema.contains_key("$vocabulary") {
+        return Err(format!(
+            "{path} declares an unsupported JSON Schema vocabulary"
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_required_properties(
+    schema: &serde_json::Map<String, Value>,
+    path: &str,
+) -> Result<(), String> {
+    let Some(required) = schema.get("required").and_then(Value::as_array) else {
+        return Ok(());
+    };
 
     let properties = schema.get("properties").and_then(Value::as_object);
-    let rejects_additional_properties =
-        schema.get("additionalProperties").and_then(Value::as_bool) == Some(false);
 
-    if rejects_additional_properties {
-        let unexpected_property = object
-            .keys()
-            .find(|name| properties.is_none_or(|known| !known.contains_key(*name)));
+    let mut seen_required = BTreeSet::new();
 
-        if let Some(name) = unexpected_property {
-            return invalid_arguments(path, &format!("unexpected property {name}"));
+    for required_property in required.iter().filter_map(Value::as_str) {
+        if !seen_required.insert(required_property) {
+            return Err(format!(
+                "{path}.required contains duplicate property {required_property}"
+            ));
         }
-    }
 
-    if let Some(properties) = properties {
-        for (name, child_schema) in properties {
-            if let Some(child) = object.get(name) {
-                validate(child_schema, child, &format!("{path}.{name}"))?;
-            }
+        if !properties.is_some_and(|properties| properties.contains_key(required_property)) {
+            return Err(format!(
+                "{path}.required refers to property {required_property} absent from properties"
+            ));
         }
     }
 
     Ok(())
-}
-
-fn validate_array(schema: &Value, array: &[Value], path: &str) -> Result<(), ToolFailure> {
-    let is_shorter_than_minimum = schema
-        .get("minItems")
-        .and_then(Value::as_u64)
-        .is_some_and(|minimum| array.len() < minimum as usize);
-
-    if is_shorter_than_minimum {
-        return invalid_arguments(path, "array is shorter than minItems");
-    }
-
-    let is_longer_than_maximum = schema
-        .get("maxItems")
-        .and_then(Value::as_u64)
-        .is_some_and(|maximum| array.len() > maximum as usize);
-
-    if is_longer_than_maximum {
-        return invalid_arguments(path, "array is longer than maxItems");
-    }
-
-    if let Some(items) = schema.get("items") {
-        for (index, item) in array.iter().enumerate() {
-            validate(items, item, &format!("{path}[{index}]"))?;
-        }
-    }
-
-    Ok(())
-}
-
-fn validate_string(schema: &Value, string: &str, path: &str) -> Result<(), ToolFailure> {
-    let is_shorter_than_minimum = schema
-        .get("minLength")
-        .and_then(Value::as_u64)
-        .is_some_and(|minimum| string.chars().count() < minimum as usize);
-
-    if is_shorter_than_minimum {
-        return invalid_arguments(path, "string is shorter than minLength");
-    }
-
-    let is_longer_than_maximum = schema
-        .get("maxLength")
-        .and_then(Value::as_u64)
-        .is_some_and(|maximum| string.chars().count() > maximum as usize);
-
-    if is_longer_than_maximum {
-        return invalid_arguments(path, "string is longer than maxLength");
-    }
-
-    Ok(())
-}
-
-fn validate_number(schema: &Value, number: f64, path: &str) -> Result<(), ToolFailure> {
-    let is_below_minimum = schema
-        .get("minimum")
-        .and_then(Value::as_f64)
-        .is_some_and(|minimum| number < minimum);
-
-    if is_below_minimum {
-        return invalid_arguments(path, "number is below minimum");
-    }
-
-    let is_above_maximum = schema
-        .get("maximum")
-        .and_then(Value::as_f64)
-        .is_some_and(|maximum| number > maximum);
-
-    if is_above_maximum {
-        return invalid_arguments(path, "number is above maximum");
-    }
-
-    Ok(())
-}
-
-fn invalid_arguments<T>(path: &str, message: &str) -> Result<T, ToolFailure> {
-    Err(ToolFailure::InvalidArguments(format!("{path}: {message}")))
-}
-
-fn is_supported_type(kind: &str) -> bool {
-    matches!(
-        kind,
-        "object" | "array" | "string" | "number" | "integer" | "boolean" | "null"
-    )
 }

@@ -32,16 +32,20 @@ fn negotiate_reasoning_options(
     warning_messages: &mut Vec<String>,
 ) -> Result<(), LlmError> {
     let reasoning_effort = options.reasoning.effort;
+
     let reasoning_effort_support = provider_capabilities
         .reasoning_efforts
         .get(&reasoning_effort)
         .copied()
         .unwrap_or(CapabilitySupport::Unknown);
+
     let reasoning_capability_support =
         provider_capabilities.support_for(ModelCapability::Reasoning);
+
     let selected_effort_is_unsupported = reasoning_effort_support == CapabilitySupport::Unsupported;
     let reasoning_is_unavailable = reasoning_capability_support == CapabilitySupport::Unsupported;
     let effort_requires_reasoning = reasoning_effort != ReasoningEffort::None;
+
     let effort_is_unsupported =
         selected_effort_is_unsupported || (effort_requires_reasoning && reasoning_is_unavailable);
 
@@ -73,6 +77,7 @@ fn handle_unsupported_reasoning_effort(
     warning_messages.push(format!(
         "provider ignored unsupported reasoning effort {reasoning_effort:?}"
     ));
+
     options.reasoning.effort = ReasoningEffort::Auto;
 
     Ok(())
@@ -94,6 +99,7 @@ fn negotiate_generation_options(
                 option_key.capability_name(),
                 warning_messages,
             )?;
+
             option_key.clear_configured_value(&mut options.generation);
         }
     }
@@ -113,6 +119,7 @@ fn negotiate_local_runtime_options(
 
         let option_is_unsupported =
             option_key.provider_support(provider_capabilities) == CapabilitySupport::Unsupported;
+
         let requires_different_lifecycle_phase = option_key
             .lifecycle_phase(provider_capabilities)
             .is_some_and(|phase| phase != crate::LocalOptionPhase::PerRequest);
@@ -139,7 +146,6 @@ fn handle_unsupported_option(
         OptionHandlingMode::Strict => Err(LlmError::UnsupportedOption(option_name.into())),
         OptionHandlingMode::BestEffort => {
             warning_messages.push(format!("provider ignored unsupported option {option_name}"));
-
             Ok(())
         }
     }

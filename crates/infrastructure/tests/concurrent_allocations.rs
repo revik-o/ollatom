@@ -48,7 +48,7 @@ async fn concurrent_user_messages_receive_unique_active_sequences() {
     sequence_numbers.sort_unstable();
     assert_eq!(
         sequence_numbers,
-        (1..=writer_count as u64).collect::<Vec<_>>()
+        (1..=u32::try_from(writer_count).expect("writer count fits u32")).collect::<Vec<_>>()
     );
 }
 
@@ -107,6 +107,6 @@ async fn concurrent_llm_messages_receive_unique_response_rounds() {
     response_round_numbers.sort_unstable();
     assert_eq!(
         response_round_numbers,
-        (1..=writer_count as u32).collect::<Vec<_>>()
+        (1..=u32::try_from(writer_count).unwrap()).collect::<Vec<_>>()
     );
 }

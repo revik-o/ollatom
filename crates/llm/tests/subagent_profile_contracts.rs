@@ -19,6 +19,8 @@ impl SubagentRunner for ProfileInspectingRunner {
             assert_eq!(request.task, "inspect");
             assert_eq!(profile.provider.as_str(), "gemini");
             assert_eq!(profile.policy.permissions(), AllowedPermissions::NONE);
+            assert_eq!(profile.options.reasoning.effort, ReasoningEffort::Low);
+            assert_eq!(profile.options.generation.max_output_tokens, Some(100));
             assert!(inherited_context.is_empty());
             assert!(!stop_token.is_stopped());
             assert_eq!(remaining_depth, 0);
@@ -37,15 +39,23 @@ fn reviewer_profile() -> SubagentProfile {
     SubagentProfile {
         provider: ProviderId::new("gemini").unwrap(),
         model: Some(ModelId::new("gemini-test").unwrap()),
-        effort: ReasoningEffort::Low,
         system_prompt: Some("review".into()),
         tool_names: vec![],
         policy: RunPolicy::default(),
-        max_tokens: Some(100),
         timeout: None,
         allow_context: false,
         max_depth: 1,
-        options: LlmOptions::default(),
+        options: LlmOptions {
+            reasoning: ReasoningOptions {
+                effort: ReasoningEffort::Low,
+                ..ReasoningOptions::default()
+            },
+            generation: GenerationOptions {
+                max_output_tokens: Some(100),
+                ..GenerationOptions::default()
+            },
+            ..LlmOptions::default()
+        },
     }
 }
 
@@ -76,6 +86,7 @@ async fn named_subagent_profiles_are_fixed_and_usage_is_aggregated() {
         .allowed(ALL_FILESYSTEM_ACCESS | ALL_USER_COMMANDS)
         .user_message("delegate")
         .send()
+        .expect("run should start")
         .await
         .unwrap()
     else {
@@ -83,5 +94,18 @@ async fn named_subagent_profiles_are_fixed_and_usage_is_aggregated() {
     };
 
     assert_eq!(response.usage.child_usage.len(), 1);
-    assert_eq!(response.usage.total_tokens_including_children(), 5);
+    assert_eq!(response.usage.total_tokens_including_children(), Ok(5));
+}
+
+#[test]
+fn subagent_profiles_reject_invalid_tool_names() {
+    let mut profile_registry = SubagentProfileRegistry::default();
+    let profile_identifier = SubagentProfileId::new("reviewer").unwrap();
+    let mut profile = reviewer_profile();
+    profile.tool_names.push("invalid tool name".into());
+
+    assert!(matches!(
+        profile_registry.register(profile_identifier, profile),
+        Err(LlmError::InvalidRequest(_))
+    ));
 }

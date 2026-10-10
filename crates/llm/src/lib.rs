@@ -4,6 +4,7 @@ mod cancellation;
 mod content;
 mod context_optimization;
 mod context_optimization_selection;
+mod conversation_history;
 mod error;
 mod event_queue;
 mod events;
@@ -24,13 +25,14 @@ mod tools;
 mod types;
 
 pub use basic_tools::{BasicToolConfiguration, register_basic_tools};
-pub use cancellation::{StopHandle, StopToken};
+pub use cancellation::{ControlledFutureOutcome, StopHandle, StopToken};
 pub use content::{ContentBlock, ConversationMessage, ConversationRole, UserMessage};
 pub use context_optimization::{ContextOptimizationOutcome, ContextOptimizationRequest};
+pub use conversation_history::append_tool_round_to_history;
 pub use error::LlmError;
 pub use events::{
-    EventCallback, EventCallbacks, RunEvent, RunEventSink, RunEventStream, SequencedEvent,
-    ToolEvent,
+    CoalescedRunDelta, EventCallback, EventCallbacks, RunEvent, RunEventDeliveryFailure,
+    RunEventSink, RunEventStream, RunStreamItem, RunStreamLag, SequencedEvent, ToolEvent,
 };
 pub use ids::{BuiltInProvider, IntoModelId, IntoProviderId, ModelId, ProviderId, RunId};
 pub use interaction::{
@@ -46,8 +48,8 @@ pub use options::{
     LocalRuntimeOptions, OptionHandlingMode, ReasoningEffort, ReasoningOptions, TransportOptions,
 };
 pub use outcome::{
-    FinishReason, LlmResponse, LlmRunOutcome, PartialResponse, ToolExecutionRecord, Usage,
-    UsageSource,
+    AssistantRound, FailedRun, FinishReason, LlmResponse, LlmRunOutcome, PartialResponse,
+    ToolExecutionRecord, Usage, UsageOverflow, UsageSource,
 };
 pub use policy::{
     ALL_FILESYSTEM_ACCESS, ALL_USER_COMMANDS, AllowedPermissions, ApprovalHandler, CommandPattern,
@@ -57,13 +59,13 @@ pub use provider::{
     LlmProvider, ProviderRunHost, ProviderRunOutcome, ProviderRunRequest, RunLimits,
 };
 pub use request::{HasUserMessage, LlmRun, MissingUserMessage, RequestBuilder};
-pub use runtime::{LLM, Llm, LlmRuntime, LlmRuntimeBuilder};
+pub use runtime::{Llm, LlmRuntime, LlmRuntimeBuilder};
 pub use subagent::{
     InvokeSubagentRequest, SubagentOutcome, SubagentProfile, SubagentProfileId,
     SubagentProfileRegistry, SubagentRunner,
 };
 pub use tools::{
-    AuthorizationGrant, Tool, ToolCall, ToolDefinition, ToolFailure, ToolOutput, ToolPlan,
-    ToolRegistry,
+    AuthorizationGrant, Tool, ToolAuthorizationRequirement, ToolCall, ToolDefinition, ToolFailure,
+    ToolOutput, ToolPlan, ToolRegistry,
 };
 pub use types::BoxFuture;

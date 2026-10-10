@@ -1,6 +1,5 @@
 use crate::{
-    BoxFuture, ConversationMessage, LlmOptions, ModelId, ProviderId, ReasoningEffort, RunPolicy,
-    StopToken, Usage,
+    BoxFuture, ConversationMessage, LlmOptions, ModelId, ProviderId, RunPolicy, StopToken, Usage,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -41,11 +40,9 @@ impl<'de> Deserialize<'de> for SubagentProfileId {
 pub struct SubagentProfile {
     pub provider: ProviderId,
     pub model: Option<ModelId>,
-    pub effort: ReasoningEffort,
     pub system_prompt: Option<String>,
     pub tool_names: Vec<String>,
     pub policy: RunPolicy,
-    pub max_tokens: Option<u64>,
     pub timeout: Option<Duration>,
     pub allow_context: bool,
     pub max_depth: u8,
@@ -64,12 +61,17 @@ impl SubagentProfileRegistry {
         profile: SubagentProfile,
     ) -> Result<(), crate::LlmError> {
         let tool_names = profile.tool_names.iter().collect::<BTreeSet<_>>();
-        let has_invalid_budget = profile.max_tokens == Some(0)
-            || profile.timeout.is_some_and(|timeout| timeout.is_zero());
-        let has_empty_tool_name = profile.tool_names.iter().any(|name| name.trim().is_empty());
+        let has_invalid_timeout = profile.timeout.is_some_and(|timeout| timeout.is_zero());
+
+        let has_invalid_tool_name = profile
+            .tool_names
+            .iter()
+            .any(|name| !crate::ids::is_valid_identifier(name));
+
         let has_duplicate_tool_names = tool_names.len() != profile.tool_names.len();
+
         let profile_is_invalid =
-            has_invalid_budget || has_empty_tool_name || has_duplicate_tool_names;
+            has_invalid_timeout || has_invalid_tool_name || has_duplicate_tool_names;
 
         if profile_is_invalid {
             return Err(crate::LlmError::InvalidRequest(

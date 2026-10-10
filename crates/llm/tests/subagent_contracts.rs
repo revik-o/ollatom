@@ -50,11 +50,9 @@ fn default_subagent_profile() -> SubagentProfile {
     SubagentProfile {
         provider: ProviderId::new("gemini").unwrap(),
         model: Some(ModelId::new("child-model").unwrap()),
-        effort: ReasoningEffort::Low,
         system_prompt: Some("review".into()),
         tool_names: vec![],
         policy: RunPolicy::default(),
-        max_tokens: Some(100),
         timeout: None,
         allow_context: false,
         max_depth: 1,
@@ -95,13 +93,14 @@ async fn unknown_profiles_are_model_visible_tool_failures() {
         .tools(["invoke_subagent"])
         .user_message("delegate")
         .send()
+        .expect("run should start")
         .await
         .unwrap()
     else {
         panic!("expected provider recovery");
     };
     assert!(matches!(
-        response.tool_executions[0].output.error,
+        response.tool_executions[0].output.as_failure(),
         Some(ToolFailure::InvalidArguments(_))
     ));
 }
@@ -137,7 +136,8 @@ async fn parent_cancellation_stops_an_active_child() {
         .request("claude")
         .tools(["invoke_subagent"])
         .user_message("delegate")
-        .send();
+        .send()
+        .expect("run should start");
     let stop_handle = run.stop_handle();
     let child_started_notification = child_started.notified();
     let run_task = tokio::spawn(run);
@@ -199,6 +199,7 @@ async fn profiles_explicitly_control_context_inheritance_and_child_depth() {
             .limits(limits)
             .user_message("delegate")
             .send()
+            .expect("run should start")
             .await
             .unwrap(),
         LlmRunOutcome::Completed(_)

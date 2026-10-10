@@ -2,10 +2,10 @@ use super::{
     AGENT_STAGE_PROMPTS, AGENT_SYSTEM_PROMPT, AVAILABLE_AGENT_TOOL_NAMES, BenchmarkResult,
     benchmark_limits, benchmark_options, require_completed_outcome, summary::run_outcome_summary,
 };
-use llm::ConversationMessage;
+use llm::{ConversationMessage, RunStreamItem};
 use ollama_benchmark::{
-    BenchmarkArtifacts, ConversationHistoryRecorder, ModelToolActivity, StageLogger,
-    verify_independent_build,
+    AgentStageBuildStatus, BenchmarkArtifacts, ConversationHistoryRecorder, ModelToolActivity,
+    StageLogger, verify_independent_build,
 };
 use serde_json::json;
 
@@ -40,7 +40,7 @@ pub(crate) async fn run_discovery_stages(
     let stage_one_logger = StageLogger::new(artifacts.open_stage_log(1)?);
     let mut available_models = discovery_runtime
         .request(llm::BuiltInProvider::Ollama)
-        .get_all_models()
+        .list_models()
         .await?;
     available_models.sort_by(|left, right| left.id.as_str().cmp(right.id.as_str()));
     stage_one_logger.write_line("stage 1: available models")?;
@@ -48,6 +48,7 @@ pub(crate) async fn run_discovery_stages(
     for model_information in &available_models {
         stage_one_logger.write_line(model_information.id.as_str())?;
     }
+    stage_one_logger.flush()?;
 
     if !available_models
         .iter()
@@ -62,8 +63,10 @@ pub(crate) async fn run_discovery_stages(
         .model(model_identifier)
         .get_info()
         .await?;
+
     stage_two_logger.write_line("stage 2: model information")?;
     stage_two_logger.write_line(serde_json::to_string_pretty(&model_information)?)?;
+    stage_two_logger.flush()?;
 
     Ok(())
 }
@@ -77,6 +80,7 @@ async fn run_agent_stage(
     conversation_history: &[ConversationMessage],
 ) -> BenchmarkResult<Vec<ConversationMessage>> {
     let stage_logger = StageLogger::new(artifacts.open_stage_log(stage_number)?);
+
     stage_logger.write_line(serde_json::to_string(
         &json!({"stage": stage_number, "prompt": stage_prompt, "context": conversation_history}),
     )?)?;
@@ -90,10 +94,14 @@ async fn run_agent_stage(
         .context(conversation_history.to_vec())
         .tools(AVAILABLE_AGENT_TOOL_NAMES)
         .trusted_folder_grants([llm::TrustedFolder::full_access(artifacts.project_root())])
-        .trusted_commands(["npm(?: .*)?"])
+        .trusted_commands([
+            r"mise exec -- npm(?: .*)?",
+            r"mise exec -- npx(?: .*)?",
+            r"mise exec -- (?:rustc|cargo) --version",
+        ])
         .deny_untrusted()
         .user_message(stage_prompt)
-        .send();
+        .send()?;
 
     let mut event_stream = llm_run
         .take_event_stream()
@@ -111,10 +119,14 @@ async fn run_agent_stage(
             if run_outcome.is_none() => run_outcome = Some(llm_run_result),
             next_event = event_stream.next(), if !event_stream_ended => {
                 match next_event {
-                    Some(sequenced_event) => {
-                        model_tool_activity.record(&sequenced_event.event);
-                        conversation_history_recorder.record(&sequenced_event.event);
-                        stage_logger.write_event(&sequenced_event)?;
+                    Some(stream_item) => {
+                        if let Some(event) = stream_item.event() {
+                            model_tool_activity.record(event);
+                            conversation_history_recorder.record(event)?;
+                        }
+                        if let RunStreamItem::Event(sequenced_event) = stream_item {
+                            stage_logger.write_event(&sequenced_event)?;
+                        }
                     }
                     None => event_stream_ended = true,
                 }
@@ -123,25 +135,70 @@ async fn run_agent_stage(
     }
 
     let run_outcome = run_outcome.ok_or_else(|| "LLM run ended without an outcome".to_string())?;
+
     stage_logger.write_line(serde_json::to_string(
         &json!({"stage": stage_number, "outcome": run_outcome_summary(&run_outcome)}),
     )?)?;
 
+    stage_logger.flush()?;
+
     require_completed_outcome(run_outcome, stage_number)?;
 
-    model_tool_activity
-        .require_successful_agent_stage(stage_number)
-        .map_err(|error| -> Box<dyn std::error::Error + Send + Sync> { error.into() })?;
+    if stage_number == 3 {
+        let (rustc_version, cargo_version) =
+            match model_tool_activity.require_rust_toolchain_versions(stage_number) {
+                Ok(versions) => versions,
+                Err(error) => {
+                    stage_logger.write_line(serde_json::to_string(&json!({
+                        "stage": stage_number,
+                        "verification": "failed",
+                        "error": error
+                    }))?)?;
+                    stage_logger.flush()?;
 
-    if let Err(error) = verify_independent_build(artifacts, &stage_logger).await {
+                    return Err(error.into());
+                }
+            };
+
+        stage_logger.write_line(rustc_version)?;
+        stage_logger.write_line(cargo_version)?;
         stage_logger.write_line(serde_json::to_string(&json!({
             "stage": stage_number,
-            "verification": "failed",
-            "error": error.to_string()
+            "verification": "rust_toolchain_versions_printed",
+            "rustc": rustc_version,
+            "cargo": cargo_version
         }))?)?;
+    } else {
+        let build_status = model_tool_activity
+            .require_successful_agent_stage(stage_number)
+            .map_err(|error| -> Box<dyn std::error::Error + Send + Sync> { error.into() })?;
 
-        return Err(error);
+        match build_status {
+            AgentStageBuildStatus::SuccessfulBuild => {
+                if let Err(error) = verify_independent_build(artifacts, &stage_logger).await {
+                    stage_logger.write_line(serde_json::to_string(&json!({
+                        "stage": stage_number,
+                        "verification": "failed",
+                        "error": error.to_string()
+                    }))?)?;
+                    stage_logger.flush()?;
+
+                    return Err(error);
+                }
+            }
+            AgentStageBuildStatus::SkippedAfterToolUnavailable => {
+                stage_logger.write_line(serde_json::to_string(&json!({
+                    "stage": stage_number,
+                    "verification": "skipped_after_tool_unavailable",
+                    "node_command_attempts": model_tool_activity.node_command_attempt_count(),
+                    "unavailable_node_command_attempts": model_tool_activity
+                        .unavailable_node_command_attempt_count(),
+                    "successful_model_builds": 0
+                }))?)?;
+            }
+        }
     }
+    stage_logger.flush()?;
 
-    Ok(conversation_history_recorder.into_conversation_history(stage_prompt))
+    Ok(conversation_history_recorder.into_conversation_history(stage_prompt)?)
 }

@@ -1,7 +1,10 @@
 mod document;
 mod error;
-mod store;
-mod worker;
+pub(crate) mod store;
 
 pub use error::YamlConfigurationError;
-pub use store::{YamlConfigurationStore, YamlConfigurationUpdate, create_yaml_configuration_file};
+pub use store::{
+    ConfigurationCommitHandle, ConfigurationCommitIdentifier, ConfigurationCommitStatus,
+    JsonConfigurationStore, JsonConfigurationUpdate, TypedYamlFile,
+    create_json_configuration_store, create_typed_yaml_file,
+};

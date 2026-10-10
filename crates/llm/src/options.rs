@@ -104,6 +104,7 @@ pub struct TransportOptions {
     pub connect_timeout_ms: Option<u64>,
     pub stream_idle_timeout_ms: Option<u64>,
     pub overall_timeout_ms: Option<u64>,
+    pub event_delivery_timeout_ms: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]

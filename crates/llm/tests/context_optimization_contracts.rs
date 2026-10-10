@@ -29,7 +29,8 @@ async fn optimization_compacts_history_without_losing_the_active_goal_or_recent_
         .options(options)
         .system_prompt("outer system")
         .user_message("start")
-        .send();
+        .send()
+        .expect("run should start");
     let mut events = run.take_event_stream().unwrap();
     let LlmRunOutcome::Completed(response) = run.await.unwrap() else {
         panic!("expected completion");
@@ -37,8 +38,11 @@ async fn optimization_compacts_history_without_losing_the_active_goal_or_recent_
     let mut context_optimized_event = None;
 
     while let Some(sequenced_event) = events.next().await {
-        if matches!(sequenced_event.event, RunEvent::ContextOptimized { .. }) {
-            context_optimized_event = Some(sequenced_event.event);
+        if matches!(
+            sequenced_event.event(),
+            Some(RunEvent::ContextOptimized { .. })
+        ) {
+            context_optimized_event = sequenced_event.into_event();
         }
     }
 
@@ -90,7 +94,8 @@ async fn disabled_optimization_returns_lossless_history_without_a_child_request(
         .request("ollama")
         .system_prompt("outer system")
         .user_message("start")
-        .send();
+        .send()
+        .expect("run should start");
     let mut events = run.take_event_stream().unwrap();
     let LlmRunOutcome::Completed(response) = run.await.unwrap() else {
         panic!("expected completion");
@@ -98,8 +103,10 @@ async fn disabled_optimization_returns_lossless_history_without_a_child_request(
     let mut optimization_event_was_emitted = false;
 
     while let Some(sequenced_event) = events.next().await {
-        optimization_event_was_emitted |=
-            matches!(sequenced_event.event, RunEvent::ContextOptimized { .. });
+        optimization_event_was_emitted |= matches!(
+            sequenced_event.event(),
+            Some(RunEvent::ContextOptimized { .. })
+        );
     }
 
     let outcome = provider.optimization_outcome();
@@ -111,4 +118,34 @@ async fn disabled_optimization_returns_lossless_history_without_a_child_request(
     assert_eq!(provider.recorded_requests().len(), 1);
     assert!(response.usage.child_usage.is_empty());
     assert!(!optimization_event_was_emitted);
+}
+
+#[tokio::test]
+async fn non_stop_summary_is_rejected_without_committing_optimization() {
+    let provider = OptimizationProvider::new(optimization_history());
+    provider.set_summary_finish_reason(FinishReason::Length);
+    let runtime = LlmRuntime::builder()
+        .provider_with_default(provider.clone(), "test-model")
+        .build()
+        .unwrap();
+    let mut options = LlmOptions::default();
+    options.context.optimization = true;
+
+    let result = runtime
+        .request("ollama")
+        .options(options)
+        .user_message("start")
+        .send()
+        .expect("run should start")
+        .await;
+
+    assert!(matches!(
+        result,
+        Ok(LlmRunOutcome::Failed(FailedRun {
+            error: LlmError::ProviderProtocol(_),
+            ..
+        }))
+    ));
+    assert_eq!(provider.summary_call_count(), 1);
+    assert!(!provider.has_optimization_outcome());
 }

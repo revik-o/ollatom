@@ -202,7 +202,11 @@ impl RequestBuilder<MissingUserMessage> {
     }
 }
 impl RequestBuilder<HasUserMessage> {
-    pub fn send(self) -> LlmRun {
-        crate::runtime::execution::start_run(self.data)
+    pub fn send(self) -> Result<LlmRun, LlmError> {
+        let runtime_handle = tokio::runtime::Handle::try_current().map_err(|_| {
+            LlmError::InvalidRequest("LLM execution requires a Tokio runtime".into())
+        })?;
+
+        crate::runtime::execution::start_run(runtime_handle, self.data)
     }
 }

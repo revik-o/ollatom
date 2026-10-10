@@ -1,7 +1,7 @@
 #[allow(dead_code)]
 mod support;
 
-use llm::{CapabilitySupport, LlmProvider, ModelCapability};
+use llm::{CapabilitySupport, LlmProvider, ModelCapability, TransportOptions};
 use ollama::OllamaProvider;
 use serde_json::json;
 use support::{ScriptedResponse, ScriptedServer};
@@ -54,7 +54,11 @@ async fn model_information_preserves_alias_and_complete_native_metadata() {
         .unwrap();
     let requested_model = llm::ModelId::new("custom-alias").unwrap();
 
-    let model_information = provider.model_info(&requested_model).await.unwrap();
+    let transport = TransportOptions::default();
+    let model_information = provider
+        .model_info(&requested_model, &transport)
+        .await
+        .unwrap();
 
     assert_eq!(model_information.id, requested_model);
     assert_eq!(model_information.context_window.value, Some(131_072));

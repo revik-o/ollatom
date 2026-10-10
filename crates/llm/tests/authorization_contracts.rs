@@ -3,7 +3,7 @@ mod common;
 use common::{ProviderBehavior, ScriptedProvider};
 use llm::*;
 use std::sync::{
-    Arc,
+    Arc, Mutex,
     atomic::{AtomicUsize, Ordering},
 };
 
@@ -21,7 +21,7 @@ impl Tool for ProtectedTool {
                 "required": ["path"],
                 "properties": {"path": {"type": "string"}}
             }),
-            requires_authorization: true,
+            authorization_requirement: ToolAuthorizationRequirement::CapabilityPolicy,
         }
     }
 
@@ -39,6 +39,7 @@ impl Tool for ProtectedTool {
                 path: requested_path.into(),
                 access: FilesystemAccess::Modify,
             }],
+            filesystem_capability: None,
             timeout: None,
         })
     }
@@ -54,6 +55,81 @@ impl Tool for ProtectedTool {
                 plan.call.id,
                 serde_json::json!("written"),
             ))
+        })
+    }
+}
+
+struct AuthorizationRequiredTool {
+    execution_count: Arc<AtomicUsize>,
+}
+
+impl Tool for AuthorizationRequiredTool {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: "unscoped_action".into(),
+            description: "an action requiring explicit authorization".into(),
+            input_schema: serde_json::json!({"type": "object"}),
+            authorization_requirement: ToolAuthorizationRequirement::ExplicitUserApproval,
+        }
+    }
+
+    fn plan(&self, call: &ToolCall) -> Result<ToolPlan, ToolFailure> {
+        Ok(ToolPlan {
+            call: call.clone(),
+            normalized_arguments: call.arguments.clone(),
+            required_capabilities: vec![],
+            filesystem_capability: None,
+            timeout: None,
+        })
+    }
+
+    fn execute(
+        &self,
+        plan: ToolPlan,
+        _authorization_grant: AuthorizationGrant,
+    ) -> BoxFuture<'static, Result<ToolOutput, ToolFailure>> {
+        self.execution_count.fetch_add(1, Ordering::SeqCst);
+        Box::pin(async move { Ok(ToolOutput::success(plan.call.id, serde_json::json!("done"))) })
+    }
+}
+
+struct UnapprovedCapabilityClaimTool {
+    execution_count: Arc<AtomicUsize>,
+}
+
+impl Tool for UnapprovedCapabilityClaimTool {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: "unapproved_claim".into(),
+            description: "attempt an unapproved capability claim".into(),
+            input_schema: serde_json::json!({"type": "object"}),
+            authorization_requirement: ToolAuthorizationRequirement::CapabilityPolicy,
+        }
+    }
+
+    fn plan(&self, call: &ToolCall) -> Result<ToolPlan, ToolFailure> {
+        Ok(ToolPlan {
+            call: call.clone(),
+            normalized_arguments: call.arguments.clone(),
+            required_capabilities: Vec::new(),
+            filesystem_capability: None,
+            timeout: None,
+        })
+    }
+
+    fn execute(
+        &self,
+        plan: ToolPlan,
+        authorization_grant: AuthorizationGrant,
+    ) -> BoxFuture<'static, Result<ToolOutput, ToolFailure>> {
+        let execution_count = self.execution_count.clone();
+
+        Box::pin(async move {
+            authorization_grant.claim_capabilities(&[RequiredCapability::Network {
+                host: "search.example".into(),
+            }])?;
+            execution_count.fetch_add(1, Ordering::SeqCst);
+            Ok(ToolOutput::success(plan.call.id, serde_json::Value::Null))
         })
     }
 }
@@ -87,118 +163,42 @@ fn runtime_with_protected_tool(
         .unwrap()
 }
 
-#[tokio::test]
-async fn privileged_tools_require_an_explicit_policy() {
-    let execution_count = Arc::new(AtomicUsize::new(0));
-    let runtime = runtime_with_protected_tool(
-        BuiltInProvider::Ollama,
-        protected_tool_call("write-1", "/tmp/work/file"),
-        execution_count.clone(),
-    );
-
-    assert!(matches!(
-        runtime
-            .request("ollama")
-            .tools(["write_file"])
-            .user_message("write")
-            .send()
-            .await,
-        Err(LlmError::InvalidRequest(_))
-    ));
-    assert_eq!(execution_count.load(Ordering::SeqCst), 0);
-}
-
-#[tokio::test]
-async fn explicit_denials_are_returned_to_the_model() {
-    let execution_count = Arc::new(AtomicUsize::new(0));
-    let runtime = runtime_with_protected_tool(
+fn runtime_with_unscoped_tool(execution_count: Arc<AtomicUsize>) -> LlmRuntime {
+    let provider = ScriptedProvider::new(
         BuiltInProvider::Claude,
-        protected_tool_call("write-2", "/tmp/work/file"),
-        execution_count.clone(),
+        ProviderBehavior::ExecuteToolRound(vec![ToolCall {
+            id: "unscoped-1".into(),
+            name: "unscoped_action".into(),
+            arguments: serde_json::json!({}),
+        }]),
     );
-
-    let LlmRunOutcome::Completed(response) = runtime
-        .request("claude")
-        .tools(["write_file"])
-        .deny_untrusted()
-        .user_message("write")
-        .send()
-        .await
-        .unwrap()
-    else {
-        panic!("expected provider recovery from a denied tool result");
-    };
-
-    assert!(matches!(
-        response.tool_executions[0].output.error,
-        Some(ToolFailure::Denied(_))
-    ));
-    assert_eq!(execution_count.load(Ordering::SeqCst), 0);
-}
-
-#[tokio::test]
-async fn trusted_folders_authorize_paths_beneath_the_trusted_root() {
-    let execution_count = Arc::new(AtomicUsize::new(0));
-    let runtime = runtime_with_protected_tool(
-        BuiltInProvider::Gemini,
-        protected_tool_call("write-3", "/tmp/work/file"),
-        execution_count.clone(),
-    );
-
-    let LlmRunOutcome::Completed(response) = runtime
-        .request("gemini")
-        .tools(["write_file"])
-        .trusted_folders(["/tmp/work"])
-        .deny_untrusted()
-        .user_message("write")
-        .send()
-        .await
-        .unwrap()
-    else {
-        panic!("expected a completed response");
-    };
-
-    assert!(response.tool_executions[0].output.error.is_none());
-    assert_eq!(execution_count.load(Ordering::SeqCst), 1);
-}
-
-#[tokio::test]
-async fn approval_callbacks_can_authorize_paths_outside_trusted_roots() {
-    let execution_count = Arc::new(AtomicUsize::new(0));
-    let runtime = runtime_with_protected_tool(
-        BuiltInProvider::ChatGpt,
-        protected_tool_call("write-4", "/outside/file"),
-        execution_count.clone(),
-    );
-
-    runtime
-        .request("chatgpt")
-        .tools(["write_file"])
-        .trusted_folders(["/tmp/work"])
-        .on_approval_request(|approval_request| async move {
-            assert_eq!(approval_request.tool_name, "write_file");
-            ApprovalDecision::AllowOnce
-        })
-        .user_message("write")
-        .send()
-        .await
+    let mut tools = ToolRegistry::new();
+    tools
+        .register(AuthorizationRequiredTool { execution_count })
         .unwrap();
 
-    assert_eq!(execution_count.load(Ordering::SeqCst), 1);
+    LlmRuntime::builder()
+        .provider_with_default(provider, "model")
+        .tools(tools)
+        .build()
+        .unwrap()
 }
 
-#[test]
-fn command_patterns_are_anchored() {
-    let command_pattern = CommandPattern::new("cargo test").unwrap();
-    assert!(command_pattern.matches("cargo test"));
-    assert!(command_pattern.matches_command("cargo", &["test".into()]));
-    assert!(!command_pattern.matches("prefix cargo test"));
+struct ApprovingToolAuthorizer {
+    requests: Arc<Mutex<Vec<ApprovalRequest>>>,
 }
 
-#[test]
-fn trusted_folder_deletion_requires_an_explicit_full_access_grant() {
-    let standard_access = TrustedFolder::standard("/tmp/work");
-    let full_access = TrustedFolder::full_access("/tmp/work");
-    assert!(!standard_access.allow_delete);
-    assert!(full_access.allow_delete);
+impl ToolAuthorizer for ApprovingToolAuthorizer {
+    fn authorize(
+        &self,
+        request: ApprovalRequest,
+    ) -> BoxFuture<'_, Result<ApprovalDecision, LlmError>> {
+        self.requests.lock().unwrap().push(request);
+        Box::pin(async { Ok(ApprovalDecision::AllowOnce) })
+    }
 }
+
+#[path = "authorization_contracts/approval_policy.rs"]
+mod approval_policy;
+#[path = "authorization_contracts/trusted_paths.rs"]
+mod trusted_paths;

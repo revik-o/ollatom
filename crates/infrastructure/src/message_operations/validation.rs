@@ -26,6 +26,7 @@ pub(crate) async fn validate_llm_reply_target(
     user_message_id: MessageId,
 ) -> InfrastructureResult<()> {
     validate_chat_exists(database_transaction, chat_id).await?;
+
     let Some(user_message) = load_message_by_id(database_transaction, user_message_id).await?
     else {
         return Err(InfrastructureError::new(
@@ -69,6 +70,7 @@ pub(crate) fn validate_attachment_inputs(
             "attachment storage reference",
             &attachment_input.storage_reference,
         )?;
+
         i64::try_from(attachment_input.byte_length).map_err(|source| {
             InfrastructureError::new(
                 InfrastructureErrorKind::EntityValidationFailed,
@@ -81,11 +83,15 @@ pub(crate) fn validate_attachment_inputs(
 }
 
 pub(crate) fn validate_batch_action_status_events(
+    initial_status_event: &LlmActionStatusEventInput,
     status_events: &[LlmActionStatusEventInput],
 ) -> InfrastructureResult<()> {
-    validate_action_status_event_sequence(status_events)?;
+    let mut status_sequence = Vec::new();
+    status_sequence.push(initial_status_event.clone());
+    status_sequence.extend(status_events.iter().cloned());
+    validate_action_status_event_sequence(&status_sequence)?;
 
-    if !status_events
+    if !status_sequence
         .last()
         .is_some_and(|status_event| status_event.status.is_terminal())
     {
@@ -123,13 +129,12 @@ pub(crate) fn validate_action_status_transition(
     next_status: LlmActionStatus,
 ) -> InfrastructureResult<()> {
     let is_valid_transition = match previous_status {
-        LlmActionStatus::Pending => matches!(
-            next_status,
-            LlmActionStatus::Running
-                | LlmActionStatus::Succeeded
-                | LlmActionStatus::Failed
-                | LlmActionStatus::Cancelled
-        ),
+        LlmActionStatus::Pending => {
+            matches!(
+                next_status,
+                LlmActionStatus::Running | LlmActionStatus::Cancelled
+            )
+        }
         LlmActionStatus::Running => matches!(
             next_status,
             LlmActionStatus::Succeeded | LlmActionStatus::Failed | LlmActionStatus::Cancelled

@@ -11,17 +11,24 @@ impl RunHost {
         tool_plan: &ToolPlan,
         execution_stop_token: crate::StopToken,
     ) -> Result<Option<AuthorizationGrant>, LlmError> {
+        let requires_explicit_user_approval = self
+            .tools
+            .definition_for_name(&tool_plan.call.name)?
+            .authorization_requirement
+            .requires_explicit_user_approval();
         let missing_capabilities = tool_plan
             .required_capabilities
             .iter()
             .filter(|capability| !self.policy.permits(capability))
             .cloned()
             .collect::<Vec<_>>();
+        let authorization_is_satisfied =
+            missing_capabilities.is_empty() && !requires_explicit_user_approval;
 
-        if missing_capabilities.is_empty() {
+        if authorization_is_satisfied {
             return Ok(Some(AuthorizationGrant::issue(
-                tool_plan,
                 execution_stop_token,
+                tool_plan.required_capabilities.clone(),
             )));
         }
 
@@ -29,9 +36,11 @@ impl RunHost {
             run_id: self.run_id,
             tool_name: tool_plan.call.name.clone(),
             call_id: tool_plan.call.id.clone(),
-            capabilities: missing_capabilities,
-            summary: format!("{} requests additional capabilities", tool_plan.call.name),
+            capabilities: tool_plan.required_capabilities.clone(),
+            normalized_arguments: tool_plan.normalized_arguments.clone(),
+            summary: approval_summary(&tool_plan.call.name, requires_explicit_user_approval),
         };
+
         let can_request_approval = self.authorizer.is_some()
             || self.policy.approval().is_some()
             || self.interaction_callback.is_some()
@@ -47,8 +56,12 @@ impl RunHost {
 
         let approval_decision = self.request_approval_decision(approval_request).await?;
 
-        Ok((approval_decision == ApprovalDecision::AllowOnce)
-            .then(|| AuthorizationGrant::issue(tool_plan, execution_stop_token)))
+        Ok((approval_decision == ApprovalDecision::AllowOnce).then(|| {
+            AuthorizationGrant::issue(
+                execution_stop_token,
+                tool_plan.required_capabilities.clone(),
+            )
+        }))
     }
 
     async fn request_approval_decision(
@@ -94,6 +107,14 @@ impl RunHost {
             .await?;
 
         approval_decision_from(interaction_reply)
+    }
+}
+
+fn approval_summary(tool_name: &str, requires_explicit_user_approval: bool) -> String {
+    if requires_explicit_user_approval {
+        format!("{tool_name} requires explicit approval")
+    } else {
+        format!("{tool_name} requests capabilities outside the run policy")
     }
 }
 

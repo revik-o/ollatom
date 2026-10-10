@@ -10,6 +10,7 @@ pub struct OptimizationProvider {
     recorded_requests: Arc<Mutex<Vec<ProviderRunRequest>>>,
     optimization_outcome: Arc<Mutex<Option<ContextOptimizationOutcome>>>,
     summary_call_count: Arc<AtomicUsize>,
+    summary_finish_reason: Arc<Mutex<FinishReason>>,
 }
 
 impl OptimizationProvider {
@@ -20,6 +21,7 @@ impl OptimizationProvider {
             recorded_requests: Arc::new(Mutex::new(Vec::new())),
             optimization_outcome: Arc::new(Mutex::new(None)),
             summary_call_count: Arc::new(AtomicUsize::new(0)),
+            summary_finish_reason: Arc::new(Mutex::new(FinishReason::Stop)),
         })
     }
 
@@ -34,6 +36,14 @@ impl OptimizationProvider {
     pub fn summary_call_count(&self) -> usize {
         self.summary_call_count.load(Ordering::SeqCst)
     }
+
+    pub fn set_summary_finish_reason(&self, finish_reason: FinishReason) {
+        *self.summary_finish_reason.lock().unwrap() = finish_reason;
+    }
+
+    pub fn has_optimization_outcome(&self) -> bool {
+        self.optimization_outcome.lock().unwrap().is_some()
+    }
 }
 
 impl LlmProvider for OptimizationProvider {
@@ -45,10 +55,11 @@ impl LlmProvider for OptimizationProvider {
         ProviderCapabilities::default()
     }
 
-    fn availability(
-        &self,
-        model: Option<&ModelId>,
-    ) -> BoxFuture<'_, Result<AvailabilityReport, LlmError>> {
+    fn availability<'a>(
+        &'a self,
+        model: Option<&'a ModelId>,
+        _transport: &'a TransportOptions,
+    ) -> BoxFuture<'a, Result<AvailabilityReport, LlmError>> {
         let provider = self.provider_id.clone();
         let selected_model = model.cloned();
         Box::pin(async move {
@@ -64,12 +75,20 @@ impl LlmProvider for OptimizationProvider {
         })
     }
 
-    fn list_models(&self, _scope: ModelScope) -> BoxFuture<'_, Result<Vec<ModelInfo>, LlmError>> {
+    fn list_models<'a>(
+        &'a self,
+        _scope: ModelScope,
+        _transport: &'a TransportOptions,
+    ) -> BoxFuture<'a, Result<Vec<ModelInfo>, LlmError>> {
         let model_information = model_information(self.provider_id.clone());
         Box::pin(async move { Ok(vec![model_information]) })
     }
 
-    fn model_info(&self, _model: &ModelId) -> BoxFuture<'_, Result<ModelInfo, LlmError>> {
+    fn model_info<'a>(
+        &'a self,
+        _model: &'a ModelId,
+        _transport: &'a TransportOptions,
+    ) -> BoxFuture<'a, Result<ModelInfo, LlmError>> {
         let model_information = model_information(self.provider_id.clone());
         Box::pin(async move { Ok(model_information) })
     }
@@ -87,6 +106,7 @@ impl LlmProvider for OptimizationProvider {
         let history = self.history.clone();
         let optimization_outcome = self.optimization_outcome.clone();
         let summary_call_count = self.summary_call_count.clone();
+        let summary_finish_reason = self.summary_finish_reason.clone();
 
         Box::pin(async move {
             host.begin_round(1).await?;
@@ -103,10 +123,12 @@ impl LlmProvider for OptimizationProvider {
                 host.emit(RunEvent::ResponseDelta("compact summary".into()))
                     .await?;
                 host.emit(RunEvent::Usage(usage.clone())).await?;
-                return Ok(ProviderRunOutcome::Completed(response(
+                let finish_reason = *summary_finish_reason.lock().unwrap();
+                return Ok(ProviderRunOutcome::Completed(response_with_finish_reason(
                     &request,
                     "compact summary",
                     usage,
+                    finish_reason,
                 )));
             }
 
@@ -197,12 +219,25 @@ fn model_information(provider: ProviderId) -> ModelInfo {
 }
 
 fn response(request: &ProviderRunRequest, text: &str, usage: Usage) -> LlmResponse {
+    response_with_finish_reason(request, text, usage, FinishReason::Stop)
+}
+
+fn response_with_finish_reason(
+    request: &ProviderRunRequest,
+    text: &str,
+    usage: Usage,
+    finish_reason: FinishReason,
+) -> LlmResponse {
     LlmResponse {
-        text: text.into(),
-        visible_reasoning: None,
         provider: request.provider.clone(),
         model: request.model.clone(),
-        finish_reason: FinishReason::Stop,
+        assistant_rounds: vec![AssistantRound {
+            round_number: 1,
+            text: text.into(),
+            finish_reason,
+            usage: usage.clone(),
+            ..AssistantRound::default()
+        }],
         tool_executions: Vec::new(),
         usage,
     }

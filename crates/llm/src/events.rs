@@ -1,13 +1,17 @@
 pub use crate::event_queue::RunEventStream;
 use crate::{
-    BoxFuture, InteractionRequest, LlmError, RunId, ToolCall, ToolOutput, Usage,
-    event_queue::EventQueue,
+    BoxFuture, FinishReason, InteractionRequest, LlmError, RunId, ToolCall, ToolOutput, Usage,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tokio::sync::{Mutex, OnceCell, mpsc};
 
-const CALLBACK_QUEUE_CAPACITY: usize = 64;
+mod dispatcher;
+mod streamed_output;
+
+pub(crate) use dispatcher::EventDispatcher;
+pub(crate) use streamed_output::StreamedOutput;
+
+const CALLBACK_QUEUE_CAPACITY: usize = 1_024;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
@@ -15,6 +19,7 @@ pub enum ToolEvent {
     Planned { call: ToolCall },
     ApprovalRequested { call_id: String },
     Started { call: ToolCall },
+    Cancelled { call_id: String, reason: String },
     Finished { output: ToolOutput },
 }
 
@@ -30,6 +35,12 @@ pub enum RunEvent {
     InteractionRequested(InteractionRequest),
     ProviderRoundStarted {
         round: u16,
+    },
+    ProviderRoundFinished {
+        round: u16,
+        finish_reason: FinishReason,
+        tool_calls: Vec<ToolCall>,
+        usage: Usage,
     },
     ContextOptimized {
         original_message_count: usize,
@@ -48,6 +59,7 @@ impl RunEvent {
             self,
             Self::Tool(_)
                 | Self::InteractionRequested(_)
+                | Self::ProviderRoundFinished { .. }
                 | Self::ContextOptimized { .. }
                 | Self::Completed
                 | Self::Cancelled
@@ -67,8 +79,63 @@ pub struct SequencedEvent {
     pub event: RunEvent,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "data", rename_all = "snake_case")]
+pub enum RunStreamItem {
+    Event(SequencedEvent),
+    CoalescedDelta(CoalescedRunDelta),
+    Lagged(RunStreamLag),
+    DeliveryFailed(RunEventDeliveryFailure),
+}
+
+impl RunStreamItem {
+    pub fn event(&self) -> Option<&RunEvent> {
+        match self {
+            Self::Event(event) => Some(&event.event),
+            Self::CoalescedDelta(delta) => Some(&delta.event),
+            Self::Lagged(_) | Self::DeliveryFailed(_) => None,
+        }
+    }
+
+    pub fn into_event(self) -> Option<RunEvent> {
+        match self {
+            Self::Event(event) => Some(event.event),
+            Self::CoalescedDelta(delta) => Some(delta.event),
+            Self::Lagged(_) | Self::DeliveryFailed(_) => None,
+        }
+    }
+
+    pub fn sequence_range(&self) -> Option<(u64, u64)> {
+        match self {
+            Self::Event(event) => Some((event.sequence, event.sequence)),
+            Self::CoalescedDelta(delta) => Some((delta.first_sequence, delta.last_sequence)),
+            Self::Lagged(_) | Self::DeliveryFailed(_) => None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CoalescedRunDelta {
+    pub first_sequence: u64,
+    pub last_sequence: u64,
+    pub event: RunEvent,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RunStreamLag {
+    pub first_missing_sequence: u64,
+    pub last_missing_sequence: u64,
+    pub missing_event_count: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RunEventDeliveryFailure {
+    pub sequence: u64,
+    pub message: String,
+}
+
 pub trait RunEventSink: Send + Sync {
-    fn emit(&self, event: SequencedEvent) -> BoxFuture<'_, Result<(), LlmError>>;
+    fn persist(&self, event: SequencedEvent) -> BoxFuture<'_, Result<(), LlmError>>;
 }
 
 pub type EventCallback = Arc<dyn Fn(SequencedEvent) -> BoxFuture<'static, ()> + Send + Sync>;
@@ -81,137 +148,5 @@ pub struct EventCallbacks {
 impl EventCallbacks {
     pub fn push(&mut self, callback: EventCallback) {
         self.callbacks.push(callback);
-    }
-}
-
-pub(crate) struct EventDispatcher {
-    run_id: RunId,
-    state: Mutex<DispatchState>,
-    event_sink: Option<Arc<dyn RunEventSink>>,
-    callbacks: Vec<EventCallback>,
-    callback_senders: OnceCell<Vec<mpsc::Sender<SequencedEvent>>>,
-    event_queue: Arc<EventQueue>,
-}
-
-struct DispatchState {
-    next_sequence: u64,
-    terminal: bool,
-    streamed: StreamedOutput,
-}
-
-#[derive(Clone, Default)]
-pub(crate) struct StreamedOutput {
-    pub text: String,
-    pub visible_reasoning: String,
-    pub usage: Usage,
-}
-
-impl DispatchState {
-    fn accumulate_streamed_output(&mut self, event: &RunEvent) {
-        match event {
-            RunEvent::ResponseDelta(delta) => self.streamed.text.push_str(delta),
-            RunEvent::ReasoningSummaryDelta(delta) => {
-                self.streamed.visible_reasoning.push_str(delta);
-            }
-            RunEvent::Usage(usage) => self.streamed.usage = usage.clone(),
-            _ => {}
-        }
-    }
-}
-
-impl EventDispatcher {
-    pub fn new(
-        run_id: RunId,
-        event_sink: Option<Arc<dyn RunEventSink>>,
-        callbacks: EventCallbacks,
-    ) -> (Self, RunEventStream) {
-        let event_queue = Arc::new(EventQueue::new());
-
-        let stream = RunEventStream::new(event_queue.clone());
-
-        (
-            Self {
-                run_id,
-                state: Mutex::new(DispatchState {
-                    next_sequence: 1,
-                    terminal: false,
-                    streamed: StreamedOutput::default(),
-                }),
-                event_sink,
-                callbacks: callbacks.callbacks,
-                callback_senders: OnceCell::new(),
-                event_queue,
-            },
-            stream,
-        )
-    }
-    pub async fn emit(&self, event: RunEvent) -> Result<(), LlmError> {
-        let mut state = self.state.lock().await;
-
-        if state.terminal {
-            return Err(LlmError::ProviderProtocol(
-                "event emitted after terminal event".into(),
-            ));
-        }
-
-        let event_is_terminal = event.is_terminal();
-
-        state.accumulate_streamed_output(&event);
-
-        let sequenced_event = SequencedEvent {
-            run_id: self.run_id,
-            sequence: state.next_sequence,
-            event,
-        };
-        state.next_sequence += 1;
-
-        if let Some(event_sink) = &self.event_sink {
-            event_sink.emit(sequenced_event.clone()).await?;
-        }
-
-        self.event_queue.push(sequenced_event.clone());
-
-        let senders = self
-            .callback_senders
-            .get_or_init(|| async {
-                self.callbacks
-                    .iter()
-                    .cloned()
-                    .map(|callback| {
-                        let (callback_sender, mut callback_receiver) =
-                            mpsc::channel(CALLBACK_QUEUE_CAPACITY);
-                        tokio::spawn(async move {
-                            while let Some(callback_event) = callback_receiver.recv().await {
-                                callback(callback_event).await;
-                            }
-                        });
-                        callback_sender
-                    })
-                    .collect()
-            })
-            .await;
-
-        for callback_sender in senders {
-            if sequenced_event.event.is_critical() {
-                let _ignored_closed_receiver = callback_sender.send(sequenced_event.clone()).await;
-            } else {
-                let _ignored_full_or_closed_queue =
-                    callback_sender.try_send(sequenced_event.clone());
-            }
-        }
-
-        state.terminal = event_is_terminal;
-
-        Ok(())
-    }
-
-    pub async fn streamed_output(&self) -> StreamedOutput {
-        self.state.lock().await.streamed.clone()
-    }
-}
-
-impl Drop for EventDispatcher {
-    fn drop(&mut self) {
-        self.event_queue.close();
     }
 }

@@ -1,18 +1,39 @@
 use super::{
     content::{NativeMessage, message_from_content_async},
-    streaming::RoundResult,
+    content_media::AttachmentBudget,
 };
-use llm::{ContentBlock, ConversationMessage, ConversationRole, LlmError, ToolFailure, ToolOutput};
+use llm::{ConversationMessage, ConversationRole, LlmError, ToolFailure, ToolOutput};
 use serde_json::json;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub(super) async fn native_messages_from_history(
     system_prompt: Option<&str>,
     history: &[ConversationMessage],
     model_is_gemma_four: bool,
 ) -> Result<Vec<NativeMessage>, LlmError> {
-    let mut messages = Vec::with_capacity(history.len() + usize::from(system_prompt.is_some()));
-    let mut historical_tool_names = HashMap::new();
+    native_messages_from_history_with_budget(
+        system_prompt,
+        history,
+        model_is_gemma_four,
+        &mut AttachmentBudget::default(),
+    )
+    .await
+}
+
+pub(crate) async fn native_messages_from_history_with_budget(
+    system_prompt: Option<&str>,
+    history: &[ConversationMessage],
+    model_is_gemma_four: bool,
+    attachment_budget: &mut AttachmentBudget,
+) -> Result<Vec<NativeMessage>, LlmError> {
+    let mut messages = Vec::with_capacity(history.len());
+
+    if system_prompt.is_some() {
+        messages.reserve(1);
+    }
+
+    let mut historical_tool_names = BTreeMap::new();
+    let mut seen_tool_call_identifiers = BTreeSet::new();
 
     if let Some(system_prompt) = system_prompt {
         let mut system_message = NativeMessage::new("system");
@@ -26,74 +47,29 @@ pub(super) async fn native_messages_from_history(
                 conversation_message.role,
                 &conversation_message.content,
                 model_is_gemma_four && conversation_message.role == ConversationRole::Assistant,
+                attachment_budget,
                 &mut historical_tool_names,
+                &mut seen_tool_call_identifiers,
             )
             .await?,
         );
     }
 
+    if let Some(call_identifier) = historical_tool_names.keys().next() {
+        return Err(LlmError::InvalidRequest(format!(
+            "tool call {call_identifier} has no matching result"
+        )));
+    }
+
     Ok(messages)
 }
 
-pub(super) fn append_round_history(
-    history: &mut Vec<ConversationMessage>,
-    round_result: &RoundResult,
-    calls: &[llm::ToolCall],
-    outputs: &[ToolOutput],
-) -> Result<(), LlmError> {
-    let mut assistant_content = Vec::new();
-
-    if !round_result.content.is_empty() {
-        assistant_content.push(ContentBlock::Text {
-            text: round_result.content.clone(),
-        });
-    }
-
-    if let Some(thinking) = &round_result.thinking {
-        assistant_content.push(ContentBlock::ReasoningSummary {
-            text: thinking.clone(),
-        });
-    }
-
-    assistant_content.extend(
-        calls
-            .iter()
-            .cloned()
-            .map(|call| ContentBlock::ToolCall { call }),
-    );
-
-    if !assistant_content.is_empty() {
-        history.push(ConversationMessage {
-            role: ConversationRole::Assistant,
-            content: assistant_content,
-        });
-    }
-
-    let outputs_by_call_id = outputs
-        .iter()
-        .map(|output| (output.call_id.as_str(), output))
-        .collect::<HashMap<_, _>>();
-
-    for call in calls {
-        let output = outputs_by_call_id.get(call.id.as_str()).ok_or_else(|| {
-            LlmError::ToolProtocol(format!("tool output missing for call {}", call.id))
-        })?;
-        history.push(ConversationMessage {
-            role: ConversationRole::Tool,
-            content: vec![ContentBlock::ToolResult {
-                output: (*output).clone(),
-            }],
-        });
-    }
-
-    Ok(())
-}
-
 pub(super) fn tool_output_content(output: &ToolOutput) -> Result<String, LlmError> {
-    let value = if let Some(error) = &output.error {
-        json!({"error": tool_failure_message(error)})
-    } else {
-        output.content.clone()
+    let value = match output {
+        ToolOutput::Success { content, .. } => content.clone(),
+        ToolOutput::Failure { error, .. } => {
+            json!({"error": tool_failure_message(error)})
+        }
     };
 
     if let Some(string) = value.as_str() {

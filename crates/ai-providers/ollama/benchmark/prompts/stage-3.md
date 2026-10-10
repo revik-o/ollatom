@@ -1,1 +1,6 @@
-Create a Vite React project with TypeScript in the benchmark project root. Install dependencies, build the application, inspect every failure, and continue working in the same uninterrupted agent loop until the project builds successfully. Do not stop before the build succeeds.
+Use the sandboxed execute_command tool to check that the Rust toolchain is available through mise. Run these two commands separately with program `mise` and the exact arguments shown:
+
+1. `["exec", "--", "rustc", "--version"]`
+2. `["exec", "--", "cargo", "--version"]`
+
+Both version lines must appear in the command output printed to the console. Do not edit any project files in this stage. Finish by reporting the exact `rustc` and `cargo` version lines returned by the commands.

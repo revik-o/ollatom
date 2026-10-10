@@ -1,10 +1,13 @@
 use crate::{ModelId, ProviderId};
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "data", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum LlmError {
     InvalidProvider(String),
     InvalidModel(String),
@@ -20,6 +23,7 @@ pub enum LlmError {
     InvalidRequest(String),
     InvalidToolDefinition(String),
     InvalidToolArguments(String),
+    IdentifierExhausted(String),
     ToolProtocol(String),
     ProviderProtocol(String),
     InteractionNotFound(u64),
@@ -69,6 +73,9 @@ impl Display for LlmError {
             }
             Self::InvalidToolArguments(message) => {
                 write!(formatter, "invalid tool arguments: {message}")
+            }
+            Self::IdentifierExhausted(identifier_kind) => {
+                write!(formatter, "{identifier_kind} identifier space is exhausted")
             }
             Self::ToolProtocol(message) => write!(formatter, "tool protocol error: {message}"),
             Self::ProviderProtocol(message) => {

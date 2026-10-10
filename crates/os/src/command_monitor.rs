@@ -42,15 +42,18 @@ pub(super) fn spawn_command_monitor(
             shared_execution.terminal_logs.clone(),
             TerminalOutputDestination::StandardOutput,
         );
+
         let standard_error_reader = spawn_output_reader(
             standard_error,
             shared_execution.terminal_logs.clone(),
             TerminalOutputDestination::StandardError,
         );
+
         let process_status = wait_for_process(&shared_execution.child_process);
         let standard_output_error = join_output_reader(standard_output_reader);
         let standard_error_error = join_output_reader(standard_error_reader);
         let output_error = standard_output_error.or(standard_error_error);
+
         let result = match (process_status, output_error) {
             (Ok(process_status), None) => {
                 let terminated = shared_execution
@@ -66,6 +69,7 @@ pub(super) fn spawn_command_monitor(
             }
             (Err(error), _) | (_, Some(error)) => Err(error),
         };
+
         let _ = sender.send(result);
     });
 }

@@ -1,12 +1,17 @@
-use super::metadata::{
-    NativeModelTag, NativeModelTagsResponse, NativeRunningModel, NativeRunningModelsResponse,
-};
 use super::provider::OllamaProvider;
-use reqwest::{Client, Method, Response, StatusCode};
+use reqwest::{Client, Method, Response, StatusCode, redirect::Policy};
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::Value;
 use std::time::Duration;
 use url::Url;
+
+mod body;
+mod discovery;
+use body::read_bounded_json_body;
+
+const MAXIMUM_JSON_RESPONSE_BYTE_COUNT: usize = 8 * 1024 * 1024;
+const MAXIMUM_CACHED_CLIENT_COUNT: usize = 16;
+const AUTHENTICATION_FAILURE_MESSAGE: &str = "Ollama authentication failed";
 
 impl OllamaProvider {
     pub(super) fn request(
@@ -23,10 +28,32 @@ impl OllamaProvider {
         path: &str,
         timeout: Duration,
     ) -> Result<reqwest::RequestBuilder, llm::LlmError> {
-        let client = Client::builder()
-            .connect_timeout(timeout)
-            .build()
-            .map_err(|error| llm::LlmError::InvalidRequest(error.to_string()))?;
+        let client = {
+            let mut clients_by_connection_timeout = self
+                .clients_by_connection_timeout
+                .lock()
+                .map_err(|_| llm::LlmError::Provider("Ollama client cache lock failed".into()))?;
+
+            if let Some(client) = clients_by_connection_timeout.get(&timeout) {
+                client.clone()
+            } else {
+                let client = Client::builder()
+                    .connect_timeout(timeout)
+                    .redirect(Policy::none())
+                    .build()
+                    .map_err(|error| llm::LlmError::InvalidRequest(error.to_string()))?;
+
+                if clients_by_connection_timeout.len() >= MAXIMUM_CACHED_CLIENT_COUNT
+                    && let Some(oldest_timeout) =
+                        clients_by_connection_timeout.keys().next().copied()
+                {
+                    clients_by_connection_timeout.remove(&oldest_timeout);
+                }
+
+                clients_by_connection_timeout.insert(timeout, client.clone());
+                client
+            }
+        };
 
         self.request_with_client(&client, method, path)
     }
@@ -61,12 +88,14 @@ impl OllamaProvider {
         } else {
             request
         };
+
         let send_request_future = request.send();
 
         if let Some(stop_token) = stop {
-            tokio::select! {
-                () = stop_token.cancelled() => Err(llm::LlmError::Cancelled),
-                result = send_request_future => result.map_err(network_error),
+            match stop_token.run_until_cancelled(send_request_future).await {
+                llm::ControlledFutureOutcome::Cancelled => Err(llm::LlmError::Cancelled),
+                llm::ControlledFutureOutcome::TimedOut => unreachable!(),
+                llm::ControlledFutureOutcome::Completed(result) => result.map_err(network_error),
             }
         } else {
             send_request_future.await.map_err(network_error)
@@ -77,86 +106,24 @@ impl OllamaProvider {
         response: Response,
         requested_model: Option<&llm::ModelId>,
     ) -> Result<T, llm::LlmError> {
+        Self::read_json_with_stop(response, requested_model, None).await
+    }
+
+    pub(super) async fn read_json_with_stop<T: for<'de> Deserialize<'de>>(
+        response: Response,
+        requested_model: Option<&llm::ModelId>,
+        stop: Option<&llm::StopToken>,
+    ) -> Result<T, llm::LlmError> {
         let status = response.status();
 
         if !status.is_success() {
             return Err(response_error(status, requested_model));
         }
 
-        response.json().await.map_err(protocol_error)
-    }
+        let response_body = read_bounded_json_body(response, stop).await?;
 
-    pub(super) async fn fetch_model_tags(&self) -> Result<Vec<NativeModelTag>, llm::LlmError> {
-        let response = self
-            .send_request(
-                self.request(Method::GET, "api/tags")?,
-                None,
-                Some(self.discovery_timeout),
-            )
-            .await?;
-
-        Ok(Self::read_json::<NativeModelTagsResponse>(response, None)
-            .await?
-            .models)
-    }
-
-    pub(super) async fn fetch_running_models(
-        &self,
-    ) -> Result<Vec<NativeRunningModel>, llm::LlmError> {
-        let response = self
-            .send_request(
-                self.request(Method::GET, "api/ps")?,
-                None,
-                Some(self.discovery_timeout),
-            )
-            .await?;
-
-        Ok(
-            Self::read_json::<NativeRunningModelsResponse>(response, None)
-                .await?
-                .models,
-        )
-    }
-
-    pub(super) async fn fetch_model_details(
-        &self,
-        model: &llm::ModelId,
-        verbose: bool,
-    ) -> Result<Value, llm::LlmError> {
-        let response = self
-            .send_request(
-                self.request(Method::POST, "api/show")?
-                    .json(&json!({"name": model.as_str(), "verbose": verbose})),
-                None,
-                Some(self.discovery_timeout),
-            )
-            .await?;
-
-        validate_model_details_response(Self::read_json::<Value>(response, Some(model)).await?)
-    }
-
-    pub(super) async fn fetch_model_details_with_stop(
-        &self,
-        model: &llm::ModelId,
-        verbose: bool,
-        stop: &llm::StopToken,
-        connection_timeout: Option<Duration>,
-    ) -> Result<Value, llm::LlmError> {
-        let request = if let Some(timeout) = connection_timeout {
-            self.request_with_connection_timeout(Method::POST, "api/show", timeout)?
-        } else {
-            self.request(Method::POST, "api/show")?
-        };
-
-        let response = self
-            .send_request(
-                request.json(&json!({"name": model.as_str(), "verbose": verbose})),
-                Some(stop),
-                None,
-            )
-            .await?;
-
-        validate_model_details_response(Self::read_json::<Value>(response, Some(model)).await?)
+        serde_json::from_slice(&response_body)
+            .map_err(|_| llm::LlmError::ProviderProtocol("invalid Ollama response".into()))
     }
 }
 
@@ -210,26 +177,50 @@ pub(super) fn response_error(status: StatusCode, model: Option<&llm::ModelId>) -
     }
 
     if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN {
-        return llm::LlmError::Unavailable("Ollama authentication failed".into());
+        return llm::LlmError::Unavailable(AUTHENTICATION_FAILURE_MESSAGE.into());
     }
 
     llm::LlmError::Provider(format!("Ollama returned HTTP {status}"))
 }
 
+pub(super) fn is_authentication_failure(error: &llm::LlmError) -> bool {
+    matches!(
+        error,
+        llm::LlmError::Unavailable(message) if message == AUTHENTICATION_FAILURE_MESSAGE
+    )
+}
+
 pub(super) fn network_error(error: reqwest::Error) -> llm::LlmError {
-    if error.is_timeout() {
-        llm::LlmError::Timeout("Ollama request timed out".into())
-    } else {
-        llm::LlmError::Unavailable("Ollama daemon is unreachable".into())
-    }
+    error
+        .is_timeout()
+        .then_some(llm::LlmError::Timeout("Ollama request timed out".into()))
+        .unwrap_or(llm::LlmError::Unavailable(
+            "Ollama daemon is unreachable".into(),
+        ))
 }
 
 fn protocol_error(_: reqwest::Error) -> llm::LlmError {
     llm::LlmError::ProviderProtocol("invalid Ollama response".into())
 }
 
-fn validate_model_details_response(model_details: Value) -> Result<Value, llm::LlmError> {
-    if model_details.is_object() {
+pub(super) fn validate_model_details_response(
+    model_details: Value,
+) -> Result<Value, llm::LlmError> {
+    let recognized_fields = [
+        "capabilities",
+        "details",
+        "license",
+        "model_info",
+        "modified_at",
+        "parameters",
+        "template",
+    ];
+
+    if model_details.as_object().is_some_and(|model_details| {
+        recognized_fields
+            .iter()
+            .any(|recognized_field| model_details.contains_key(*recognized_field))
+    }) {
         Ok(model_details)
     } else {
         Err(llm::LlmError::ProviderProtocol(

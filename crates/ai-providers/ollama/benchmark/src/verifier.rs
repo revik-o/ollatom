@@ -1,5 +1,7 @@
-use crate::{BenchmarkArtifacts, StageLogger};
-use os::{CommandOutcome, execute_command_in_directory_with_arguments};
+use crate::{BenchmarkArtifacts, StageLogger, programming_toolchain_command_options};
+use os::{
+    CommandOutcome, SandboxNetworkPolicy, execute_command_in_directory_with_arguments_and_options,
+};
 use serde_json::json;
 use std::{fs, io, time::Duration};
 
@@ -15,7 +17,7 @@ pub async fn verify_independent_build(
 
     logger.write_line(serde_json::to_string(&json!({
         "verification": "independent_build",
-        "command": ["npm", "run", "build"],
+        "command": ["mise", "exec", "--", "npm", "run", "build"],
         "success": command_outcome.succeeded,
         "exit_code": command_outcome.exit_code,
         "stdout": command_outcome.terminal_logs.standard_output,
@@ -24,7 +26,7 @@ pub async fn verify_independent_build(
 
     if !command_outcome.succeeded {
         return Err(format!(
-            "independent npm build failed: {}",
+            "independent mise npm build failed: {}",
             command_outcome.exit_code.unwrap_or(-1)
         )
         .into());
@@ -37,12 +39,20 @@ pub async fn verify_independent_build(
 }
 
 async fn execute_build_command(artifacts: &BenchmarkArtifacts) -> io::Result<CommandOutcome> {
-    let command_entity = execute_command_in_directory_with_arguments(
+    let command_entity = execute_command_in_directory_with_arguments_and_options(
         artifacts.project_root(),
-        "npm",
-        ["run".to_owned(), "build".to_owned()],
+        "mise",
+        [
+            "exec".to_owned(),
+            "--".to_owned(),
+            "npm".to_owned(),
+            "run".to_owned(),
+            "build".to_owned(),
+        ],
+        programming_toolchain_command_options(SandboxNetworkPolicy::Denied)?,
     )
     .map_err(command_error)?;
+
     let mut command_future = Box::pin(command_entity);
 
     match tokio::time::timeout(INDEPENDENT_BUILD_TIMEOUT, &mut command_future).await {
@@ -53,7 +63,9 @@ async fn execute_build_command(artifacts: &BenchmarkArtifacts) -> io::Result<Com
                 .get_ref()
                 .terminate()
                 .map_err(command_error)?;
+
             let _ = tokio::time::timeout(TERMINATION_COMPLETION_TIMEOUT, command_future).await;
+
             Err(io::Error::new(
                 io::ErrorKind::TimedOut,
                 "independent build timed out",
@@ -82,6 +94,7 @@ fn validate_distribution_output(
     }
 
     let mut resource_count = 0usize;
+
     count_distribution_resources(
         &distribution_directory_path,
         &index_file_path,
@@ -115,7 +128,7 @@ fn count_distribution_resources(
         if metadata.is_dir() {
             count_distribution_resources(&path, index_file_path, resource_count)?;
         } else if metadata.is_file() && path != index_file_path {
-            *resource_count += 1;
+            *resource_count = resource_count.saturating_add(1);
         }
     }
 

@@ -1,30 +1,91 @@
 use super::{
     content::NativeToolCall,
-    run::RunProgress,
     streaming_tools::merge_native_tool_calls,
     streaming_usage::{finish_reason_from_native, record_completed_frame_usage},
     transport::network_error,
 };
 use futures_util::StreamExt;
-use llm::{FinishReason, LlmError, ProviderRunHost, RunEvent, StopToken};
+use llm::{
+    AssistantRound, ControlledFutureOutcome, FinishReason, LlmError, ProviderRunHost, RunEvent,
+    StopToken, Usage,
+};
 use reqwest::Response;
-use serde_json::Value;
+use serde::Deserialize;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
-use tokio::time::timeout;
 
 const MAXIMUM_ERROR_MESSAGE_CHARACTERS: usize = 4096;
+const MAXIMUM_FRAME_BYTE_COUNT: usize = 1024 * 1024;
+
+mod round;
+pub(super) use round::stream_round;
+
+#[derive(Debug, Default, Deserialize)]
+pub(super) struct NativeChatFrame {
+    #[serde(default, deserialize_with = "deserialize_present_value")]
+    pub(super) error: Option<NativeChatError>,
+    #[serde(default)]
+    pub(super) message: NativeChatMessageDelta,
+    #[serde(default)]
+    pub(super) done: bool,
+    #[serde(default)]
+    pub(super) done_reason: Option<String>,
+    #[serde(default)]
+    pub(super) prompt_eval_count: Option<u64>,
+    #[serde(default)]
+    pub(super) eval_count: Option<u64>,
+    #[serde(default)]
+    pub(super) reasoning_tokens: Option<u64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub(super) struct NativeChatMessageDelta {
+    #[serde(default)]
+    pub(super) content: String,
+    #[serde(default)]
+    pub(super) thinking: String,
+    #[serde(default)]
+    pub(super) tool_calls: Vec<NativeToolCall>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub(super) enum NativeChatError {
+    Message(String),
+    Details(NativeChatErrorDetails),
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct NativeChatErrorDetails {
+    #[serde(default)]
+    message: Option<String>,
+}
+
+impl NativeChatError {
+    fn message(&self) -> Option<&str> {
+        match self {
+            Self::Message(message) => Some(message),
+            Self::Details(details) => details.message.as_deref(),
+        }
+    }
+}
+
+fn deserialize_present_value<'de, Deserializer, ValueType>(
+    deserializer: Deserializer,
+) -> Result<Option<ValueType>, Deserializer::Error>
+where
+    Deserializer: serde::Deserializer<'de>,
+    ValueType: Deserialize<'de>,
+{
+    ValueType::deserialize(deserializer).map(Some)
+}
 
 pub(super) struct RoundResult {
     pub(super) tool_calls: Vec<NativeToolCall>,
-    pub(super) content: String,
-    pub(super) thinking: Option<String>,
     pub(super) finish_reason: FinishReason,
     pub(super) observed_input_tokens: u64,
 }
 
 pub(super) struct RoundStreamState {
-    pub(super) content: String,
-    pub(super) thinking: String,
     pub(super) tool_calls: BTreeMap<usize, NativeToolCall>,
     pub(super) is_complete: bool,
     pub(super) finish_reason: FinishReason,
@@ -34,8 +95,6 @@ pub(super) struct RoundStreamState {
 impl Default for RoundStreamState {
     fn default() -> Self {
         Self {
-            content: String::new(),
-            thinking: String::new(),
             tool_calls: BTreeMap::new(),
             is_complete: false,
             finish_reason: FinishReason::Stop,
@@ -44,148 +103,37 @@ impl Default for RoundStreamState {
     }
 }
 
-pub(super) async fn stream_round(
-    response: Response,
-    host: &Arc<dyn ProviderRunHost>,
-    stop: &StopToken,
-    idle_timeout_milliseconds: Option<u64>,
-    run_progress: &mut RunProgress,
-) -> Result<RoundResult, LlmError> {
-    let mut response_stream = response.bytes_stream();
-    let mut pending_frame_bytes = Vec::new();
-    let mut round_stream_state = RoundStreamState::default();
-
-    'stream: loop {
-        let next_chunk = tokio::select! {
-            () = stop.cancelled() => return Err(LlmError::Cancelled),
-            result = async {
-                if let Some(timeout_milliseconds) = idle_timeout_milliseconds {
-                    timeout(Duration::from_millis(timeout_milliseconds), response_stream.next())
-                        .await
-                        .map_err(|_| LlmError::Timeout("Ollama stream idle timeout".into()))
-                } else {
-                    Ok(response_stream.next().await)
-                }
-            } => result,
-        }?;
-
-        let Some(chunk) = next_chunk else {
-            break;
-        };
-
-        pending_frame_bytes.extend_from_slice(&chunk.map_err(network_error)?);
-
-        while let Some(newline_position) =
-            pending_frame_bytes.iter().position(|byte| *byte == b'\n')
-        {
-            let frame_bytes = pending_frame_bytes
-                .drain(..=newline_position)
-                .collect::<Vec<_>>();
-            let frame_bytes = &frame_bytes[..frame_bytes.len() - 1];
-
-            if frame_bytes.iter().all(u8::is_ascii_whitespace) {
-                continue;
-            }
-
-            process_frame_bytes(frame_bytes, host, run_progress, &mut round_stream_state).await?;
-
-            if round_stream_state.is_complete {
-                pending_frame_bytes.clear();
-                break 'stream;
-            }
-        }
-    }
-
-    if !pending_frame_bytes.iter().all(u8::is_ascii_whitespace) {
-        process_frame_bytes(
-            &pending_frame_bytes,
-            host,
-            run_progress,
-            &mut round_stream_state,
-        )
-        .await?;
-    }
-
-    if !round_stream_state.is_complete {
-        return Err(LlmError::ProviderProtocol(
-            "Ollama stream ended before done=true".into(),
-        ));
-    }
-
-    host.emit(RunEvent::Usage(run_progress.usage.clone()))
-        .await?;
-
-    if !round_stream_state.tool_calls.is_empty()
-        && round_stream_state.finish_reason == FinishReason::Stop
-    {
-        round_stream_state.finish_reason = FinishReason::ToolCalls;
-    }
-
-    Ok(RoundResult {
-        tool_calls: round_stream_state.tool_calls.into_values().collect(),
-        content: round_stream_state.content,
-        thinking: (!round_stream_state.thinking.is_empty()).then_some(round_stream_state.thinking),
-        finish_reason: round_stream_state.finish_reason,
-        observed_input_tokens: round_stream_state.observed_input_tokens,
-    })
-}
-
-async fn process_frame_bytes(
-    frame_bytes: &[u8],
-    host: &Arc<dyn ProviderRunHost>,
-    run_progress: &mut RunProgress,
-    round_stream_state: &mut RoundStreamState,
-) -> Result<(), LlmError> {
-    let frame = serde_json::from_slice(frame_bytes)
-        .map_err(|_| LlmError::ProviderProtocol("invalid Ollama NDJSON frame".into()))?;
-
-    process_frame(&frame, host, run_progress, round_stream_state).await
-}
-
 async fn process_frame(
-    frame: &Value,
+    frame: &NativeChatFrame,
     host: &Arc<dyn ProviderRunHost>,
-    run_progress: &mut RunProgress,
+    assistant_round: &mut AssistantRound,
+    aggregate_usage: &mut Usage,
     round_stream_state: &mut RoundStreamState,
 ) -> Result<(), LlmError> {
-    if let Some(error) = frame.get("error") {
+    if let Some(error) = &frame.error {
         return Err(native_error_frame(error));
     }
 
-    if let Some(message) = frame.get("message") {
-        if let Some(content) = message.get("content").and_then(Value::as_str) {
-            append_response_delta(content, host, run_progress, round_stream_state).await?;
-        }
+    append_response_delta(&frame.message.content, host, assistant_round).await?;
+    append_reasoning_delta(&frame.message.thinking, host, assistant_round).await?;
+    merge_native_tool_calls(
+        &frame.message.tool_calls,
+        &mut round_stream_state.tool_calls,
+    )?;
 
-        if let Some(thinking) = message.get("thinking").and_then(Value::as_str) {
-            append_reasoning_delta(thinking, host, run_progress, round_stream_state).await?;
-        }
-
-        if let Some(native_calls) = message.get("tool_calls").and_then(Value::as_array) {
-            merge_native_tool_calls(native_calls, &mut round_stream_state.tool_calls)?;
-        }
-    }
-
-    if frame.get("done").and_then(Value::as_bool) == Some(true) {
+    if frame.done {
         round_stream_state.is_complete = true;
-        round_stream_state.finish_reason = finish_reason_from_native(frame.get("done_reason"));
-        record_completed_frame_usage(frame, run_progress, round_stream_state);
+        round_stream_state.finish_reason = finish_reason_from_native(frame.done_reason.as_deref());
+        record_completed_frame_usage(frame, aggregate_usage, assistant_round, round_stream_state)?;
     }
 
     Ok(())
 }
 
-fn native_error_frame(error: &Value) -> LlmError {
+fn native_error_frame(error: &NativeChatError) -> LlmError {
     let error_message = error
-        .as_str()
+        .message()
         .map(ToString::to_string)
-        .or_else(|| {
-            error
-                .get("message")
-                .and_then(Value::as_str)
-                .map(ToString::to_string)
-        })
-        .or_else(|| serde_json::to_string(error).ok())
         .unwrap_or_else(|| "Ollama returned an error frame".into());
 
     LlmError::Provider(
@@ -199,15 +147,13 @@ fn native_error_frame(error: &Value) -> LlmError {
 async fn append_response_delta(
     response_delta: &str,
     host: &Arc<dyn ProviderRunHost>,
-    run_progress: &mut RunProgress,
-    round_stream_state: &mut RoundStreamState,
+    assistant_round: &mut AssistantRound,
 ) -> Result<(), LlmError> {
     if response_delta.is_empty() {
         return Ok(());
     }
 
-    run_progress.response_text.push_str(response_delta);
-    round_stream_state.content.push_str(response_delta);
+    assistant_round.text.push_str(response_delta);
     host.emit(RunEvent::ResponseDelta(response_delta.into()))
         .await
 }
@@ -215,15 +161,17 @@ async fn append_response_delta(
 async fn append_reasoning_delta(
     reasoning_delta: &str,
     host: &Arc<dyn ProviderRunHost>,
-    run_progress: &mut RunProgress,
-    round_stream_state: &mut RoundStreamState,
+    assistant_round: &mut AssistantRound,
 ) -> Result<(), LlmError> {
     if reasoning_delta.is_empty() {
         return Ok(());
     }
 
-    run_progress.visible_reasoning.push_str(reasoning_delta);
-    round_stream_state.thinking.push_str(reasoning_delta);
+    assistant_round
+        .visible_reasoning
+        .get_or_insert_with(String::new)
+        .push_str(reasoning_delta);
+
     host.emit(RunEvent::ReasoningSummaryDelta(reasoning_delta.into()))
         .await
 }

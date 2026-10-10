@@ -1,24 +1,33 @@
 # Infrastructure
 
-The infrastructure crate owns persistent application data, SQLite initialization, transaction boundaries, the trusted SQL builder, and YAML configuration storage.
+The infrastructure crate owns persistent application data, SQLite initialization, typed transaction operations, and YAML configuration storage.
 
-Every SQLite database is initialized from an explicit absolute file path. The caller creates the parent directory and chooses the filename. Initialization enables foreign keys, WAL journal mode, NORMAL synchronous mode, a five-second busy timeout, and embedded migrations.
+Every SQLite database is initialized from an explicit absolute file path. The caller creates the parent directory and chooses the filename. Initialization enables foreign keys, WAL journal mode, `FULL` synchronous mode by default, a five-second busy timeout, and embedded migrations. Applications that explicitly choose lower durability can pass `DatabaseDurability::Balanced`, which uses `NORMAL` synchronous mode.
+
+On Unix, the database parent directory must be owned by the current user with mode `0700`; SQLite files must be regular files owned by that user with mode `0600`. Initialization creates new database files with those permissions and rejects insecure existing files. Initialization fails closed on platforms without private database ACL enforcement.
 
 Domain mutations require an `InfrastructureTransaction`. Manual transactions commit or roll back explicitly. `execute_db_actions` commits successful closures and rolls back failed closures. A transaction containing a failed operation cannot commit.
 
 User revision numbers and LLM response round numbers are separate concepts. User revisions identify edits to one logical request. LLM response rounds identify multiple responses to one exact active user-message revision.
 
-The SQL builder is a trusted application and plugin API. Values are bound parameters, identifiers are validated, unfiltered updates and deletes require explicit authorization, and schema changes remain controlled by migrations.
+SQL access is private to the infrastructure crate. Public operations use typed repositories and parameterized statements; callers cannot submit raw SQL or choose arbitrary table and column names.
 
 ## Public API Overview
 
 ### 1. Database Initialization and Connection
 
 ```rust
-use infrastructure::Infrastructure;
+use infrastructure::{DatabaseConfiguration, DatabaseDurability, Infrastructure};
 use std::path::Path;
 
 let infra = Infrastructure::init(Path::new("/path/to/database.db")).await?;
+
+let balanced_infra = Infrastructure::init_with_configuration(
+    Path::new("/path/to/secondary-database.db"),
+    DatabaseConfiguration {
+        durability: DatabaseDurability::Balanced,
+    },
+).await?;
 
 let mut transaction = infra.make_transaction().await?;
 transaction.commit().await?;
@@ -29,7 +38,7 @@ let project = infra.execute_db_actions(async |transaction| {
 
 let existing_project = infra.get_project_by_path("/path/to/ollatom").await?;
 ```
-**Description:** This shows how to establish a connection pool and execute queries. `Infrastructure::init` connects via `sqlx` and runs DB migrations. Manual transactions can be created with `make_transaction`, which maps to `BEGIN IMMEDIATE` under the hood. Alternatively, `execute_db_actions` accepts an async closure, automatically issuing `commit()` if successful or `rollback()` upon errors. Simple read-only operations can bypass transactions completely.
+**Description:** This shows how to establish a connection pool and execute queries. `Infrastructure::init` connects via `sqlx` and runs DB migrations. Manual transactions can be created with `make_transaction`, which maps to `BEGIN IMMEDIATE` under the hood. Alternatively, `execute_db_actions` accepts an async closure, automatically issuing `commit()` if successful or `rollback()` upon errors. Read-only path lookups use a deferred transaction.
 
 
 ### 2. Project API
@@ -49,26 +58,26 @@ transaction.update_project(
         .with_cpu_usage_percentage(80)
 ).await?;
 
-transaction.set_llm_thinking_for_project_by_id(true, project.id).await?;
+transaction.set_llm_thinking_for_project(true, project.id).await?;
 
-transaction.delete_project_by_id(project.id).await?;
+transaction.delete_project(project.id).await?;
 ```
-**Description:** Demonstrates the CRUD lifecycle for projects. Under the hood, these methods safely bind variables to execute `INSERT INTO`, `UPDATE`, and `DELETE FROM` statements in the `projects` table using the active `InfrastructureTransaction`.
+**Description:** Register an existing directory as a project. The crate stores its canonical UTF-8 path and physical filesystem identity, so relative paths and symlinks resolve to the same project. Updating a project's path requires the new path to identify the same directory; register a new project to use a different directory.
 
 ### 3. Chat API
 
 ```rust
 use infrastructure::ChatInitializationParameters;
 
-let chat = transaction.create_chat_by_project_id(
+let chat = transaction.create_chat(
     "General Discussion",
     project.id,
     ChatInitializationParameters::default(),
 ).await?;
 
-transaction.set_llm_context_optimization_for_chat_by_id(true, chat.id).await?;
+transaction.set_llm_context_optimization_for_chat(true, chat.id).await?;
 
-transaction.delete_chat_by_id(chat.id).await?;
+transaction.delete_chat(chat.id).await?;
 ```
 **Description:** Demonstrates creating and manipulating chat rooms. Under the hood, these methods perform parameterized SQL executions against the `chats` table. The transaction ensures that chat records remain structurally tied to their parent project.
 
@@ -76,10 +85,10 @@ transaction.delete_chat_by_id(chat.id).await?;
 ### 4. Message & LLM Action API
 
 ```rust
-use infrastructure::{AttachmentInput, LlmActionDetails, CommandActionDetails, LlmActionStatusEventInput, LlmActionStatus};
+use infrastructure::{LlmActionDetails, CommandActionDetails, LlmActionStatusEventInput, LlmActionStatus};
 use serde_json::json;
 
-let user_message = transaction.add_message_from_user_by_chat_id(
+let user_message = transaction.add_message_from_user(
     "Can you create a hello world app?",
     vec![],
     chat.id,
@@ -117,52 +126,38 @@ transaction.complete_llm_message_by_id(
     "I have executed the hello world command successfully.",
 ).await?;
 ```
-**Description:** Demonstrates the end-to-end conversation flow. User and LLM messages receive independent revision and response-round metadata. LLM actions are stored in their journal and detail tables, while status updates are append-only events. Finally, `complete_llm_message_by_id` validates terminal action states and switches the message to `Completed`.
+**Description:** Demonstrates the end-to-end conversation flow. User and LLM messages receive independent revision and response-round metadata. Each action stores its kind-specific JSON details and initial status in one immutable row; later status changes append events starting at sequence 2. `complete_llm_message_by_id` requires terminal action states before completing the message.
 
 
-### 5. `SqlBuilderFactory` (Custom Query Builder)
-
-```rust
-use infrastructure::SqlValue;
-
-let builder = infra.sql_builder();
-let rows = builder
-    .select(["id", "name", "path"])
-    .from("projects")
-    .filter("name = {}", [SqlValue::from("My Project")])
-    .order_by("created_at", infrastructure::SqlSortDirection::Descending)
-    .limit(1)
-    .commit()
-    .await?;
-
-let mut transaction = infra.make_transaction().await?;
-transaction.sql_builder()
-    .update("projects")
-    .set("cpu_usage_percentage", SqlValue::from(50_i64))
-    .filter("id = {}", [SqlValue::from(project.id.as_uuid())])
-    .execute()
-    .await?;
-```
-**Description:** Demonstrates dynamically built queries without interpolating values. `commit` opens an internal transaction for infrastructure-bound builders. `fetch_all`, `fetch_optional`, `fetch_one`, and `execute` are available on transaction-bound builders and participate in the caller's transaction.
-
-
-### 6. YAML Configuration Store (`yaml_configuration`)
+### 5. YAML Configuration Store (`yaml_configuration`)
 
 ```rust
-use infrastructure::create_yaml_configuration_file;
+use infrastructure::{create_json_configuration_store, create_typed_yaml_file};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-let config_store = create_yaml_configuration_file(
-    "settings.yaml", 
-    "/path/to/config/dir"
+#[derive(Deserialize, Serialize)]
+struct AppConfig {
+    network_port: u16,
+}
+
+let settings = create_json_configuration_store(
+    "settings.yaml",
+    "/path/to/config/dir",
 ).await?;
 
-let port_value = config_store.read_parameter("network.port").await?;
-
-config_store.create_update()
-    .add_parameter("network.port", json!(8080))?
+let port = settings.read_parameter("network.port").await?;
+let commit = settings.clone().add_parameter("network.port", json!(8080))?
     .add_parameter("ui.theme", json!("dark"))?
-    .commit()
-    .await?;
+    .commit()?;
+let operation_identifier = commit.operation_identifier();
+let status = commit.wait().await;
+
+let typed_settings = create_typed_yaml_file::<AppConfig>(
+    "settings.yaml",
+    "/path/to/config/dir",
+).await?;
+let configuration = typed_settings.read().await?;
+typed_settings.write(&configuration).await?;
 ```
-**Description:** Demonstrates reading and modifying a YAML configuration file. Under the hood, this API acts as a client to a dedicated `tokio` worker thread. Creating the update map gathers the desired changes; calling `commit()` flushes those changes across an `mpsc` channel to the worker, ensuring file modifications occur synchronously without OS race conditions.
+**Description:** `JsonConfigurationStore` supports a JSON-compatible mapping and dotted keys. Its updates reread the current file under a shared process coordinator and sibling OS advisory lock, then write atomically. `commit()` returns an operation handle before completion; `wait()` observes and acknowledges its result. `TypedYamlFile<Configuration>` reads and writes full typed YAML values, including scalar and sequence roots, without converting through JSON.

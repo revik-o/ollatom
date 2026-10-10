@@ -1,21 +1,11 @@
 use super::InfrastructureTransaction;
 use crate::{
-    AttachmentInput, Chat, ChatId, InfrastructureResult, LlmAction, LlmActionDetails,
-    LlmActionInput, LlmActionStatusEventInput, Message, MessageId,
+    AttachmentInput, ChatId, InfrastructureResult, LlmAction, LlmActionDetails, LlmActionInput,
+    LlmActionStatusEventInput, Message, MessageId,
 };
 
 impl InfrastructureTransaction {
     pub async fn add_message_from_user(
-        &mut self,
-        message_contents: impl Into<String>,
-        attachments: Vec<AttachmentInput>,
-        chat: &Chat,
-    ) -> InfrastructureResult<Message> {
-        self.add_message_from_user_by_chat_id(message_contents, attachments, chat.id)
-            .await
-    }
-
-    pub async fn add_message_from_user_by_chat_id(
         &mut self,
         message_contents: impl Into<String>,
         attachments: Vec<AttachmentInput>,
@@ -28,6 +18,7 @@ impl InfrastructureTransaction {
             chat_id.into(),
         )
         .await;
+
         self.record_operation_result(operation_result)
     }
 
@@ -35,46 +26,22 @@ impl InfrastructureTransaction {
         &mut self,
         message_contents: impl Into<String>,
         actions: Vec<LlmActionInput>,
-        answer_on_user_message: &Message,
-        chat: &Chat,
-    ) -> InfrastructureResult<Message> {
-        self.add_message_from_llm_by_chat_id_and_user_message_id(
-            message_contents,
-            actions,
-            chat.id,
-            answer_on_user_message.id,
-        )
-        .await
-    }
-
-    pub async fn add_message_from_llm_by_chat_id_and_user_message_id(
-        &mut self,
-        message_contents: impl Into<String>,
-        actions: Vec<LlmActionInput>,
+        answer_on_user_message_id: impl Into<MessageId>,
         chat_id: impl Into<ChatId>,
-        user_message_id: impl Into<MessageId>,
     ) -> InfrastructureResult<Message> {
         let operation_result = crate::message_operations::add_message_from_llm(
             self.database_transaction_mut()?,
             message_contents.into(),
             actions,
             chat_id.into(),
-            user_message_id.into(),
+            answer_on_user_message_id.into(),
         )
         .await;
+
         self.record_operation_result(operation_result)
     }
 
     pub async fn edit_message_from_user(
-        &mut self,
-        new_message_contents: impl Into<String>,
-        old_message: &Message,
-    ) -> InfrastructureResult<Option<Message>> {
-        self.edit_message_from_user_by_id(new_message_contents, old_message.id)
-            .await
-    }
-
-    pub async fn edit_message_from_user_by_id(
         &mut self,
         new_message_contents: impl Into<String>,
         message_id: impl Into<MessageId>,
@@ -85,17 +52,11 @@ impl InfrastructureTransaction {
             message_id.into(),
         )
         .await;
+
         self.record_operation_result(operation_result)
     }
 
     pub async fn delete_message_from_user(
-        &mut self,
-        message: &Message,
-    ) -> InfrastructureResult<Option<Message>> {
-        self.delete_message_from_user_by_id(message.id).await
-    }
-
-    pub async fn delete_message_from_user_by_id(
         &mut self,
         message_id: impl Into<MessageId>,
     ) -> InfrastructureResult<Option<Message>> {
@@ -104,6 +65,7 @@ impl InfrastructureTransaction {
             message_id.into(),
         )
         .await;
+
         self.record_operation_result(operation_result)
     }
 
@@ -118,6 +80,7 @@ impl InfrastructureTransaction {
             user_message_id.into(),
         )
         .await;
+
         self.record_operation_result(operation_result)
     }
 
@@ -136,6 +99,7 @@ impl InfrastructureTransaction {
             initial_status_event,
         )
         .await;
+
         self.record_operation_result(operation_result)
     }
 
@@ -150,6 +114,7 @@ impl InfrastructureTransaction {
             status_event,
         )
         .await;
+
         self.record_operation_result(operation_result)
     }
 
@@ -164,6 +129,7 @@ impl InfrastructureTransaction {
             completed_message_contents.into(),
         )
         .await;
+
         self.record_operation_result(operation_result)
     }
 
@@ -179,6 +145,7 @@ impl InfrastructureTransaction {
             failure_message_contents.into(),
         )
         .await;
+
         self.record_operation_result(operation_result)
     }
 
@@ -193,6 +160,7 @@ impl InfrastructureTransaction {
             String::new(),
         )
         .await;
+
         self.record_operation_result(operation_result)
     }
 }

@@ -54,7 +54,7 @@ export class ThemeService {
 
     try {
       await this.applicationConfig.addProperty(APPLICATION_THEME_CONFIGURATION_KEY, preference);
-      this.writeFirstPaintCache(preference);
+      this.writeFirstPaintCacheBestEffort(preference);
     } catch (error) {
       if (changeVersion === this.changeVersion) {
         this.preferenceState.set(previousPreference);
@@ -69,20 +69,22 @@ export class ThemeService {
     await this.initializeNativeThemeListener();
 
     const changeVersion = this.changeVersion;
-    try {
-      const configuredPreference = await this.applicationConfig.readProperty(
-        APPLICATION_THEME_CONFIGURATION_KEY,
-      );
+    const configuredPreference = await this.readConfiguredPreference();
 
-      if (changeVersion === this.changeVersion && isThemePreference(configuredPreference)) {
-        this.preferenceState.set(configuredPreference);
-      }
-    } catch {
-      // A missing preference defaults to following the system theme.
+    if (changeVersion === this.changeVersion && isThemePreference(configuredPreference)) {
+      this.preferenceState.set(configuredPreference);
     }
 
     await this.apply(this.resolvedTheme());
-    this.writeFirstPaintCache(this.preferenceState());
+    this.writeFirstPaintCacheBestEffort(this.preferenceState());
+  }
+
+  private async readConfiguredPreference(): Promise<unknown> {
+    try {
+      return await this.applicationConfig.readProperty(APPLICATION_THEME_CONFIGURATION_KEY);
+    } catch {
+      return undefined;
+    }
   }
 
   private async initializeNativeThemeListener(): Promise<void> {
@@ -120,25 +122,35 @@ export class ThemeService {
       document.documentElement.style.colorScheme = theme === 'black' ? 'dark' : 'light';
     }
 
+    await this.trySetNativeWindowTheme(theme);
+
+    await this.osWindowService.setWindowAppearance(theme);
+  }
+
+  private async trySetNativeWindowTheme(theme: ResolvedTheme): Promise<void> {
     try {
       const currentWindow = getCurrentWindow();
       await currentWindow.setTheme(
         this.preferenceState() === 'system' ? null : theme === 'black' ? 'dark' : 'light',
       );
     } catch {
-      // Browser tests and unsupported desktop environments use CSS only.
+      return;
     }
-
-    await this.osWindowService.setWindowAppearance(theme);
   }
 
-  private writeFirstPaintCache(preference: ThemePreference): void {
+  private writeFirstPaintCacheBestEffort(preference: ThemePreference): void {
     try {
-      if (typeof localStorage === 'undefined') return;
-      if (preference === 'system') localStorage.removeItem(THEME_CACHE_KEY);
-      else localStorage.setItem(THEME_CACHE_KEY, preference);
+      if (typeof localStorage === 'undefined') {
+        return;
+      }
+
+      if (preference === 'system') {
+        localStorage.removeItem(THEME_CACHE_KEY);
+      } else {
+        localStorage.setItem(THEME_CACHE_KEY, preference);
+      }
     } catch {
-      // Cache failure must not turn a recoverable preference failure into startup failure.
+      return;
     }
   }
 }

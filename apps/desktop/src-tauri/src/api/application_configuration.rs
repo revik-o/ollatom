@@ -33,7 +33,7 @@ pub async fn set_application_config_value(
 ) -> Result<ApplicationConfigurationUpdateStatus, String> {
     let value = validate_application_configuration_value(value)?;
 
-    startup
+    let commit_status = startup
         .resources()
         .await?
         .configuration
@@ -41,8 +41,17 @@ pub async fn set_application_config_value(
         .add_parameter(key, value)
         .map_err(|error| error.to_string())?
         .commit()
-        .await
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| error.to_string())?
+        .wait()
+        .await;
+
+    match commit_status {
+        infrastructure::ConfigurationCommitStatus::Succeeded => {}
+        infrastructure::ConfigurationCommitStatus::Pending => {
+            return Err("application configuration update is still pending".to_owned());
+        }
+        infrastructure::ConfigurationCommitStatus::Failed(message) => return Err(message),
+    }
 
     Ok(ApplicationConfigurationUpdateStatus::Success)
 }

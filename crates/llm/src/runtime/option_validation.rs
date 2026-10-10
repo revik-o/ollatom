@@ -114,6 +114,7 @@ fn validate_transport_options(options: &LlmOptions) -> Result<(), LlmError> {
         options.transport.connect_timeout_ms,
         options.transport.stream_idle_timeout_ms,
         options.transport.overall_timeout_ms,
+        options.transport.event_delivery_timeout_ms,
     ];
 
     let has_zero_transport_timeout = transport_timeouts

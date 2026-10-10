@@ -3,14 +3,11 @@ use super::interactions::InteractionHub;
 use crate::{
     InteractionId, InteractionReply, IntoProviderId, LlmError, LlmProvider, ModelId, ProviderId,
     RequestBuilder, RunEventSink, StopHandle, SubagentProfileRegistry, ToolRegistry,
-    subagent::SharedSubagentRunner,
+    ids::allocate_monotonic_identifier, subagent::SharedSubagentRunner,
 };
 use std::{
     collections::BTreeMap,
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicU64, Ordering},
-    },
+    sync::{Arc, Mutex, atomic::AtomicU64},
 };
 
 pub(crate) struct ProviderRegistration {
@@ -48,16 +45,13 @@ impl LlmRuntime {
     }
 
     pub fn cancel(&self, run_id: impl Into<crate::RunId>) -> bool {
-        self.inner
-            .active
-            .lock()
-            .ok()
-            .and_then(|active_runs| active_runs.get(&run_id.into()).cloned())
-            .map(|stop_handle| {
+        let run_identifier = run_id.into();
+        self.inner.active.lock().ok().is_some_and(|active_runs| {
+            active_runs.get(&run_identifier).is_some_and(|stop_handle| {
                 stop_handle.stop();
                 true
             })
-            .unwrap_or(false)
+        })
     }
 
     pub fn resolve_interaction(
@@ -70,8 +64,11 @@ impl LlmRuntime {
             .resolve_interaction(interaction_id, reply)
     }
 
-    pub(crate) fn next_run_id(&self) -> crate::RunId {
-        crate::RunId(self.inner.next_run_id.fetch_add(1, Ordering::SeqCst))
+    pub(crate) fn next_run_id(&self) -> Result<crate::RunId, LlmError> {
+        Ok(crate::RunId(allocate_monotonic_identifier(
+            &self.inner.next_run_id,
+            "run",
+        )?))
     }
 
     pub(crate) fn register_run(

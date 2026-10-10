@@ -1,4 +1,4 @@
-use llm::{FinishReason, LlmError, LlmRunOutcome};
+use llm::{LlmError, LlmRunOutcome};
 use serde_json::json;
 
 pub(crate) fn run_outcome_summary(
@@ -6,23 +6,14 @@ pub(crate) fn run_outcome_summary(
 ) -> serde_json::Value {
     match run_outcome {
         Ok(LlmRunOutcome::Completed(response)) => {
-            json!({"status": "completed", "finish_reason": finish_reason_name(response.finish_reason), "text": response.text, "visible_reasoning": response.visible_reasoning, "usage": response.usage})
+            json!({"status": "completed", "assistant_rounds": response.assistant_rounds, "tool_executions": response.tool_executions, "usage": response.usage})
         }
         Ok(LlmRunOutcome::Cancelled(response)) => {
-            json!({"status": "cancelled", "text": response.text, "visible_reasoning": response.visible_reasoning, "usage": response.usage})
+            json!({"status": "cancelled", "assistant_rounds": response.assistant_rounds, "tool_executions": response.tool_executions, "usage": response.usage})
+        }
+        Ok(LlmRunOutcome::Failed(failed_run)) => {
+            json!({"status": "failed", "error": failed_run.error.to_string(), "assistant_rounds": failed_run.partial_response.assistant_rounds, "usage": failed_run.partial_response.usage, "tool_executions": failed_run.partial_response.tool_executions, "terminal_event_delivered": failed_run.terminal_event_delivered})
         }
         Err(error) => json!({"status": "failed", "error": error.to_string()}),
-    }
-}
-
-fn finish_reason_name(finish_reason: FinishReason) -> &'static str {
-    match finish_reason {
-        FinishReason::Stop => "stop",
-        FinishReason::ToolCalls => "tool_calls",
-        FinishReason::Length => "length",
-        FinishReason::ContentFilter => "content_filter",
-        FinishReason::Error => "error",
-        FinishReason::Cancelled => "cancelled",
-        FinishReason::Unknown => "unknown",
     }
 }

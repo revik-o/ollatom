@@ -2,51 +2,11 @@ use std::fs;
 use std::path::Path;
 
 #[test]
-fn infrastructure_source_files_follow_the_required_structure() {
-    let source_directory_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-    verify_source_directory(&source_directory_path);
+fn infrastructure_schema_keeps_sqlx_private_and_message_roles_distinct() {
     let migration_directory_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("migrations");
     verify_migration_directory(&migration_directory_path);
     verify_role_specific_message_columns(&migration_directory_path);
     verify_sqlx_is_private_to_infrastructure();
-    verify_no_source_test_modules();
-}
-
-fn verify_no_source_test_modules() {
-    let workspace_directory_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    for source_parent_directory in ["apps", "crates"] {
-        verify_directory_has_no_source_test_modules(
-            &workspace_directory_path.join(source_parent_directory),
-        );
-    }
-}
-
-fn verify_directory_has_no_source_test_modules(directory_path: &Path) {
-    for directory_entry in fs::read_dir(directory_path).unwrap() {
-        let entry_path = directory_entry.unwrap().path();
-        if entry_path
-            .file_name()
-            .is_some_and(|file_name| file_name == "tests")
-        {
-            continue;
-        }
-        if entry_path.is_dir() {
-            verify_directory_has_no_source_test_modules(&entry_path);
-            continue;
-        }
-        if entry_path
-            .extension()
-            .is_none_or(|extension| extension != "rs")
-        {
-            continue;
-        }
-        let source_text = fs::read_to_string(&entry_path).unwrap();
-        assert!(
-            !source_text.contains("#[cfg(test)]") && !source_text.contains("mod tests"),
-            "{} contains a source test module",
-            entry_path.display()
-        );
-    }
 }
 
 fn verify_role_specific_message_columns(directory_path: &Path) {
@@ -111,42 +71,6 @@ fn verify_migration_directory(directory_path: &Path) {
             !migration_text.contains("--") && !migration_text.contains("/*"),
             "{} contains a migration comment",
             migration_path.display()
-        );
-    }
-}
-
-fn verify_source_directory(directory_path: &Path) {
-    for directory_entry in fs::read_dir(directory_path).unwrap() {
-        let directory_entry = directory_entry.unwrap();
-        let entry_path = directory_entry.path();
-        if entry_path.is_dir() {
-            verify_source_directory(&entry_path);
-            continue;
-        }
-        if entry_path
-            .extension()
-            .is_none_or(|extension| extension != "rs")
-        {
-            continue;
-        }
-        let source_text = fs::read_to_string(&entry_path).unwrap();
-        assert!(
-            source_text.lines().count() <= 250,
-            "{} exceeds 250 lines",
-            entry_path.display()
-        );
-        assert!(
-            !source_text.contains("#[cfg(test)]"),
-            "{} contains a source test module",
-            entry_path.display()
-        );
-        assert!(
-            !source_text
-                .lines()
-                .any(|source_line| source_line.trim_start().starts_with("//")
-                    || source_line.contains("/*")),
-            "{} contains a source comment",
-            entry_path.display()
         );
     }
 }

@@ -48,23 +48,16 @@ fn terminate_running_child_process(
         )
     })?;
 
-    if signal_process_group(process_group_identifier) == 0 {
-        return Ok(ProcessTerminationResult::SignalSent);
+    match nix::sys::signal::killpg(
+        nix::unistd::Pid::from_raw(process_group_identifier),
+        nix::sys::signal::Signal::SIGKILL,
+    ) {
+        Ok(()) => Ok(ProcessTerminationResult::SignalSent),
+        Err(nix::errno::Errno::ESRCH) if child_process.try_wait()?.is_some() => {
+            Ok(ProcessTerminationResult::AlreadyExited)
+        }
+        Err(error) => Err(std::io::Error::from_raw_os_error(error as i32)),
     }
-
-    let termination_error = std::io::Error::last_os_error();
-
-    if termination_error.raw_os_error() == Some(libc::ESRCH) && child_process.try_wait()?.is_some()
-    {
-        return Ok(ProcessTerminationResult::AlreadyExited);
-    }
-
-    Err(termination_error)
-}
-
-#[cfg(unix)]
-fn signal_process_group(process_group_identifier: i32) -> i32 {
-    unsafe { libc::kill(-process_group_identifier, libc::SIGKILL) }
 }
 
 #[cfg(not(unix))]
