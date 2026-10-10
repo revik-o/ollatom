@@ -7,33 +7,44 @@ async fn duplicate_tool_call_ids_reuse_the_first_result() {
         name: "echo".into(),
         arguments: serde_json::json!({"value":"x"}),
     };
+
     let provider = ScriptedProvider::new(
         BuiltInProvider::Gemini,
         ProviderBehavior::ExecuteToolRound(vec![call.clone(), call]),
     );
+
     let executions = Arc::new(AtomicUsize::new(0));
     let mut tools = ToolRegistry::new();
+
     tools
         .register(EchoTool {
             execution_count: executions.clone(),
         })
         .unwrap();
+
     let runtime = LlmRuntime::builder()
         .provider_with_default(provider, "gemini-test")
         .tools(tools)
         .build()
         .unwrap();
-    let outcome = runtime
-        .request("gemini")
-        .tools(["echo"])
-        .user_message("run")
-        .send()
-        .expect("run should start")
-        .await
-        .unwrap();
+
+    let outcome = tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        runtime
+            .request("gemini")
+            .tools(["echo"])
+            .user_message("run")
+            .send()
+            .expect("run should start"),
+    )
+    .await
+    .expect("tool round must complete without deadlocking")
+    .unwrap();
+
     let LlmRunOutcome::Completed(response) = outcome else {
         panic!("expected a completed response");
     };
+
     assert_eq!(executions.load(Ordering::SeqCst), 1);
     assert_eq!(response.tool_executions.len(), 1);
     assert_eq!(response.tool_executions[0].call_id, "call-1");

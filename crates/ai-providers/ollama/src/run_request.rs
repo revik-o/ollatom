@@ -70,9 +70,26 @@ pub(super) async fn send_native_chat_request(
         provider.request(Method::POST, "api/chat")?
     };
 
-    let response = provider
-        .send_request(request_builder.json(&request_body), Some(stop), None)
-        .await?;
+    let send_request = provider.send_request(request_builder.json(&request_body), Some(stop), None);
+
+    let response =
+        if let Some(timeout_milliseconds) = request.options.transport.stream_idle_timeout_ms {
+            match stop
+                .run_until_cancelled_or_timeout(
+                    Duration::from_millis(timeout_milliseconds),
+                    send_request,
+                )
+                .await
+            {
+                llm::ControlledFutureOutcome::Completed(response) => response?,
+                llm::ControlledFutureOutcome::Cancelled => return Err(LlmError::Cancelled),
+                llm::ControlledFutureOutcome::TimedOut => {
+                    return Err(LlmError::Timeout("Ollama stream idle timeout".into()));
+                }
+            }
+        } else {
+            send_request.await?
+        };
 
     if !response.status().is_success() {
         return Err(response_error(response.status(), Some(&request.model)));

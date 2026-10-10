@@ -8,6 +8,8 @@ The benchmark is opt-in because it downloads a model and creates a project next 
 
 Set `OLLAMA_BENCHMARK_MODEL` to use a different installed model. The default is `gemma4:e2b`.
 
+Agent runs allow up to 60 minutes waiting for response headers or the next streamed chunk. The idle timer resets whenever a chunk arrives, including reasoning and tool-call output. There is no fixed overall run deadline, so an active stream can continue beyond one hour. This uses the existing optional `TransportOptions.stream_idle_timeout_ms` setting; `None` disables it for library callers.
+
 The launcher builds the release executable, starts a native Ollama daemon only when one is not already available, pulls the selected model, runs all six stages, and stops only the daemon it started. Model data is kept in Ollama's normal local model store.
 
 The Rust benchmark accesses the model only through `llm::LlmRuntime`. Stages 1–2 discover the model, Stage 3 requires the agent to print Rust and Cargo versions from sandboxed `mise exec` commands, and Stages 4–6 create and extend a React project. It creates `ollama-react-test`, writes `stage-1.log` through `stage-6.log`, and leaves the generated project, ownership marker, build output, and logs beside the executable. Existing projects are replaced only when the ownership marker belongs to this benchmark.

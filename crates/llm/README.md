@@ -63,7 +63,7 @@ match run.await? {
 
 ### 3. Transport Deadlines
 
-`TransportOptions.overall_timeout_ms` sets the run deadline. `event_delivery_timeout_ms` bounds a single event-sink write and time spent waiting for the event dispatcher; it defaults to 5,000 ms. Each event operation uses the shorter of that value and the remaining run deadline. A zero timeout is rejected. Timeouts after provider startup produce `FailedRun` and retain available partial output and completed tool records.
+`TransportOptions.overall_timeout_ms` sets the run deadline. For Ollama, `stream_idle_timeout_ms` bounds waiting for response headers and each subsequent streamed chunk, resetting whenever a chunk arrives; `None` disables this idle timeout. `event_delivery_timeout_ms` bounds a single event-sink write and time spent waiting for the event dispatcher; it defaults to 5,000 ms. Each event operation uses the shorter of that value and the remaining run deadline. A zero timeout is rejected. Timeouts after provider startup produce `FailedRun` and retain available partial output and completed tool records.
 
 ### 4. Event Streaming and Policy
 

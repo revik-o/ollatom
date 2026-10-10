@@ -14,3 +14,5 @@ use support::{ScriptedResponse, ScriptedServer};
 mod native_requests;
 #[path = "provider_contract/provider_discovery.rs"]
 mod provider_discovery;
+#[path = "provider_contract/stream_timeout.rs"]
+mod stream_timeout;

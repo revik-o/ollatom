@@ -127,8 +127,8 @@ pub(crate) fn benchmark_options() -> LlmOptions {
         },
         transport: TransportOptions {
             connect_timeout_ms: Some(10_000),
-            stream_idle_timeout_ms: Some(900_000),
-            overall_timeout_ms: Some(3_600_000),
+            stream_idle_timeout_ms: Some(60 * 60 * 1_000),
+            overall_timeout_ms: None,
             event_delivery_timeout_ms: None,
         },
         handling: OptionHandlingMode::BestEffort,

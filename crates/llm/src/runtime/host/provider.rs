@@ -81,6 +81,9 @@ impl ProviderRunHost for RunHost {
             }
 
             state.tool_round_executed = true;
+
+            drop(state);
+
             self.validate_tool_round(round, &tool_calls).await?;
             self.preflight_tool_round(&tool_calls).await?;
 

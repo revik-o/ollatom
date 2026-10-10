@@ -12,6 +12,8 @@ pub struct ScriptedResponse {
     reason_phrase: &'static str,
     content_type: &'static str,
     body: String,
+    header_delay: Duration,
+    streamed_chunks: Vec<(Duration, String)>,
 }
 
 impl ScriptedResponse {
@@ -21,6 +23,8 @@ impl ScriptedResponse {
             reason_phrase,
             content_type: "application/json",
             body: body.to_string(),
+            header_delay: Duration::ZERO,
+            streamed_chunks: Vec::new(),
         }
     }
 
@@ -30,7 +34,21 @@ impl ScriptedResponse {
             reason_phrase: "OK",
             content_type: "application/x-ndjson",
             body: body.into(),
+            header_delay: Duration::ZERO,
+            streamed_chunks: Vec::new(),
         }
+    }
+
+    pub fn delayed_headers(mut self, delay: Duration) -> Self {
+        self.header_delay = delay;
+        self
+    }
+
+    pub fn delayed_stream(chunks: Vec<(Duration, String)>) -> Self {
+        let mut response = Self::stream("");
+        response.body = chunks.iter().map(|(_, chunk)| chunk.as_str()).collect();
+        response.streamed_chunks = chunks;
+        response
     }
 }
 
@@ -160,15 +178,35 @@ fn content_length(headers: &str) -> usize {
 }
 
 fn write_response(connection: &mut TcpStream, scripted_response: ScriptedResponse) {
+    thread::sleep(scripted_response.header_delay);
     let response = format!(
-        "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
         scripted_response.status_code,
         scripted_response.reason_phrase,
         scripted_response.content_type,
         scripted_response.body.len(),
-        scripted_response.body
     );
-    connection
-        .write_all(response.as_bytes())
-        .expect("test response should be writable");
+
+    if scripted_response.header_delay.is_zero() && scripted_response.streamed_chunks.is_empty() {
+        connection
+            .write_all(format!("{response}{}", scripted_response.body).as_bytes())
+            .expect("test response should be writable");
+        return;
+    }
+
+    if connection.write_all(response.as_bytes()).is_err() {
+        return;
+    }
+
+    if scripted_response.streamed_chunks.is_empty() {
+        let _ = connection.write_all(scripted_response.body.as_bytes());
+    } else {
+        for (delay, chunk) in scripted_response.streamed_chunks {
+            thread::sleep(delay);
+
+            if connection.write_all(chunk.as_bytes()).is_err() {
+                return;
+            }
+        }
+    }
 }
