@@ -15,6 +15,7 @@ pub enum DirectoryIdentity {
         device_identifier: u64,
         inode_identifier: u64,
     },
+
     #[cfg(windows)]
     Windows {
         volume_identifier: Vec<u8>,
@@ -86,6 +87,7 @@ pub struct AtomicCommitHandle {
     operation_identifier: AtomicCommitIdentifier,
     completion_receiver: watch::Receiver<AtomicCommitStatus>,
 }
+
 impl WorkspaceDirectory {
     pub async fn open(path: impl AsRef<Path>) -> Result<Self, FilesystemError> {
         let requested_path = path.as_ref().to_owned();
@@ -97,11 +99,13 @@ impl WorkspaceDirectory {
             let metadata = directory
                 .dir_metadata()
                 .map_err(|source| io_error(&canonical_directory_path, source))?;
+
             if !metadata.is_dir() {
                 return Err(FilesystemError::NotARegularFile {
                     path: canonical_directory_path,
                 });
             }
+
             #[cfg(unix)]
             let filesystem_identity = {
                 use cap_fs_ext::MetadataExt;
@@ -110,9 +114,11 @@ impl WorkspaceDirectory {
                     inode_identifier: metadata.ino(),
                 }
             };
+
             #[cfg(windows)]
             let filesystem_identity =
                 directory_filesystem_identity(&canonical_directory_path, &metadata)?;
+
             Ok(Self {
                 directory: Arc::new(directory),
                 canonical_directory_path: Arc::new(canonical_directory_path),
@@ -150,6 +156,7 @@ fn directory_filesystem_identity(
 
     let file_identity = win_file_id::get_high_res_file_id(canonical_directory_path)
         .map_err(|source| io_error(canonical_directory_path, source))?;
+
     let win_file_id::FileId::HighRes {
         volume_serial_number,
         file_id,
@@ -165,6 +172,7 @@ fn directory_filesystem_identity(
     };
 
     let file_identifier_bytes = file_id.to_le_bytes();
+
     let opened_file_identifier = u64::from_le_bytes([
         file_identifier_bytes[0],
         file_identifier_bytes[1],
@@ -175,6 +183,7 @@ fn directory_filesystem_identity(
         file_identifier_bytes[6],
         file_identifier_bytes[7],
     ]);
+
     let opened_volume_identifier = volume_serial_number & u64::from(u32::MAX);
 
     if opened_directory_metadata.dev() != opened_volume_identifier
@@ -202,11 +211,13 @@ impl WorkspaceRelativePath {
             && path
                 .components()
                 .all(|component| matches!(component, Component::Normal(_)));
+
         if !valid {
             return Err(FilesystemError::InvalidWorkspaceRelativePath {
                 path: path.to_owned(),
             });
         }
+
         Ok(Self(path.to_owned()))
     }
 
