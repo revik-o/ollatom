@@ -2,11 +2,14 @@ use super::super::{
     AtomicCommitHandle, AtomicCommitIdentifier, AtomicCommitStatus, AtomicMetadataPolicy,
     PreparedAtomicWrite, WorkspaceFile, io_error,
 };
+
 use crate::FilesystemError;
 use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
 use cap_std::fs::OpenOptions;
+
 #[cfg(unix)]
 use cap_std::fs::OpenOptionsExt;
+
 #[cfg(windows)]
 use cap_std::fs::OpenOptionsExt;
 use std::ffi::OsString;
@@ -24,6 +27,7 @@ impl WorkspaceFile {
         metadata_policy: AtomicMetadataPolicy,
     ) -> Result<PreparedAtomicWrite, FilesystemError> {
         let this = self.clone();
+
         tokio::task::spawn_blocking(move || {
             this.prepare_atomic_write_blocking(contents, metadata_policy)
         })

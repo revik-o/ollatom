@@ -1,6 +1,9 @@
 use std::io;
 use std::path::Path;
 
+#[cfg(unix)]
+use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
+
 pub fn restrict_directory_to_current_user(directory_path: &Path) -> io::Result<()> {
     #[cfg(unix)]
     {
@@ -20,10 +23,9 @@ pub fn restrict_directory_to_current_user(directory_path: &Path) -> io::Result<(
         ))
     }
 }
+
 #[cfg(unix)]
 fn restrict_unix_directory(directory_path: &Path) -> io::Result<()> {
-    use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
-
     let mut directory_open_options = std::fs::OpenOptions::new();
 
     directory_open_options
@@ -41,6 +43,7 @@ fn restrict_unix_directory(directory_path: &Path) -> io::Result<()> {
     }
 
     directory.set_permissions(std::fs::Permissions::from_mode(0o700))?;
+
     let secured_directory_metadata = directory.metadata()?;
 
     if secured_directory_metadata.mode() & 0o7777 != 0o700 {

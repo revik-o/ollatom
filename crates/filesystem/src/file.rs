@@ -1,4 +1,5 @@
 use crate::FilesystemError;
+use crate::permissions::restrict_open_file_to_current_user;
 use std::path::{Component, Path, PathBuf};
 use tokio::fs::{self, OpenOptions};
 
@@ -137,6 +138,7 @@ pub async fn create_file(
     options
         .mode(0o600)
         .custom_flags(nix::fcntl::OFlag::O_NOFOLLOW.bits());
+
     #[cfg(windows)]
     options
         .access_mode(
@@ -155,7 +157,7 @@ pub async fn create_file(
 
     let mut file = file.into_std().await;
 
-    crate::permissions::restrict_open_file_to_current_user(&mut file)
+    restrict_open_file_to_current_user(&mut file)
         .map_err(|source| FilesystemError::from_input_output_operation(&file_path, source))?;
 
     Ok(FilePointer { path: file_path })

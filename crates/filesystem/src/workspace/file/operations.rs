@@ -70,6 +70,7 @@ impl WorkspaceFile {
                         path: this.relative_path.0.clone(),
                     });
                 };
+
                 match directory.open_dir_nofollow(name) {
                     Ok(child) => directory = child,
                     Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
