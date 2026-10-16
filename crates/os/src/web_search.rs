@@ -8,8 +8,8 @@ mod request;
 
 const GOOGLE_SEARCH_URL: &str = "https://www.google.com/search";
 
-#[derive(Debug, Error, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
+#[derive(Debug, Error, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum WebSearchError {
     #[error("search input must not be empty")]
     EmptyInput,

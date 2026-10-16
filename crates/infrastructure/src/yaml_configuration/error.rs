@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 use thiserror::Error;
 
-#[derive(Debug, Error)]
 #[non_exhaustive]
+#[derive(Debug, Error)]
 pub enum YamlConfigurationError {
     #[error(transparent)]
     Filesystem(#[from] filesystem::FilesystemError),

@@ -80,8 +80,8 @@ const MAXIMUM_COMBINED_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
 const OUTPUT_BUFFER_BYTE_COUNT: usize = 8192;
 const OUTPUT_DRAIN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
 
-#[derive(Debug, Error, Clone, PartialEq, Eq)]
 #[non_exhaustive]
+#[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum CommandError {
     #[error("command must contain an executable")]
     EmptyCommand,

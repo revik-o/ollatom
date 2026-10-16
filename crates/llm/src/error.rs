@@ -5,9 +5,9 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
 
+#[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "data", rename_all = "snake_case")]
-#[non_exhaustive]
 pub enum LlmError {
     InvalidProvider(String),
     InvalidModel(String),

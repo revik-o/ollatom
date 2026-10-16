@@ -1,8 +1,8 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InfrastructureErrorKind {
     InvalidDatabaseFilePath,
     DatabaseParentDirectoryDoesNotExist,

@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 use thiserror::Error;
 
-#[derive(Debug, Error)]
 #[non_exhaustive]
+#[derive(Debug, Error)]
 pub enum FilesystemError {
     #[error("invalid filesystem entry name '{entry_name}'")]
     InvalidFilesystemEntryName { entry_name: String },
