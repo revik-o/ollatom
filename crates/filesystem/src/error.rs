@@ -1,5 +1,7 @@
+use std::io::Error;
 use std::path::PathBuf;
 use thiserror::Error;
+use tokio::task::JoinError;
 
 #[non_exhaustive]
 #[derive(Debug, Error)]
@@ -11,7 +13,7 @@ pub enum FilesystemError {
     #[error("symbolic links are not allowed at '{path}'")]
     SymbolicLinkNotAllowed { path: PathBuf },
     #[error("'{path}' is not a regular file")]
-    NotARegularFile { path: PathBuf },
+    NotRegularFile { path: PathBuf },
     #[error("file '{path}' exceeds the {maximum_byte_count}-byte limit")]
     FileSizeLimitExceeded {
         path: PathBuf,
@@ -27,22 +29,29 @@ pub enum FilesystemError {
     InputOutputOperation {
         path: PathBuf,
         #[source]
-        source: std::io::Error,
+        source: Error,
     },
     #[error("filesystem operation task failed for '{path}': {source}")]
     FilesystemOperationTaskFailed {
         path: PathBuf,
         #[source]
-        source: tokio::task::JoinError,
+        source: JoinError,
     },
 }
 
 impl FilesystemError {
-    pub(crate) fn from_input_output_operation(
-        path: impl Into<PathBuf>,
-        source: std::io::Error,
-    ) -> Self {
+    pub(crate) fn from_input_output_operation(path: impl Into<PathBuf>, source: Error) -> Self {
         Self::InputOutputOperation {
+            path: path.into(),
+            source,
+        }
+    }
+
+    pub(crate) fn throw_filesystem_operation_task_failed(
+        path: impl Into<PathBuf>,
+        source: JoinError,
+    ) -> Self {
+        Self::FilesystemOperationTaskFailed {
             path: path.into(),
             source,
         }

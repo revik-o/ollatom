@@ -110,15 +110,19 @@ test_desktop_e2e() {
 
 test_crates() {
     require_command cargo
+
     crate_manifest_paths=$(find "$CRATES_DIRECTORY" -name Cargo.toml -print | sort)
+
     if [ -z "$crate_manifest_paths" ]; then
         echo "error: no Rust crates were found in $CRATES_DIRECTORY" >&2
         exit 1
     fi
+
     printf '%s\n' "$crate_manifest_paths" | while IFS= read -r crate_manifest_path; do
         crate_directory_name=$(basename "$(dirname "$crate_manifest_path")")
         echo "==> Testing crate $crate_directory_name"
         cargo test --manifest-path "$crate_manifest_path"
+
     done
 }
 

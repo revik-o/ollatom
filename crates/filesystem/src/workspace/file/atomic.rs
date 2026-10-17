@@ -32,9 +32,11 @@ impl WorkspaceFile {
             this.prepare_atomic_write_blocking(contents, metadata_policy)
         })
         .await
-        .map_err(|source| FilesystemError::FilesystemOperationTaskFailed {
-            path: self.relative_path.0.clone(),
-            source,
+        .map_err(|source| {
+            FilesystemError::throw_filesystem_operation_task_failed(
+                self.relative_path.0.clone(),
+                source,
+            )
         })?
     }
     fn prepare_atomic_write_blocking(

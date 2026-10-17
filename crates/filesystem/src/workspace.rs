@@ -1,10 +1,18 @@
 use crate::FilesystemError;
+use cap_fs_ext::MetadataExt;
 use cap_std::ambient_authority;
 use cap_std::fs::Dir;
 use std::ffi::OsString;
+use std::fs::canonicalize;
+use std::io::Error;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::watch;
+
+#[cfg(windows)]
+use cap_std::fs::Metadata;
+#[cfg(windows)]
+use std::io::ErrorKind;
 
 mod file;
 
@@ -91,33 +99,35 @@ pub struct AtomicCommitHandle {
 impl WorkspaceDirectory {
     pub async fn open(path: impl AsRef<Path>) -> Result<Self, FilesystemError> {
         let requested_path = path.as_ref().to_owned();
+
         tokio::task::spawn_blocking(move || {
-            let canonical_directory_path = std::fs::canonicalize(&requested_path)
+            let canonical_directory_path = canonicalize(&requested_path)
                 .map_err(|source| io_error(&requested_path, source))?;
+
             let directory = Dir::open_ambient_dir(&canonical_directory_path, ambient_authority())
                 .map_err(|source| io_error(&canonical_directory_path, source))?;
-            let metadata = directory
+
+            let dir_metadata = directory
                 .dir_metadata()
                 .map_err(|source| io_error(&canonical_directory_path, source))?;
 
-            if !metadata.is_dir() {
-                return Err(FilesystemError::NotARegularFile {
+            if !dir_metadata.is_dir() {
+                return Err(FilesystemError::NotRegularFile {
                     path: canonical_directory_path,
                 });
             }
 
             #[cfg(unix)]
             let filesystem_identity = {
-                use cap_fs_ext::MetadataExt;
                 DirectoryIdentity::Unix {
-                    device_identifier: metadata.dev(),
-                    inode_identifier: metadata.ino(),
+                    device_identifier: dir_metadata.dev(),
+                    inode_identifier: dir_metadata.ino(),
                 }
             };
 
             #[cfg(windows)]
             let filesystem_identity =
-                directory_filesystem_identity(&canonical_directory_path, &metadata)?;
+                directory_filesystem_identity(&canonical_directory_path, &dir_metadata)?;
 
             Ok(Self {
                 directory: Arc::new(directory),
@@ -126,9 +136,8 @@ impl WorkspaceDirectory {
             })
         })
         .await
-        .map_err(|source| FilesystemError::FilesystemOperationTaskFailed {
-            path: path.as_ref().to_owned(),
-            source,
+        .map_err(|source| {
+            FilesystemError::throw_filesystem_operation_task_failed(path.as_ref(), source)
         })?
     }
 
@@ -147,13 +156,12 @@ impl WorkspaceDirectory {
         })
     }
 }
+
 #[cfg(windows)]
 fn directory_filesystem_identity(
     canonical_directory_path: &Path,
-    opened_directory_metadata: &cap_std::fs::Metadata,
+    opened_directory_metadata: &Metadata,
 ) -> Result<DirectoryIdentity, FilesystemError> {
-    use cap_fs_ext::MetadataExt;
-
     let file_identity = win_file_id::get_high_res_file_id(canonical_directory_path)
         .map_err(|source| io_error(canonical_directory_path, source))?;
 
@@ -164,8 +172,8 @@ fn directory_filesystem_identity(
     else {
         return Err(io_error(
             canonical_directory_path,
-            std::io::Error::new(
-                std::io::ErrorKind::Unsupported,
+            Error::new(
+                ErrorKind::Unsupported,
                 "high-resolution directory identity is unavailable",
             ),
         ));
@@ -185,14 +193,14 @@ fn directory_filesystem_identity(
     ]);
 
     let opened_volume_identifier = volume_serial_number & u64::from(u32::MAX);
+    let is_directory_changed = opened_directory_metadata.dev() != opened_volume_identifier
+        || opened_directory_metadata.ino() != opened_file_identifier;
 
-    if opened_directory_metadata.dev() != opened_volume_identifier
-        || opened_directory_metadata.ino() != opened_file_identifier
-    {
+    if is_directory_changed {
         return Err(io_error(
             canonical_directory_path,
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
+            Error::new(
+                ErrorKind::InvalidData,
                 "directory identity changed while it was opened",
             ),
         ));
@@ -203,6 +211,7 @@ fn directory_filesystem_identity(
         file_identifier: file_id.to_le_bytes(),
     })
 }
+
 impl WorkspaceRelativePath {
     pub fn new(path: impl AsRef<Path>) -> Result<Self, FilesystemError> {
         let path = path.as_ref();
@@ -225,7 +234,8 @@ impl WorkspaceRelativePath {
         &self.0
     }
 }
-fn map_open_error(path: &Path, source: std::io::Error) -> FilesystemError {
+
+fn map_open_error(path: &Path, source: Error) -> FilesystemError {
     if source.raw_os_error() == Some(40) {
         FilesystemError::SymbolicLinkNotAllowed {
             path: path.to_owned(),
@@ -235,6 +245,6 @@ fn map_open_error(path: &Path, source: std::io::Error) -> FilesystemError {
     }
 }
 
-fn io_error(path: impl Into<PathBuf>, source: std::io::Error) -> FilesystemError {
+fn io_error(path: impl Into<PathBuf>, source: Error) -> FilesystemError {
     FilesystemError::from_input_output_operation(path, source)
 }

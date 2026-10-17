@@ -9,10 +9,12 @@ pub fn restrict_directory_to_current_user(directory_path: &Path) -> io::Result<(
     {
         restrict_unix_directory(directory_path)
     }
+
     #[cfg(windows)]
     {
         super::windows::restrict_windows_directory(directory_path)
     }
+
     #[cfg(not(any(unix, windows)))]
     {
         let _ = directory_path;

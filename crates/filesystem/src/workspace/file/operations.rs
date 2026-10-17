@@ -3,6 +3,8 @@ use crate::FilesystemError;
 use cap_fs_ext::{DirExt, FollowSymlinks, OpenOptionsFollowExt};
 use cap_std::fs::{Dir, OpenOptions};
 use std::ffi::OsString;
+use std::io::Error;
+use std::io::ErrorKind;
 use std::io::{Read, Write};
 use std::path::Component;
 
@@ -19,9 +21,11 @@ impl WorkspaceFile {
 
         tokio::task::spawn_blocking(move || this.read_bounded_blocking(maximum_byte_count))
             .await
-            .map_err(|source| FilesystemError::FilesystemOperationTaskFailed {
-                path: self.relative_path.0.clone(),
-                source,
+            .map_err(|source| {
+                FilesystemError::throw_filesystem_operation_task_failed(
+                    self.relative_path.0.clone(),
+                    source,
+                )
             })?
     }
 
@@ -36,7 +40,7 @@ impl WorkspaceFile {
         String::from_utf8(bytes).map_err(|source| {
             io_error(
                 &self.relative_path.0,
-                std::io::Error::new(std::io::ErrorKind::InvalidData, source),
+                Error::new(ErrorKind::InvalidData, source),
             )
         })
     }
@@ -73,7 +77,7 @@ impl WorkspaceFile {
 
                 match directory.open_dir_nofollow(name) {
                     Ok(child) => directory = child,
-                    Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
+                    Err(source) if source.kind() == ErrorKind::NotFound => {
                         directory
                             .create_dir(name)
                             .map_err(|source| io_error(&this.relative_path.0, source))?;
@@ -90,21 +94,24 @@ impl WorkspaceFile {
             Ok(())
         })
         .await
-        .map_err(|source| FilesystemError::FilesystemOperationTaskFailed {
-            path: self.relative_path.0.clone(),
-            source,
+        .map_err(|source| {
+            FilesystemError::throw_filesystem_operation_task_failed(
+                self.relative_path.0.clone(),
+                source,
+            )
         })?
     }
 
     pub async fn remove_entry(&self) -> Result<(), FilesystemError> {
         let this = self.clone();
+
         tokio::task::spawn_blocking(move || {
             let (parent, name) = this.open_parent()?;
             let metadata = parent
                 .symlink_metadata(&name)
                 .map_err(|source| io_error(&this.relative_path.0, source))?;
 
-            if metadata.file_type().is_symlink() {
+            if metadata.is_symlink() {
                 return Err(FilesystemError::SymbolicLinkNotAllowed {
                     path: this.relative_path.0.clone(),
                 });
@@ -121,9 +128,11 @@ impl WorkspaceFile {
             }
         })
         .await
-        .map_err(|source| FilesystemError::FilesystemOperationTaskFailed {
-            path: self.relative_path.0.clone(),
-            source,
+        .map_err(|source| {
+            FilesystemError::throw_filesystem_operation_task_failed(
+                self.relative_path.0.clone(),
+                source,
+            )
         })?
     }
     pub async fn rename_without_replacement(
@@ -140,7 +149,7 @@ impl WorkspaceFile {
             source_parent
                 .hard_link(&source_name, &destination_parent, &destination_name)
                 .map_err(|source_error| {
-                    if source_error.kind() == std::io::ErrorKind::AlreadyExists {
+                    if source_error.kind() == ErrorKind::AlreadyExists {
                         FilesystemError::DestinationAlreadyExists {
                             path: destination.relative_path.0.clone(),
                         }
@@ -157,9 +166,11 @@ impl WorkspaceFile {
             Ok(())
         })
         .await
-        .map_err(|source| FilesystemError::FilesystemOperationTaskFailed {
-            path: self.relative_path.0.clone(),
-            source,
+        .map_err(|source| {
+            FilesystemError::throw_filesystem_operation_task_failed(
+                self.relative_path.0.clone(),
+                source,
+            )
         })?
     }
     fn read_bounded_blocking(&self, maximum_byte_count: u64) -> Result<Vec<u8>, FilesystemError> {
@@ -177,7 +188,7 @@ impl WorkspaceFile {
             .map_err(|source| io_error(&self.relative_path.0, source))?;
 
         if !metadata.is_file() {
-            return Err(FilesystemError::NotARegularFile {
+            return Err(FilesystemError::NotRegularFile {
                 path: self.relative_path.0.clone(),
             });
         }
@@ -225,7 +236,7 @@ impl WorkspaceFile {
                 .map_err(|source| io_error(&this.relative_path.0, source))?;
 
             if !metadata.is_file() {
-                return Err(FilesystemError::NotARegularFile {
+                return Err(FilesystemError::NotRegularFile {
                     path: this.relative_path.0.clone(),
                 });
             }
@@ -235,9 +246,11 @@ impl WorkspaceFile {
                 .map_err(|source| io_error(&this.relative_path.0, source))
         })
         .await
-        .map_err(|source| FilesystemError::FilesystemOperationTaskFailed {
-            path: self.relative_path.0.clone(),
-            source,
+        .map_err(|source| {
+            FilesystemError::throw_filesystem_operation_task_failed(
+                self.relative_path.0.clone(),
+                source,
+            )
         })?
     }
     pub(super) fn open_parent(&self) -> Result<(Dir, OsString), FilesystemError> {
