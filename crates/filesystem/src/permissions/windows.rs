@@ -1,11 +1,24 @@
-use std::io;
+use std::fs::OpenOptions;
+use std::io::Error;
+use std::io::ErrorKind;
 use std::path::Path;
 
 #[cfg(windows)]
-pub(super) fn restrict_windows_directory(directory_path: &Path) -> io::Result<()> {
-    use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
+use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
+#[cfg(windows)]
+use std::os::windows::io::AsRawHandle;
+#[cfg(windows)]
+use windows_permissions::constants::{AccessRights, AceFlags, AceType, SeObjectType, SecurityInformation};
+#[cfg(windows)]
+use windows_permissions::utilities::current_process_sid;
+#[cfg(windows)]
+use windows_permissions::wrappers::{GetSecurityInfo, SetSecurityInfo};
+#[cfg(windows)]
+use windows_permissions::{LocalBox, SecurityDescriptor};
 
-    let mut directory_open_options = std::fs::OpenOptions::new();
+#[cfg(windows)]
+pub(super) fn restrict_windows_directory(directory_path: &Path) -> io::Result<()> {
+    let mut directory_open_options = OpenOptions::new();
     directory_open_options
         .access_mode(
             windows_file_access::FILE_READ_ATTRIBUTES
@@ -14,12 +27,14 @@ pub(super) fn restrict_windows_directory(directory_path: &Path) -> io::Result<()
         )
         .share_mode(windows_file_access::FILE_SHARE_READ | windows_file_access::FILE_SHARE_WRITE)
         .custom_flags(windows_file_attribute::BACKUP_SEMANTICS | windows_file_attribute::OPEN_REPARSE_POINT);
+
     let mut directory = directory_open_options.open(directory_path)?;
     let directory_metadata = directory.metadata()?;
+
     if !directory_metadata.is_dir() || directory_metadata.file_attributes() & windows_file_attribute::REPARSE_POINT != 0
     {
-        return Err(io::Error::new(
-            io::ErrorKind::PermissionDenied,
+        return Err(Error::new(
+            ErrorKind::PermissionDenied,
             "private directory must be a directory and must not be a reparse point",
         ));
     }
@@ -30,14 +45,9 @@ pub(super) fn restrict_windows_directory(directory_path: &Path) -> io::Result<()
 #[cfg(windows)]
 pub(super) fn set_and_verify_windows_acl<FileHandle>(file: &mut FileHandle, is_directory: bool) -> io::Result<()>
 where
-    FileHandle: std::os::windows::io::AsRawHandle,
+    FileHandle: AsRawHandle,
 {
-    use windows_permissions::constants::{AccessRights, AceFlags, AceType, SeObjectType, SecurityInformation};
-
-    use windows_permissions::wrappers::{GetSecurityInfo, SetSecurityInfo};
-    use windows_permissions::{LocalBox, SecurityDescriptor};
-
-    let current_user_sid = windows_permissions::utilities::current_process_sid()?;
+    let current_user_sid = current_process_sid()?;
     let original_security_descriptor = GetSecurityInfo(
         &*file,
         SeObjectType::SE_FILE_OBJECT,
@@ -45,8 +55,8 @@ where
     )?;
 
     if original_security_descriptor.owner() != Some(&current_user_sid) {
-        return Err(io::Error::new(
-            io::ErrorKind::PermissionDenied,
+        return Err(Error::new(
+            ErrorKind::PermissionDenied,
             "private file system entry is not owned by the current user",
         ));
     }
@@ -64,8 +74,8 @@ where
     let security_descriptor_sddl = format!("D:P{system_access_control_entry}{user_access_control_entry}");
     let private_security_descriptor: LocalBox<SecurityDescriptor> = security_descriptor_sddl.parse()?;
     let private_discretionary_access_control_list = private_security_descriptor.dacl().ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::InvalidData,
+        Error::new(
+            ErrorKind::InvalidData,
             "owner-only security descriptor is missing its access list",
         )
     })?;
@@ -87,8 +97,8 @@ where
     )?;
 
     if secured_security_descriptor.owner() != Some(&current_user_sid) {
-        return Err(io::Error::new(
-            io::ErrorKind::PermissionDenied,
+        return Err(Error::new(
+            ErrorKind::PermissionDenied,
             "private file system entry owner changed while applying its access list",
         ));
     }
@@ -96,15 +106,15 @@ where
     let secured_security_descriptor_sddl = secured_security_descriptor.as_sddl()?;
 
     if !secured_security_descriptor_sddl.to_string_lossy().contains("D:P") {
-        return Err(io::Error::new(
-            io::ErrorKind::PermissionDenied,
+        return Err(Error::new(
+            ErrorKind::PermissionDenied,
             "private file system entry still inherits access permissions",
         ));
     }
 
     let discretionary_access_control_list = secured_security_descriptor.dacl().ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::PermissionDenied,
+        Error::new(
+            ErrorKind::PermissionDenied,
             "private file system entry has no access list",
         )
     })?;
@@ -112,32 +122,33 @@ where
     let expected_ace_count = (current_user_sid == system_sid).then_some(1).unwrap_or(2);
 
     if discretionary_access_control_list.len() != expected_ace_count {
-        return Err(io::Error::new(
-            io::ErrorKind::PermissionDenied,
+        return Err(Error::new(
+            ErrorKind::PermissionDenied,
             "private file system entry has access grants beyond the current user and system",
         ));
     }
 
+    let mut system_access_granted = false;
+    let mut user_access_granted = false;
     let expected_inheritance_flags = is_directory
         .then_some(AceFlags::ContainerInherit | AceFlags::ObjectInherit)
         .unwrap_or(AceFlags::empty());
 
-    let mut system_access_granted = false;
-    let mut user_access_granted = false;
-
     for ace_index in 0..discretionary_access_control_list.len() {
         let access_control_entry = discretionary_access_control_list
             .get_ace(ace_index)
-            .ok_or_else(|| io::Error::other("private access list entry is unavailable"))?;
+            .ok_or_else(|| Error::other("private access list entry is unavailable"))?;
+
         if access_control_entry.ace_type() != AceType::ACCESS_ALLOWED_ACE_TYPE
             || access_control_entry.mask().bits() != AccessRights::FileAllAccess.bits()
             || access_control_entry.flags().bits() != expected_inheritance_flags.bits()
         {
-            return Err(io::Error::new(
-                io::ErrorKind::PermissionDenied,
+            return Err(Error::new(
+                ErrorKind::PermissionDenied,
                 "private file system entry has an unexpected access grant",
             ));
         }
+
         match access_control_entry.sid() {
             Some(access_sid) if access_sid == &*system_sid && !system_access_granted => {
                 system_access_granted = true;
@@ -148,22 +159,24 @@ where
                 user_access_granted = true;
             }
             _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::PermissionDenied,
+                return Err(Error::new(
+                    ErrorKind::PermissionDenied,
                     "private file system entry grants access to an unexpected principal",
                 ));
             }
         }
     }
+
     if !system_access_granted || (current_user_sid != system_sid && !user_access_granted) {
-        return Err(io::Error::new(
-            io::ErrorKind::PermissionDenied,
+        return Err(Error::new(
+            ErrorKind::PermissionDenied,
             "private file system entry is missing current-user or system access",
         ));
     }
 
     Ok(())
 }
+
 #[cfg(windows)]
 pub(crate) mod windows_file_access {
     pub const FILE_GENERIC_WRITE: u32 = 0x0012_0116;

@@ -6,11 +6,6 @@ use super::super::{
 use crate::FilesystemError;
 use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
 use cap_std::fs::OpenOptions;
-
-#[cfg(unix)]
-use cap_std::fs::OpenOptionsExt;
-
-#[cfg(windows)]
 use cap_std::fs::OpenOptionsExt;
 use std::ffi::OsString;
 use std::io::Write;
@@ -34,6 +29,7 @@ impl WorkspaceFile {
                 FilesystemError::throw_filesystem_operation_task_failed(self.relative_path.0.clone(), source)
             })?
     }
+
     fn prepare_atomic_write_blocking(
         &self,
         contents: Vec<u8>,

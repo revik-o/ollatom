@@ -1,20 +1,29 @@
+use cap_std::fs::{MetadataExt, PermissionsExt};
+use std::fs::File;
+use std::io;
+use std::path::Path;
+
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
+
 #[cfg(windows)]
 use super::windows::set_and_verify_windows_acl;
 #[cfg(windows)]
 use super::{windows_file_access, windows_file_attribute};
-use std::fs::File;
-use std::io;
-use std::path::Path;
+#[cfg(windows)]
+use std::os::windows::fs::OpenOptionsExt;
 
 pub fn restrict_open_file_to_current_user(file: &mut File) -> io::Result<()> {
     #[cfg(unix)]
     {
         restrict_unix_std_file(file)
     }
+
     #[cfg(windows)]
     {
         restrict_windows_std_file(file)
     }
+
     #[cfg(not(any(unix, windows)))]
     {
         let _ = file;
@@ -24,17 +33,16 @@ pub fn restrict_open_file_to_current_user(file: &mut File) -> io::Result<()> {
 
 pub fn open_or_create_owner_only_file(path: &Path) -> io::Result<File> {
     let mut options = std::fs::OpenOptions::new();
+
     options.read(true).write(true).create(true).truncate(false);
+
     #[cfg(unix)]
     {
-        use std::os::unix::fs::OpenOptionsExt;
-
         options.mode(0o600).custom_flags(nix::fcntl::OFlag::O_NOFOLLOW.bits());
     }
+
     #[cfg(windows)]
     {
-        use std::os::windows::fs::OpenOptionsExt;
-
         options
             .access_mode(
                 windows_file_access::FILE_GENERIC_WRITE
@@ -45,6 +53,7 @@ pub fn open_or_create_owner_only_file(path: &Path) -> io::Result<File> {
             .share_mode(windows_file_access::FILE_SHARE_READ | windows_file_access::FILE_SHARE_WRITE)
             .custom_flags(windows_file_attribute::OPEN_REPARSE_POINT);
     }
+
     let mut file = options.open(path)?;
 
     restrict_open_file_to_current_user(&mut file)?;
@@ -67,6 +76,7 @@ pub(crate) fn restrict_capability_file_to_current_user(file: &mut cap_std::fs::F
         Err(unsupported_file_permissions())
     }
 }
+
 #[cfg(not(any(unix, windows)))]
 fn unsupported_file_permissions() -> io::Error {
     io::Error::new(
@@ -89,8 +99,6 @@ fn restrict_unix_std_file(file: &mut File) -> io::Result<()> {
 
 #[cfg(unix)]
 fn restrict_unix_capability_file(file: &mut cap_std::fs::File) -> io::Result<()> {
-    use cap_std::fs::{MetadataExt, PermissionsExt};
-
     let metadata = file.metadata()?;
 
     validate_unix_private_file(metadata.is_file(), metadata.uid(), metadata.nlink())?;
@@ -127,6 +135,7 @@ fn restrict_windows_std_file(file: &mut File) -> io::Result<()> {
     use std::os::windows::fs::MetadataExt;
 
     let file_metadata = file.metadata()?;
+
     if !file_metadata.is_file() || file_metadata.file_attributes() & windows_file_attribute::REPARSE_POINT != 0 {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
@@ -139,8 +148,6 @@ fn restrict_windows_std_file(file: &mut File) -> io::Result<()> {
 
 #[cfg(windows)]
 fn restrict_windows_capability_file(file: &mut cap_std::fs::File) -> io::Result<()> {
-    use cap_std::fs::MetadataExt;
-
     let file_metadata = file.metadata()?;
 
     if !file_metadata.is_file() || file_metadata.file_attributes() & windows_file_attribute::REPARSE_POINT != 0 {

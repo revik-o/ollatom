@@ -109,6 +109,7 @@ impl WorkspaceFile {
             FilesystemError::throw_filesystem_operation_task_failed(self.relative_path.0.clone(), source)
         })?
     }
+
     pub async fn rename_without_replacement(&self, destination: &WorkspaceFile) -> Result<(), FilesystemError> {
         let source = self.clone();
         let destination = destination.clone();
@@ -141,6 +142,7 @@ impl WorkspaceFile {
             FilesystemError::throw_filesystem_operation_task_failed(self.relative_path.0.clone(), source)
         })?
     }
+
     fn read_bounded_blocking(&self, maximum_byte_count: u64) -> Result<Vec<u8>, FilesystemError> {
         let (parent, name) = self.open_parent()?;
         let mut options = OpenOptions::new();
@@ -214,6 +216,7 @@ impl WorkspaceFile {
             FilesystemError::throw_filesystem_operation_task_failed(self.relative_path.0.clone(), source)
         })?
     }
+
     pub(super) fn open_parent(&self) -> Result<(Dir, OsString), FilesystemError> {
         let mut parent = self
             .workspace_directory
