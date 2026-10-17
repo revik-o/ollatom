@@ -37,10 +37,7 @@ async fn configured_default_model_and_ordered_events_work() {
 
 #[tokio::test]
 async fn completed_response_preserves_assistant_round_boundaries() {
-    let provider = ScriptedProvider::new(
-        BuiltInProvider::Ollama,
-        ProviderBehavior::ReturnMultipleAssistantRounds,
-    );
+    let provider = ScriptedProvider::new(BuiltInProvider::Ollama, ProviderBehavior::ReturnMultipleAssistantRounds);
     let runtime = LlmRuntime::builder()
         .provider_with_default(provider, "qwen3:4b")
         .build()
@@ -66,10 +63,7 @@ async fn completed_response_preserves_assistant_round_boundaries() {
 
 #[tokio::test]
 async fn cancellation_returns_partial_and_runtime_aliases_chatgpt() {
-    let provider = ScriptedProvider::new(
-        BuiltInProvider::ChatGpt,
-        ProviderBehavior::WaitForCancellation,
-    );
+    let provider = ScriptedProvider::new(BuiltInProvider::ChatGpt, ProviderBehavior::WaitForCancellation);
     let runtime = LlmRuntime::builder()
         .provider_with_default(provider, "gpt-test")
         .build()
@@ -89,10 +83,7 @@ async fn cancellation_returns_partial_and_runtime_aliases_chatgpt() {
 
 #[tokio::test]
 async fn runtime_cancel_and_dropping_a_started_run_both_reach_terminal_cancellation() {
-    let provider = ScriptedProvider::new(
-        BuiltInProvider::Ollama,
-        ProviderBehavior::WaitForCancellation,
-    );
+    let provider = ScriptedProvider::new(BuiltInProvider::Ollama, ProviderBehavior::WaitForCancellation);
     let runtime = LlmRuntime::builder()
         .provider_with_default(provider, "model")
         .build()
@@ -106,10 +97,7 @@ async fn runtime_cancel_and_dropping_a_started_run_both_reach_terminal_cancellat
     assert!(runtime.cancel(run_id));
     assert!(matches!(run.await.unwrap(), LlmRunOutcome::Cancelled(_)));
 
-    let provider = ScriptedProvider::new(
-        BuiltInProvider::Claude,
-        ProviderBehavior::WaitForCancellation,
-    );
+    let provider = ScriptedProvider::new(BuiltInProvider::Claude, ProviderBehavior::WaitForCancellation);
     let runtime = LlmRuntime::builder()
         .provider_with_default(provider, "model")
         .build()
@@ -141,10 +129,7 @@ async fn runtime_cancel_and_dropping_a_started_run_both_reach_terminal_cancellat
 
 #[tokio::test]
 async fn overall_timeout_stops_the_run_and_is_reported_distinctly() {
-    let provider = ScriptedProvider::new(
-        BuiltInProvider::LlamaCpp,
-        ProviderBehavior::WaitForCancellation,
-    );
+    let provider = ScriptedProvider::new(BuiltInProvider::LlamaCpp, ProviderBehavior::WaitForCancellation);
     let runtime = LlmRuntime::builder()
         .provider_with_default(provider, "model")
         .build()
@@ -168,8 +153,7 @@ async fn overall_timeout_stops_the_run_and_is_reported_distinctly() {
 
 #[tokio::test]
 async fn ask_user_can_be_resolved_later_by_the_host() {
-    let provider =
-        ScriptedProvider::new(BuiltInProvider::Claude, ProviderBehavior::RequestUserInput);
+    let provider = ScriptedProvider::new(BuiltInProvider::Claude, ProviderBehavior::RequestUserInput);
     let runtime = LlmRuntime::builder()
         .provider_with_default(provider, "claude-test")
         .build()
@@ -184,10 +168,7 @@ async fn ask_user_can_be_resolved_later_by_the_host() {
     let runtime_for_reply = runtime.clone();
     let interaction_responder = tokio::spawn(async move {
         while let Some(event) = events.next().await {
-            if let Some(RunEvent::InteractionRequested(InteractionRequest::AskUser {
-                id, ..
-            })) = event.event()
-            {
+            if let Some(RunEvent::InteractionRequested(InteractionRequest::AskUser { id, .. })) = event.event() {
                 runtime_for_reply
                     .resolve_interaction(
                         *id,

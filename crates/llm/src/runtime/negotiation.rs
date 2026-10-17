@@ -4,8 +4,7 @@ use super::{
     option_validation::validate_option_values,
 };
 use crate::{
-    CapabilitySupport, LlmError, LlmOptions, ModelCapability, OptionHandlingMode,
-    ProviderCapabilities, ReasoningEffort,
+    CapabilitySupport, LlmError, LlmOptions, ModelCapability, OptionHandlingMode, ProviderCapabilities, ReasoningEffort,
 };
 
 pub(super) use super::provider_content_validation::{validate_context, validate_user_message};
@@ -39,8 +38,7 @@ fn negotiate_reasoning_options(
         .copied()
         .unwrap_or(CapabilitySupport::Unknown);
 
-    let reasoning_capability_support =
-        provider_capabilities.support_for(ModelCapability::Reasoning);
+    let reasoning_capability_support = provider_capabilities.support_for(ModelCapability::Reasoning);
 
     let selected_effort_is_unsupported = reasoning_effort_support == CapabilitySupport::Unsupported;
     let reasoning_is_unavailable = reasoning_capability_support == CapabilitySupport::Unsupported;
@@ -53,8 +51,7 @@ fn negotiate_reasoning_options(
         handle_unsupported_reasoning_effort(options, warning_messages)?;
     }
 
-    let token_budget_is_unsupported =
-        options.reasoning.budget_tokens.is_some() && reasoning_is_unavailable;
+    let token_budget_is_unsupported = options.reasoning.budget_tokens.is_some() && reasoning_is_unavailable;
 
     if token_budget_is_unsupported {
         handle_unsupported_option(options.handling, "reasoning token budget", warning_messages)?;
@@ -90,15 +87,10 @@ fn negotiate_generation_options(
 ) -> Result<(), LlmError> {
     for option_key in GENERATION_OPTION_KEYS {
         let option_is_configured = option_key.is_present(&options.generation);
-        let option_is_unsupported =
-            option_key.provider_support(provider_capabilities) == CapabilitySupport::Unsupported;
+        let option_is_unsupported = option_key.provider_support(provider_capabilities) == CapabilitySupport::Unsupported;
 
         if option_is_configured && option_is_unsupported {
-            handle_unsupported_option(
-                options.handling,
-                option_key.capability_name(),
-                warning_messages,
-            )?;
+            handle_unsupported_option(options.handling, option_key.capability_name(), warning_messages)?;
 
             option_key.clear_configured_value(&mut options.generation);
         }
@@ -117,19 +109,14 @@ fn negotiate_local_runtime_options(
             continue;
         }
 
-        let option_is_unsupported =
-            option_key.provider_support(provider_capabilities) == CapabilitySupport::Unsupported;
+        let option_is_unsupported = option_key.provider_support(provider_capabilities) == CapabilitySupport::Unsupported;
 
         let requires_different_lifecycle_phase = option_key
             .lifecycle_phase(provider_capabilities)
             .is_some_and(|phase| phase != crate::LocalOptionPhase::PerRequest);
 
         if option_is_unsupported || requires_different_lifecycle_phase {
-            handle_unsupported_option(
-                options.handling,
-                option_key.capability_name(),
-                warning_messages,
-            )?;
+            handle_unsupported_option(options.handling, option_key.capability_name(), warning_messages)?;
             option_key.clear_configured_value(&mut options.local);
         }
     }

@@ -15,16 +15,10 @@ async fn all_six_builtin_ids_share_the_same_facade_contract() {
 
     for provider in BuiltInProvider::ALL {
         assert!(runtime.request(provider).is_available().await.unwrap());
-        assert_eq!(
-            runtime.request(provider).list_models().await.unwrap().len(),
-            1
-        );
+        assert_eq!(runtime.request(provider).list_models().await.unwrap().len(), 1);
         let model_information = runtime.request(provider).get_info().await.unwrap();
         assert_eq!(model_information.provider, ProviderId::from(provider));
-        assert_eq!(
-            model_information.id.as_str(),
-            format!("{}-test", provider.as_str())
-        );
+        assert_eq!(model_information.id.as_str(), format!("{}-test", provider.as_str()));
         assert!(matches!(
             runtime
                 .request(provider)
@@ -64,11 +58,8 @@ async fn strict_and_best_effort_option_negotiation_are_distinct() {
     capabilities
         .generation_options
         .insert("temperature".into(), CapabilitySupport::Unsupported);
-    let provider = ScriptedProvider::with_capabilities(
-        BuiltInProvider::Ollama,
-        ProviderBehavior::Complete,
-        capabilities,
-    );
+    let provider =
+        ScriptedProvider::with_capabilities(BuiltInProvider::Ollama, ProviderBehavior::Complete, capabilities);
     let runtime = LlmRuntime::builder()
         .provider_with_default(provider.clone(), "model")
         .build()
@@ -111,11 +102,8 @@ async fn keep_alive_uses_its_public_capability_name() {
     capabilities
         .local_runtime_options
         .insert("keep_alive_seconds".into(), CapabilitySupport::Unsupported);
-    let provider = ScriptedProvider::with_capabilities(
-        BuiltInProvider::Ollama,
-        ProviderBehavior::Complete,
-        capabilities,
-    );
+    let provider =
+        ScriptedProvider::with_capabilities(BuiltInProvider::Ollama, ProviderBehavior::Complete, capabilities);
     let runtime = LlmRuntime::builder()
         .provider_with_default(provider, "model")
         .build()
@@ -147,11 +135,8 @@ async fn auto_preserves_native_reasoning_but_explicit_unsupported_effort_fails()
     capabilities
         .features
         .insert(ModelCapability::Reasoning, CapabilitySupport::Unsupported);
-    let provider = ScriptedProvider::with_capabilities(
-        BuiltInProvider::LmStudio,
-        ProviderBehavior::Complete,
-        capabilities,
-    );
+    let provider =
+        ScriptedProvider::with_capabilities(BuiltInProvider::LmStudio, ProviderBehavior::Complete, capabilities);
     let runtime = LlmRuntime::builder()
         .provider_with_default(provider.clone(), "model")
         .build()
@@ -164,10 +149,7 @@ async fn auto_preserves_native_reasoning_but_explicit_unsupported_effort_fails()
         .await
         .unwrap();
     assert_eq!(
-        provider.recorded_requests.lock().unwrap()[0]
-            .options
-            .reasoning
-            .effort,
+        provider.recorded_requests.lock().unwrap()[0].options.reasoning.effort,
         ReasoningEffort::Auto
     );
     assert!(matches!(
@@ -190,10 +172,7 @@ fn opaque_provider_state_and_identifiers_round_trip_through_serde() {
         data: vec![1, 2, 3],
     };
     let encoded = serde_json::to_string(&block).unwrap();
-    assert_eq!(
-        serde_json::from_str::<ContentBlock>(&encoded).unwrap(),
-        block
-    );
+    assert_eq!(serde_json::from_str::<ContentBlock>(&encoded).unwrap(), block);
     assert!(serde_json::from_str::<ModelId>("\"\"").is_err());
     let usage: Usage = serde_json::from_str("{}").unwrap();
     assert_eq!(usage.source, UsageSource::Unknown);

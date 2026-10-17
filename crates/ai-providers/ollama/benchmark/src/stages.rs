@@ -1,11 +1,11 @@
 use super::{
-    AGENT_STAGE_PROMPTS, AGENT_SYSTEM_PROMPT, AVAILABLE_AGENT_TOOL_NAMES, BenchmarkResult,
-    benchmark_limits, benchmark_options, require_completed_outcome, summary::run_outcome_summary,
+    AGENT_STAGE_PROMPTS, AGENT_SYSTEM_PROMPT, AVAILABLE_AGENT_TOOL_NAMES, BenchmarkResult, benchmark_limits,
+    benchmark_options, require_completed_outcome, summary::run_outcome_summary,
 };
 use llm::{ConversationMessage, RunStreamItem};
 use ollama_benchmark::{
-    AgentStageBuildStatus, BenchmarkArtifacts, ConversationHistoryRecorder, ModelToolActivity,
-    StageLogger, verify_independent_build,
+    AgentStageBuildStatus, BenchmarkArtifacts, ConversationHistoryRecorder, ModelToolActivity, StageLogger,
+    verify_independent_build,
 };
 use serde_json::json;
 
@@ -145,20 +145,19 @@ async fn run_agent_stage(
     require_completed_outcome(run_outcome, stage_number)?;
 
     if stage_number == 3 {
-        let (rustc_version, cargo_version) =
-            match model_tool_activity.require_rust_toolchain_versions(stage_number) {
-                Ok(versions) => versions,
-                Err(error) => {
-                    stage_logger.write_line(serde_json::to_string(&json!({
-                        "stage": stage_number,
-                        "verification": "failed",
-                        "error": error
-                    }))?)?;
-                    stage_logger.flush()?;
+        let (rustc_version, cargo_version) = match model_tool_activity.require_rust_toolchain_versions(stage_number) {
+            Ok(versions) => versions,
+            Err(error) => {
+                stage_logger.write_line(serde_json::to_string(&json!({
+                    "stage": stage_number,
+                    "verification": "failed",
+                    "error": error
+                }))?)?;
+                stage_logger.flush()?;
 
-                    return Err(error.into());
-                }
-            };
+                return Err(error.into());
+            }
+        };
 
         stage_logger.write_line(rustc_version)?;
         stage_logger.write_line(cargo_version)?;

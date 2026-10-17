@@ -1,7 +1,4 @@
-use crate::{
-    CapabilitySupport, GenerationOptions, LocalOptionPhase, LocalRuntimeOptions,
-    ProviderCapabilities,
-};
+use crate::{CapabilitySupport, GenerationOptions, LocalOptionPhase, LocalRuntimeOptions, ProviderCapabilities};
 
 #[derive(Clone, Copy)]
 pub(super) enum GenerationOptionKey {
@@ -107,14 +104,8 @@ impl LocalRuntimeOptionKey {
             .unwrap_or(CapabilitySupport::Unknown)
     }
 
-    pub(super) fn lifecycle_phase(
-        self,
-        capabilities: &ProviderCapabilities,
-    ) -> Option<LocalOptionPhase> {
-        capabilities
-            .local_option_phases
-            .get(self.capability_name())
-            .copied()
+    pub(super) fn lifecycle_phase(self, capabilities: &ProviderCapabilities) -> Option<LocalOptionPhase> {
+        capabilities.local_option_phases.get(self.capability_name()).copied()
     }
 
     pub(super) fn clear_configured_value(self, options: &mut LocalRuntimeOptions) {

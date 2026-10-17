@@ -68,9 +68,5 @@ pub(super) async fn verify_sqlite_connection_configuration(
 }
 
 fn configuration_error(operation: &str, source: sqlx::Error) -> InfrastructureError {
-    InfrastructureError::from_database_error(
-        InfrastructureErrorKind::DatabaseConfigurationFailed,
-        operation,
-        source,
-    )
+    InfrastructureError::from_database_error(InfrastructureErrorKind::DatabaseConfigurationFailed, operation, source)
 }

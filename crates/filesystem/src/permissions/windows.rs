@@ -13,13 +13,10 @@ pub(super) fn restrict_windows_directory(directory_path: &Path) -> io::Result<()
                 | windows_file_access::WRITE_DAC,
         )
         .share_mode(windows_file_access::FILE_SHARE_READ | windows_file_access::FILE_SHARE_WRITE)
-        .custom_flags(
-            windows_file_attribute::BACKUP_SEMANTICS | windows_file_attribute::OPEN_REPARSE_POINT,
-        );
+        .custom_flags(windows_file_attribute::BACKUP_SEMANTICS | windows_file_attribute::OPEN_REPARSE_POINT);
     let mut directory = directory_open_options.open(directory_path)?;
     let directory_metadata = directory.metadata()?;
-    if !directory_metadata.is_dir()
-        || directory_metadata.file_attributes() & windows_file_attribute::REPARSE_POINT != 0
+    if !directory_metadata.is_dir() || directory_metadata.file_attributes() & windows_file_attribute::REPARSE_POINT != 0
     {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
@@ -31,16 +28,11 @@ pub(super) fn restrict_windows_directory(directory_path: &Path) -> io::Result<()
 }
 
 #[cfg(windows)]
-pub(super) fn set_and_verify_windows_acl<FileHandle>(
-    file: &mut FileHandle,
-    is_directory: bool,
-) -> io::Result<()>
+pub(super) fn set_and_verify_windows_acl<FileHandle>(file: &mut FileHandle, is_directory: bool) -> io::Result<()>
 where
     FileHandle: std::os::windows::io::AsRawHandle,
 {
-    use windows_permissions::constants::{
-        AccessRights, AceFlags, AceType, SeObjectType, SecurityInformation,
-    };
+    use windows_permissions::constants::{AccessRights, AceFlags, AceType, SeObjectType, SecurityInformation};
 
     use windows_permissions::wrappers::{GetSecurityInfo, SetSecurityInfo};
     use windows_permissions::{LocalBox, SecurityDescriptor};
@@ -69,17 +61,14 @@ where
         format!("(A;{inheritance_flags};FA;;;{current_user_sid})")
     };
 
-    let security_descriptor_sddl =
-        format!("D:P{system_access_control_entry}{user_access_control_entry}");
-    let private_security_descriptor: LocalBox<SecurityDescriptor> =
-        security_descriptor_sddl.parse()?;
-    let private_discretionary_access_control_list =
-        private_security_descriptor.dacl().ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::InvalidData,
-                "owner-only security descriptor is missing its access list",
-            )
-        })?;
+    let security_descriptor_sddl = format!("D:P{system_access_control_entry}{user_access_control_entry}");
+    let private_security_descriptor: LocalBox<SecurityDescriptor> = security_descriptor_sddl.parse()?;
+    let private_discretionary_access_control_list = private_security_descriptor.dacl().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            "owner-only security descriptor is missing its access list",
+        )
+    })?;
 
     SetSecurityInfo(
         file,
@@ -106,23 +95,19 @@ where
 
     let secured_security_descriptor_sddl = secured_security_descriptor.as_sddl()?;
 
-    if !secured_security_descriptor_sddl
-        .to_string_lossy()
-        .contains("D:P")
-    {
+    if !secured_security_descriptor_sddl.to_string_lossy().contains("D:P") {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
             "private file system entry still inherits access permissions",
         ));
     }
 
-    let discretionary_access_control_list =
-        secured_security_descriptor.dacl().ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::PermissionDenied,
-                "private file system entry has no access list",
-            )
-        })?;
+    let discretionary_access_control_list = secured_security_descriptor.dacl().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "private file system entry has no access list",
+        )
+    })?;
 
     let expected_ace_count = (current_user_sid == system_sid).then_some(1).unwrap_or(2);
 
@@ -158,9 +143,7 @@ where
                 system_access_granted = true;
             }
             Some(access_sid)
-                if access_sid == &*current_user_sid
-                    && !user_access_granted
-                    && current_user_sid != system_sid =>
+                if access_sid == &*current_user_sid && !user_access_granted && current_user_sid != system_sid =>
             {
                 user_access_granted = true;
             }

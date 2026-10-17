@@ -4,19 +4,12 @@ use super::*;
 async fn creates_gets_updates_and_deletes_project() {
     let test_infrastructure = create_initialized_test_infrastructure().await;
     let project_path = create_project_directory(&test_infrastructure, "project");
-    let moved_project_path = test_infrastructure
-        .temporary_directory
-        .path()
-        .join("moved-project");
+    let moved_project_path = test_infrastructure.temporary_directory.path().join("moved-project");
     let project = test_infrastructure
         .infrastructure
         .execute_db_actions(async |transaction| {
             transaction
-                .create_project(
-                    "Project",
-                    &project_path,
-                    ProjectInitializationParameters::default(),
-                )
+                .create_project("Project", &project_path, ProjectInitializationParameters::default())
                 .await
         })
         .await
@@ -61,20 +54,9 @@ async fn creates_gets_updates_and_deletes_project() {
         updated_project.canonical_directory_path,
         std::fs::canonicalize(&moved_project_path).unwrap()
     );
-    assert_eq!(
-        updated_project.filesystem_identity,
-        project.filesystem_identity
-    );
-    assert!(
-        updated_project
-            .execution_settings
-            .large_language_model_thinking_enabled
-    );
-    assert!(
-        updated_project
-            .execution_settings
-            .context_optimization_enabled
-    );
+    assert_eq!(updated_project.filesystem_identity, project.filesystem_identity);
+    assert!(updated_project.execution_settings.large_language_model_thinking_enabled);
+    assert!(updated_project.execution_settings.context_optimization_enabled);
     assert_eq!(updated_project.execution_settings.cpu_usage_percentage, 75);
     assert_eq!(updated_project.execution_settings.gpu_usage_percentage, 65);
 
@@ -110,9 +92,7 @@ async fn creates_gets_updates_and_deletes_project() {
         .unwrap();
     let deleted_by_id = test_infrastructure
         .infrastructure
-        .execute_db_actions(async |transaction| {
-            transaction.delete_project(project_for_id_deletion.id).await
-        })
+        .execute_db_actions(async |transaction| transaction.delete_project(project_for_id_deletion.id).await)
         .await
         .unwrap();
     assert_eq!(deleted_by_id.unwrap().id, project_for_id_deletion.id);
@@ -132,9 +112,7 @@ async fn project_settings_are_updated_independently() {
                     ProjectInitializationParameters::default(),
                 )
                 .await?;
-            transaction
-                .set_llm_thinking_for_project(true, &project)
-                .await?;
+            transaction.set_llm_thinking_for_project(true, &project).await?;
             transaction
                 .set_llm_context_optimization_for_project(true, &project)
                 .await?;
@@ -146,11 +124,7 @@ async fn project_settings_are_updated_independently() {
         .unwrap()
         .unwrap();
 
-    assert!(
-        project
-            .execution_settings
-            .large_language_model_thinking_enabled
-    );
+    assert!(project.execution_settings.large_language_model_thinking_enabled);
     assert!(project.execution_settings.context_optimization_enabled);
     assert_eq!(project.execution_settings.cpu_usage_percentage, 50);
     assert_eq!(project.execution_settings.gpu_usage_percentage, 25);

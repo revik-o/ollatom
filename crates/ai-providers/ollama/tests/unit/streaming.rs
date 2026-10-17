@@ -13,10 +13,7 @@ fn native_chat_frame_rejects_malformed_consumed_fields() {
         r#"{"done":true,"eval_count":"5"}"#,
         r#"{"error":null}"#,
     ] {
-        assert!(
-            serde_json::from_str::<NativeChatFrame>(frame).is_err(),
-            "{frame}"
-        );
+        assert!(serde_json::from_str::<NativeChatFrame>(frame).is_err(), "{frame}");
     }
 }
 
@@ -30,7 +27,6 @@ fn native_chat_frame_accepts_complete_and_error_frames() {
     assert_eq!(complete_frame.message.content, "done");
     assert_eq!(complete_frame.prompt_eval_count, Some(7));
 
-    let error_frame =
-        serde_json::from_str::<NativeChatFrame>(r#"{"error":{"message":"daemon error"}}"#).unwrap();
+    let error_frame = serde_json::from_str::<NativeChatFrame>(r#"{"error":{"message":"daemon error"}}"#).unwrap();
     assert!(error_frame.error.is_some());
 }

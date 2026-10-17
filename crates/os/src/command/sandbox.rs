@@ -58,17 +58,11 @@ pub(super) fn build_sandbox_process(
 
     for system_directory in &authorization.filesystem_policy.read_only_system_directories {
         if system_directory.exists() {
-            command
-                .arg("--ro-bind")
-                .arg(system_directory)
-                .arg(system_directory);
+            command.arg("--ro-bind").arg(system_directory).arg(system_directory);
         }
     }
 
-    for additional_directory in &authorization
-        .filesystem_policy
-        .additional_read_only_directories
-    {
+    for additional_directory in &authorization.filesystem_policy.additional_read_only_directories {
         let mut parent_directories = additional_directory
             .ancestors()
             .filter(|directory| *directory != Path::new("/"))
@@ -98,10 +92,7 @@ pub(super) fn build_sandbox_process(
         command.arg("--setenv").arg(name).arg(value);
     }
 
-    command
-        .arg("--ro-bind-fd")
-        .arg("0")
-        .arg(&authorization.executable_path);
+    command.arg("--ro-bind-fd").arg("0").arg(&authorization.executable_path);
 
     let pinned_executable_for_child = pinned_executable
         .try_clone()
@@ -136,18 +127,13 @@ pub(super) fn build_sandbox_process(
         "(version 1)(deny default)(allow process*)(allow file-read* (subpath \"/System\") (subpath \"/usr\") (subpath \"/bin\") (subpath \"/sbin\"))(allow file-read* file-write* (subpath \"{escaped_workspace}\"))(allow file-read* file-write* (subpath \"/private/tmp\"))"
     );
 
-    for additional_directory in &authorization
-        .filesystem_policy
-        .additional_read_only_directories
-    {
+    for additional_directory in &authorization.filesystem_policy.additional_read_only_directories {
         let escaped_directory = additional_directory
             .to_string_lossy()
             .replace('\\', "\\\\")
             .replace('"', "\\\"");
 
-        sandbox_policy.push_str(&format!(
-            "(allow file-read* (subpath \"{escaped_directory}\"))"
-        ));
+        sandbox_policy.push_str(&format!("(allow file-read* (subpath \"{escaped_directory}\"))"));
     }
 
     if authorization.network_policy == SandboxNetworkPolicy::Allowed {

@@ -21,9 +21,7 @@ fn validate_context_options(options: &LlmOptions) -> Result<(), LlmError> {
     }
 
     if options.context.input_token_budget == Some(0) {
-        return Err(LlmError::InvalidRequest(
-            POSITIVE_TOKEN_BUDGET_REQUIREMENT.into(),
-        ));
+        return Err(LlmError::InvalidRequest(POSITIVE_TOKEN_BUDGET_REQUIREMENT.into()));
     }
 
     Ok(())
@@ -31,9 +29,7 @@ fn validate_context_options(options: &LlmOptions) -> Result<(), LlmError> {
 
 fn validate_reasoning_options(options: &LlmOptions) -> Result<(), LlmError> {
     if options.reasoning.budget_tokens == Some(0) {
-        return Err(LlmError::InvalidRequest(
-            POSITIVE_TOKEN_BUDGET_REQUIREMENT.into(),
-        ));
+        return Err(LlmError::InvalidRequest(POSITIVE_TOKEN_BUDGET_REQUIREMENT.into()));
     }
 
     Ok(())
@@ -60,13 +56,12 @@ fn validate_generation_options(options: &LlmOptions) -> Result<(), LlmError> {
         ));
     }
 
-    let has_invalid_diversity_threshold =
-        options
-            .generation
-            .diversity_threshold
-            .is_some_and(|diversity_threshold| {
-                !diversity_threshold.is_finite() || !(0.0..=1.0).contains(&diversity_threshold)
-            });
+    let has_invalid_diversity_threshold = options
+        .generation
+        .diversity_threshold
+        .is_some_and(|diversity_threshold| {
+            !diversity_threshold.is_finite() || !(0.0..=1.0).contains(&diversity_threshold)
+        });
 
     if has_invalid_diversity_threshold {
         return Err(LlmError::InvalidRequest(
@@ -95,10 +90,7 @@ fn validate_local_runtime_options(options: &LlmOptions) -> Result<(), LlmError> 
         options.local.threads,
     ];
 
-    let has_zero_local_runtime_size = local_runtime_sizes
-        .into_iter()
-        .flatten()
-        .any(|size| size == 0);
+    let has_zero_local_runtime_size = local_runtime_sizes.into_iter().flatten().any(|size| size == 0);
 
     if has_zero_local_runtime_size {
         return Err(LlmError::InvalidRequest(

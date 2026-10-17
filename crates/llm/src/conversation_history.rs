@@ -68,15 +68,11 @@ pub fn append_tool_round_to_history(
 
         let tool_output = outputs_by_call_identifier
             .remove(&tool_call.id)
-            .ok_or_else(|| {
-                LlmError::ToolProtocol(format!("tool output missing for call {}", tool_call.id))
-            })?;
+            .ok_or_else(|| LlmError::ToolProtocol(format!("tool output missing for call {}", tool_call.id)))?;
 
         round_messages.push(ConversationMessage {
             role: ConversationRole::Tool,
-            content: vec![ContentBlock::ToolResult {
-                output: tool_output,
-            }],
+            content: vec![ContentBlock::ToolResult { output: tool_output }],
         });
     }
 

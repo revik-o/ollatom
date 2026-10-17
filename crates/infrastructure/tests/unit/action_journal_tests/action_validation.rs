@@ -3,14 +3,12 @@ use super::*;
 #[tokio::test]
 async fn action_journal_preserves_initial_status_and_rejects_mutation() {
     let (_temporary_directory, infrastructure, chat) = create_test_chat().await;
-    let (user_message_id, llm_message_id, action_id) =
-        create_pending_command_action(&infrastructure, &chat).await;
+    let (user_message_id, llm_message_id, action_id) = create_pending_command_action(&infrastructure, &chat).await;
 
-    let action_update_result =
-        sqlx::query("UPDATE llm_actions SET summary = 'Rewritten' WHERE id = ?")
-            .bind(action_id.as_bytes().to_vec())
-            .execute(&infrastructure.connection_pool)
-            .await;
+    let action_update_result = sqlx::query("UPDATE llm_actions SET summary = 'Rewritten' WHERE id = ?")
+        .bind(action_id.as_bytes().to_vec())
+        .execute(&infrastructure.connection_pool)
+        .await;
     assert!(action_update_result.is_err());
 
     let illegal_initial_transition = sqlx::query(
@@ -57,11 +55,10 @@ async fn action_journal_preserves_initial_status_and_rejects_mutation() {
         .unwrap();
     assert_eq!(running_event.sequence_number, 2);
 
-    let status_update_result =
-        sqlx::query("UPDATE action_status_events SET status = 'failed' WHERE id = ?")
-            .bind(running_event.id.as_bytes().to_vec())
-            .execute(&infrastructure.connection_pool)
-            .await;
+    let status_update_result = sqlx::query("UPDATE action_status_events SET status = 'failed' WHERE id = ?")
+        .bind(running_event.id.as_bytes().to_vec())
+        .execute(&infrastructure.connection_pool)
+        .await;
     assert!(status_update_result.is_err());
 
     let status_delete_result = sqlx::query("DELETE FROM action_status_events WHERE id = ?")
@@ -101,10 +98,9 @@ async fn action_journal_preserves_initial_status_and_rejects_mutation() {
         .unwrap();
     assert_eq!(succeeded_event.sequence_number, 3);
 
-    let completion_result =
-        sqlx::query("UPDATE messages SET llm_message_state = 'completed' WHERE id = ?")
-            .bind(llm_message_id.as_bytes().to_vec())
-            .execute(&infrastructure.connection_pool)
-            .await;
+    let completion_result = sqlx::query("UPDATE messages SET llm_message_state = 'completed' WHERE id = ?")
+        .bind(llm_message_id.as_bytes().to_vec())
+        .execute(&infrastructure.connection_pool)
+        .await;
     assert!(completion_result.is_ok());
 }

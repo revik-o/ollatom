@@ -37,10 +37,7 @@ async fn command_entity_exposes_logs_before_completion() {
 
     assert!(
         wait_for_condition(Duration::from_secs(2), || {
-            command_entity
-                .terminal_logs()
-                .standard_output
-                .contains("start")
+            command_entity.terminal_logs().standard_output.contains("start")
         })
         .await
     );
@@ -196,10 +193,7 @@ async fn pinned_executable_launch_preserves_argv0_and_null_stdin() {
     )
     .unwrap();
 
-    let outcome = execute_sandboxed_command(authorization)
-        .unwrap()
-        .await
-        .unwrap();
+    let outcome = execute_sandboxed_command(authorization).unwrap().await.unwrap();
 
     assert!(outcome.succeeded);
     assert_eq!(

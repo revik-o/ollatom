@@ -14,11 +14,8 @@ pub(crate) async fn stream_round(
 
     loop {
         let next_chunk_outcome = if let Some(timeout_milliseconds) = idle_timeout_milliseconds {
-            stop.run_until_cancelled_or_timeout(
-                Duration::from_millis(timeout_milliseconds),
-                response_stream.next(),
-            )
-            .await
+            stop.run_until_cancelled_or_timeout(Duration::from_millis(timeout_milliseconds), response_stream.next())
+                .await
         } else {
             stop.run_until_cancelled(response_stream.next()).await
         };
@@ -144,12 +141,5 @@ async fn process_frame_bytes(
     let frame = serde_json::from_slice::<NativeChatFrame>(frame_bytes)
         .map_err(|_| LlmError::ProviderProtocol("invalid Ollama NDJSON frame".into()))?;
 
-    process_frame(
-        &frame,
-        host,
-        assistant_round,
-        aggregate_usage,
-        round_stream_state,
-    )
-    .await
+    process_frame(&frame, host, assistant_round, aggregate_usage, round_stream_state).await
 }

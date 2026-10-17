@@ -14,9 +14,6 @@ impl Llm {
     }
 
     pub fn init<P: IntoProviderId>(provider: P) -> RequestBuilder<crate::MissingUserMessage> {
-        RequestBuilder::new(
-            GLOBAL_RUNTIME.get().map(|runtime| runtime.as_ref().clone()),
-            provider,
-        )
+        RequestBuilder::new(GLOBAL_RUNTIME.get().map(|runtime| runtime.as_ref().clone()), provider)
     }
 }

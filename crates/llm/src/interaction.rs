@@ -46,10 +46,7 @@ impl AskUserRequest {
                 return invalid_interaction("question IDs must be unique");
             }
 
-            let requires_choices = matches!(
-                question.kind,
-                QuestionKind::SingleChoice | QuestionKind::MultipleChoice
-            );
+            let requires_choices = matches!(question.kind, QuestionKind::SingleChoice | QuestionKind::MultipleChoice);
 
             if requires_choices && question.choices.is_empty() {
                 return invalid_interaction("choice questions require suggested choices");
@@ -67,9 +64,7 @@ impl AskUserRequest {
                 .questions
                 .iter()
                 .find(|question| question.id == answer.question_id)
-                .ok_or_else(|| {
-                    invalid_interaction_error("answer references an unknown question")
-                })?;
+                .ok_or_else(|| invalid_interaction_error("answer references an unknown question"))?;
 
             if !answered.insert(answer.question_id.as_str()) {
                 return invalid_interaction("each question may be answered only once");
@@ -80,22 +75,14 @@ impl AskUserRequest {
             }
 
             let has_restricted_choices = !question.choices.is_empty();
-            let contains_unknown_choice = has_restricted_choices
-                && answer
-                    .values
-                    .iter()
-                    .any(|value| !question.choices.contains(value));
+            let contains_unknown_choice =
+                has_restricted_choices && answer.values.iter().any(|value| !question.choices.contains(value));
 
             if contains_unknown_choice {
-                return invalid_interaction(
-                    "answer contains a value outside the suggested choices",
-                );
+                return invalid_interaction("answer contains a value outside the suggested choices");
             }
 
-            let accepts_single_value = matches!(
-                question.kind,
-                QuestionKind::SingleChoice | QuestionKind::Confirmation
-            );
+            let accepts_single_value = matches!(question.kind, QuestionKind::SingleChoice | QuestionKind::Confirmation);
 
             if accepts_single_value && answer.values.len() > 1 {
                 return invalid_interaction("this question accepts only one value");
@@ -158,9 +145,8 @@ pub enum InteractionReply {
     UserAnswers(Vec<QuestionAnswer>),
 }
 
-pub(crate) type InteractionCallback = std::sync::Arc<
-    dyn Fn(InteractionRequest) -> BoxFuture<'static, InteractionReply> + Send + Sync,
->;
+pub(crate) type InteractionCallback =
+    std::sync::Arc<dyn Fn(InteractionRequest) -> BoxFuture<'static, InteractionReply> + Send + Sync>;
 
 fn invalid_interaction<T>(message: &str) -> Result<T, crate::LlmError> {
     Err(invalid_interaction_error(message))

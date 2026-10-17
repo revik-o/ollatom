@@ -62,12 +62,8 @@ where
         arguments: arguments.into_iter().map(Into::into).collect(),
     };
 
-    let authorization = prepare_sandboxed_command_with_options(
-        working_directory,
-        command_invocation,
-        BTreeMap::new(),
-        options,
-    )?;
+    let authorization =
+        prepare_sandboxed_command_with_options(working_directory, command_invocation, BTreeMap::new(), options)?;
 
     execute_sandboxed_command(authorization)
 }
@@ -110,10 +106,8 @@ pub fn prepare_sandboxed_command_with_options(
         ));
     }
 
-    let executable_search_directories = configured_directories(
-        &options.executable_search_directories,
-        "executable search directory",
-    )?;
+    let executable_search_directories =
+        configured_directories(&options.executable_search_directories, "executable search directory")?;
 
     let additional_read_only_directories = configured_directories(
         &options.additional_read_only_directories,
@@ -127,11 +121,10 @@ pub fn prepare_sandboxed_command_with_options(
     trusted_search_directories.extend(executable_search_directories.iter().cloned());
     deduplicate_paths(&mut trusted_search_directories);
 
-    let executable_path =
-        resolve_trusted_executable(&command_invocation.executable, &trusted_search_directories)?;
+    let executable_path = resolve_trusted_executable(&command_invocation.executable, &trusted_search_directories)?;
 
-    let executable_metadata = std::fs::metadata(&executable_path)
-        .map_err(|error| CommandError::InvalidAuthorization(error.to_string()))?;
+    let executable_metadata =
+        std::fs::metadata(&executable_path).map_err(|error| CommandError::InvalidAuthorization(error.to_string()))?;
 
     if !executable_metadata.is_file() {
         return Err(CommandError::InvalidAuthorization(
@@ -139,8 +132,7 @@ pub fn prepare_sandboxed_command_with_options(
         ));
     }
 
-    let environment =
-        build_sanitized_environment(requested_environment, &trusted_search_directories);
+    let environment = build_sanitized_environment(requested_environment, &trusted_search_directories);
 
     Ok(SandboxedCommandAuthorization {
         executable_identity: executable_identity(&executable_path, &executable_metadata)?,
@@ -158,10 +150,7 @@ pub fn prepare_sandboxed_command_with_options(
     })
 }
 
-fn configured_directories(
-    directories: &[PathBuf],
-    description: &str,
-) -> Result<Vec<PathBuf>, CommandError> {
+fn configured_directories(directories: &[PathBuf], description: &str) -> Result<Vec<PathBuf>, CommandError> {
     let mut canonical_directories = Vec::with_capacity(directories.len());
 
     for directory in directories {
@@ -171,8 +160,8 @@ fn configured_directories(
             )));
         }
 
-        let canonical_directory = std::fs::canonicalize(directory)
-            .map_err(|error| CommandError::InvalidAuthorization(error.to_string()))?;
+        let canonical_directory =
+            std::fs::canonicalize(directory).map_err(|error| CommandError::InvalidAuthorization(error.to_string()))?;
 
         let metadata = std::fs::metadata(&canonical_directory)
             .map_err(|error| CommandError::InvalidAuthorization(error.to_string()))?;

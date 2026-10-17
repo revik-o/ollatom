@@ -8,10 +8,7 @@ pub(super) fn merge_native_tool_calls(
     accumulated_tool_calls: &mut BTreeMap<usize, NativeToolCall>,
 ) -> Result<(), LlmError> {
     for (fallback_call_index, native_tool_call) in native_tool_calls.iter().enumerate() {
-        let tool_call_index = native_tool_call
-            .function
-            .index
-            .unwrap_or(fallback_call_index);
+        let tool_call_index = native_tool_call.function.index.unwrap_or(fallback_call_index);
 
         let accumulated_tool_call = accumulated_tool_calls
             .entry(tool_call_index)
@@ -44,10 +41,7 @@ pub(super) fn merge_native_tool_calls(
     Ok(())
 }
 
-fn merge_arguments(
-    current: &mut ToolArgumentAssembly,
-    next: ToolArgumentAssembly,
-) -> Result<(), LlmError> {
+fn merge_arguments(current: &mut ToolArgumentAssembly, next: ToolArgumentAssembly) -> Result<(), LlmError> {
     match (current, next) {
         (current @ ToolArgumentAssembly::Uninitialized, next) => {
             *current = next;
@@ -60,17 +54,17 @@ fn merge_arguments(
             current_fragments.push_str(&next_fragments);
             Ok(())
         }
-        (
-            ToolArgumentAssembly::CompleteObject(current_object),
-            ToolArgumentAssembly::CompleteObject(next_object),
-        ) if current_object.is_empty() => {
+        (ToolArgumentAssembly::CompleteObject(current_object), ToolArgumentAssembly::CompleteObject(next_object))
+            if current_object.is_empty() =>
+        {
             *current_object = next_object;
             Ok(())
         }
-        (
-            ToolArgumentAssembly::CompleteObject(current_object),
-            ToolArgumentAssembly::CompleteObject(next_object),
-        ) if current_object == &next_object => Ok(()),
+        (ToolArgumentAssembly::CompleteObject(current_object), ToolArgumentAssembly::CompleteObject(next_object))
+            if current_object == &next_object =>
+        {
+            Ok(())
+        }
         _ => Err(LlmError::ProviderProtocol(
             "Ollama tool arguments changed representation during streaming".into(),
         )),
@@ -101,9 +95,9 @@ pub(super) fn normalize_tool_call(
 
         while observed_call_identifiers.contains(&tool_call_identifier) {
             tool_call_identifier = format!("{base_identifier}-{collision_suffix}");
-            collision_suffix = collision_suffix.checked_add(1).ok_or_else(|| {
-                LlmError::ProviderProtocol("Ollama tool-call identifier collision overflow".into())
-            })?;
+            collision_suffix = collision_suffix
+                .checked_add(1)
+                .ok_or_else(|| LlmError::ProviderProtocol("Ollama tool-call identifier collision overflow".into()))?;
         }
     }
 
@@ -117,9 +111,7 @@ pub(super) fn normalize_tool_call(
     };
 
     if !tool_arguments.is_object() {
-        return Err(LlmError::InvalidToolArguments(
-            native_tool_call.function.name,
-        ));
+        return Err(LlmError::InvalidToolArguments(native_tool_call.function.name));
     }
 
     Ok(ToolCall {

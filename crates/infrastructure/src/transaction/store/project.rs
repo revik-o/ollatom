@@ -1,11 +1,7 @@
 use super::super::PROJECT_COLUMNS;
-use crate::database::{
-    database_operation_error, format_timestamp, validate_nonblank_value, validate_usage_percentage,
-};
+use crate::database::{database_operation_error, format_timestamp, validate_nonblank_value, validate_usage_percentage};
 use crate::mapping::map_project_row;
-use crate::{
-    InfrastructureResult, Project, ProjectId, ProjectInitializationParameters, ProjectUpdateOptions,
-};
+use crate::{InfrastructureResult, Project, ProjectId, ProjectInitializationParameters, ProjectUpdateOptions};
 use sqlx::{AssertSqlSafe, Sqlite, Transaction};
 use std::path::Path;
 use time::OffsetDateTime;
@@ -32,8 +28,7 @@ pub(crate) async fn create_project(
 
     let (canonical_directory_path, canonical_path_text, filesystem_identity) =
         path::resolve_project_directory(project_path).await?;
-    let (identity_kind, volume_identifier, object_identifier) =
-        path::filesystem_identity_columns(&filesystem_identity);
+    let (identity_kind, volume_identifier, object_identifier) = path::filesystem_identity_columns(&filesystem_identity);
 
     let project_id = ProjectId::new();
     let created_at = OffsetDateTime::now_utc();
@@ -101,8 +96,7 @@ pub(crate) async fn get_project_by_path(
     project_path: &Path,
 ) -> InfrastructureResult<Option<Project>> {
     let (_, _, filesystem_identity) = path::resolve_project_directory(project_path).await?;
-    let (identity_kind, volume_identifier, object_identifier) =
-        path::filesystem_identity_columns(&filesystem_identity);
+    let (identity_kind, volume_identifier, object_identifier) = path::filesystem_identity_columns(&filesystem_identity);
     let query_text = format!(
         "SELECT {PROJECT_COLUMNS} FROM projects WHERE filesystem_identity_kind = ? AND filesystem_volume_identifier = ? AND filesystem_object_identifier = ?"
     );
@@ -121,9 +115,7 @@ pub(crate) async fn update_project(
     database_transaction: &mut Transaction<'static, Sqlite>,
     update_options: ProjectUpdateOptions,
 ) -> InfrastructureResult<Option<Project>> {
-    let Some(existing_project) =
-        get_project_by_id(database_transaction, update_options.project_id).await?
-    else {
+    let Some(existing_project) = get_project_by_id(database_transaction, update_options.project_id).await? else {
         return Ok(None);
     };
 
@@ -163,15 +155,9 @@ pub(crate) async fn update_project(
 
     validate_nonblank_value("project name", &project_name)?;
 
-    validate_usage_percentage(
-        "project CPU usage percentage",
-        execution_settings.cpu_usage_percentage,
-    )?;
+    validate_usage_percentage("project CPU usage percentage", execution_settings.cpu_usage_percentage)?;
 
-    validate_usage_percentage(
-        "project GPU usage percentage",
-        execution_settings.gpu_usage_percentage,
-    )?;
+    validate_usage_percentage("project GPU usage percentage", execution_settings.gpu_usage_percentage)?;
 
     let updated_at = OffsetDateTime::now_utc();
     let updated_at_text = format_timestamp(updated_at)?;

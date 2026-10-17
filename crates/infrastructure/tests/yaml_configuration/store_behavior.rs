@@ -17,17 +17,11 @@ async fn creates_and_reads_nested_configuration_parameters() {
 
     assert_eq!(commit_status, ConfigurationCommitStatus::Succeeded);
     assert_eq!(
-        configuration_store
-            .read_parameter("app.language")
-            .await
-            .unwrap(),
+        configuration_store.read_parameter("app.language").await.unwrap(),
         Some(Value::String("en".to_owned()))
     );
     assert_eq!(
-        configuration_store
-            .read_parameter("app.window.width")
-            .await
-            .unwrap(),
+        configuration_store.read_parameter("app.window.width").await.unwrap(),
         Some(Value::from(1280))
     );
 }
@@ -157,19 +151,15 @@ async fn reads_changes_written_through_an_independent_store() {
 #[tokio::test]
 async fn reads_and_writes_typed_yaml_configuration() {
     let temporary_directory = tempdir().unwrap();
-    let configuration_file =
-        create_typed_yaml_file::<TestConfiguration>("application.yaml", temporary_directory.path())
-            .await
-            .unwrap();
+    let configuration_file = create_typed_yaml_file::<TestConfiguration>("application.yaml", temporary_directory.path())
+        .await
+        .unwrap();
     let expected_configuration = TestConfiguration {
         enabled: true,
         name: "ollatom".to_owned(),
     };
 
-    configuration_file
-        .write(&expected_configuration)
-        .await
-        .unwrap();
+    configuration_file.write(&expected_configuration).await.unwrap();
     let actual_configuration = configuration_file.read().await.unwrap();
 
     assert_eq!(actual_configuration, expected_configuration);
@@ -184,10 +174,9 @@ async fn typed_yaml_supports_scalar_and_sequence_roots() {
     scalar_file.write(&42).await.unwrap();
     assert_eq!(scalar_file.read().await.unwrap(), 42);
 
-    let sequence_file =
-        create_typed_yaml_file::<Vec<u32>>("sequence.yaml", temporary_directory.path())
-            .await
-            .unwrap();
+    let sequence_file = create_typed_yaml_file::<Vec<u32>>("sequence.yaml", temporary_directory.path())
+        .await
+        .unwrap();
     let expected_sequence = vec![1, 2, 3];
     sequence_file.write(&expected_sequence).await.unwrap();
     assert_eq!(sequence_file.read().await.unwrap(), expected_sequence);
@@ -202,17 +191,13 @@ async fn typed_yaml_preserves_complex_keys_and_non_finite_numbers() {
     )
     .await
     .unwrap();
-    let expected_mapping = BTreeMap::from([(
-        BTreeMap::from([("answer".to_owned(), 42)]),
-        "pair".to_owned(),
-    )]);
+    let expected_mapping = BTreeMap::from([(BTreeMap::from([("answer".to_owned(), 42)]), "pair".to_owned())]);
     complex_key_file.write(&expected_mapping).await.unwrap();
     assert_eq!(complex_key_file.read().await.unwrap(), expected_mapping);
 
-    let non_finite_file =
-        create_typed_yaml_file::<f64>("non-finite.yaml", temporary_directory.path())
-            .await
-            .unwrap();
+    let non_finite_file = create_typed_yaml_file::<f64>("non-finite.yaml", temporary_directory.path())
+        .await
+        .unwrap();
     non_finite_file.write(&f64::NAN).await.unwrap();
     assert!(non_finite_file.read().await.unwrap().is_nan());
 }

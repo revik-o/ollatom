@@ -15,8 +15,7 @@ pub use verifier::verify_independent_build;
 pub fn node_toolchain_command_options(
     network_policy: os::SandboxNetworkPolicy,
 ) -> std::io::Result<os::SandboxedCommandOptions> {
-    let path = std::env::var_os("PATH")
-        .ok_or_else(|| std::io::Error::other("benchmark PATH is not configured"))?;
+    let path = std::env::var_os("PATH").ok_or_else(|| std::io::Error::other("benchmark PATH is not configured"))?;
 
     for binary_directory in std::env::split_paths(&path) {
         if !binary_directory.join("node").is_file() || !binary_directory.join("npm").is_file() {
@@ -64,9 +63,7 @@ pub fn programming_toolchain_command_options(
 
     let cargo_binary_directory = std::env::var_os("PATH").and_then(|path| {
         std::env::split_paths(&path).find(|directory| {
-            directory.join("rustup").is_file()
-                && directory.join("rustc").is_file()
-                && directory.join("cargo").is_file()
+            directory.join("rustup").is_file() && directory.join("rustc").is_file() && directory.join("cargo").is_file()
         })
     });
 

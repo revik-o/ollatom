@@ -35,9 +35,7 @@ pub(crate) fn allocate_configuration_commit_identifier(
             }
         })
         .map(ConfigurationCommitIdentifier)
-        .map_err(
-            |_| YamlConfigurationError::ConfigurationCommitIdentifierExhausted {
-                path: file_path.to_owned(),
-            },
-        )
+        .map_err(|_| YamlConfigurationError::ConfigurationCommitIdentifierExhausted {
+            path: file_path.to_owned(),
+        })
 }

@@ -1,7 +1,6 @@
 use llm::{
-    ContextOptions, ContextOverflowPolicy, FinishReason, GenerationOptions, LlmError, LlmOptions,
-    LlmRunOutcome, LocalRuntimeOptions, OptionHandlingMode, ReasoningEffort, RunLimits,
-    TransportOptions,
+    ContextOptions, ContextOverflowPolicy, FinishReason, GenerationOptions, LlmError, LlmOptions, LlmRunOutcome,
+    LocalRuntimeOptions, OptionHandlingMode, ReasoningEffort, RunLimits, TransportOptions,
 };
 use ollama_benchmark::{BenchmarkArtifacts, programming_toolchain_command_options};
 use std::{error::Error, sync::Arc, time::Duration};
@@ -31,8 +30,7 @@ pub(crate) const AVAILABLE_AGENT_TOOL_NAMES: [&str; 7] = [
     "execute_command",
 ];
 pub(crate) const AGENT_COMMAND_TIMEOUT_MILLISECONDS: u64 = 15 * 60 * 1_000;
-pub(crate) const AGENT_COMMAND_TIMEOUT: Duration =
-    Duration::from_millis(AGENT_COMMAND_TIMEOUT_MILLISECONDS);
+pub(crate) const AGENT_COMMAND_TIMEOUT: Duration = Duration::from_millis(AGENT_COMMAND_TIMEOUT_MILLISECONDS);
 const MODEL_KEEP_ALIVE_SECONDS: u64 = 15 * 60;
 pub(crate) type BenchmarkResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 
@@ -40,8 +38,7 @@ pub(crate) type BenchmarkResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 async fn main() -> BenchmarkResult<()> {
     let artifacts = Arc::new(BenchmarkArtifacts::from_current_executable()?);
     artifacts.initialize()?;
-    let model_identifier =
-        std::env::var("OLLAMA_BENCHMARK_MODEL").unwrap_or_else(|_| DEFAULT_MODEL_IDENTIFIER.into());
+    let model_identifier = std::env::var("OLLAMA_BENCHMARK_MODEL").unwrap_or_else(|_| DEFAULT_MODEL_IDENTIFIER.into());
     let ollama_provider = ollama::OllamaProvider::from_environment()?;
     let discovery_runtime = llm::LlmRuntime::builder()
         .provider_with_default(Arc::new(ollama_provider.clone()), model_identifier.clone())
@@ -73,9 +70,7 @@ pub(crate) fn require_completed_outcome(
             if response
                 .assistant_rounds
                 .last()
-                .is_some_and(|assistant_round| {
-                    assistant_round.finish_reason == FinishReason::Stop
-                }) =>
+                .is_some_and(|assistant_round| assistant_round.finish_reason == FinishReason::Stop) =>
         {
             Ok(())
         }
@@ -89,9 +84,7 @@ pub(crate) fn require_completed_outcome(
             )
             .into())
         }
-        Ok(LlmRunOutcome::Cancelled(_)) => {
-            Err(format!("stage {stage_number} LLM run was cancelled").into())
-        }
+        Ok(LlmRunOutcome::Cancelled(_)) => Err(format!("stage {stage_number} LLM run was cancelled").into()),
         Ok(LlmRunOutcome::Failed(failed_run)) => {
             Err(format!("stage {stage_number} LLM run failed: {}", failed_run.error).into())
         }

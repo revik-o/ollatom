@@ -16,10 +16,7 @@ async fn run_response(response: ScriptedResponse, idle_timeout_ms: Option<u64>) 
         ScriptedResponse::json(200, "OK", json!({"capabilities": ["completion"]})),
         response,
     ]);
-    let provider = OllamaProvider::builder()
-        .endpoint(server.endpoint())
-        .build()
-        .unwrap();
+    let provider = OllamaProvider::builder().endpoint(server.endpoint()).build().unwrap();
     let runtime = llm::LlmRuntime::builder()
         .provider_with_default(std::sync::Arc::new(provider), "test-model")
         .build()
@@ -46,17 +43,14 @@ fn require_idle_timeout(outcome: LlmRunOutcome) {
     let LlmRunOutcome::Failed(failed) = outcome else {
         panic!("expected idle timeout")
     };
-    assert!(
-        matches!(failed.error, llm::LlmError::Timeout(message) if message.contains("stream idle timeout"))
-    );
+    assert!(matches!(failed.error, llm::LlmError::Timeout(message) if message.contains("stream idle timeout")));
 }
 
 #[tokio::test]
 async fn idle_timeout_bounds_wait_for_response_headers() {
     require_idle_timeout(
         run_response(
-            ScriptedResponse::stream(frame("done", true))
-                .delayed_headers(Duration::from_millis(300)),
+            ScriptedResponse::stream(frame("done", true)).delayed_headers(Duration::from_millis(300)),
             Some(100),
         )
         .await,
@@ -67,10 +61,7 @@ async fn idle_timeout_bounds_wait_for_response_headers() {
 async fn idle_timeout_bounds_wait_for_first_body_chunk() {
     require_idle_timeout(
         run_response(
-            ScriptedResponse::delayed_stream(vec![(
-                Duration::from_millis(300),
-                frame("done", true),
-            )]),
+            ScriptedResponse::delayed_stream(vec![(Duration::from_millis(300), frame("done", true))]),
             Some(100),
         )
         .await,

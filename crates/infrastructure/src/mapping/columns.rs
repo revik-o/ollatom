@@ -43,10 +43,7 @@ where
     })
 }
 
-pub(super) fn read_integer_boolean(
-    database_row: &SqliteRow,
-    column_name: &str,
-) -> InfrastructureResult<bool> {
+pub(super) fn read_integer_boolean(database_row: &SqliteRow, column_name: &str) -> InfrastructureResult<bool> {
     match read_column::<i64>(database_row, column_name)? {
         0 => Ok(false),
         1 => Ok(true),
@@ -59,8 +56,7 @@ pub(super) fn read_integer_boolean(
 
 pub(super) fn read_u8(database_row: &SqliteRow, column_name: &str) -> InfrastructureResult<u8> {
     let stored_value: i64 = read_column(database_row, column_name)?;
-    let value = u8::try_from(stored_value)
-        .map_err(|source| corrupt_database_value(column_name, source.to_string()))?;
+    let value = u8::try_from(stored_value).map_err(|source| corrupt_database_value(column_name, source.to_string()))?;
 
     if value > 100 {
         return Err(corrupt_database_value(
@@ -72,10 +68,7 @@ pub(super) fn read_u8(database_row: &SqliteRow, column_name: &str) -> Infrastruc
     Ok(value)
 }
 
-pub(super) fn corrupt_database_value(
-    column_name: &str,
-    detail: impl std::fmt::Display,
-) -> InfrastructureError {
+pub(super) fn corrupt_database_value(column_name: &str, detail: impl std::fmt::Display) -> InfrastructureError {
     InfrastructureError::new(
         InfrastructureErrorKind::CorruptDatabaseValue,
         format!("stored column '{column_name}' is corrupt: {detail}"),
@@ -93,10 +86,7 @@ pub(super) fn read_u32(database_row: &SqliteRow, column_name: &str) -> Infrastru
     })
 }
 
-pub(super) fn read_required_optional_u32(
-    database_row: &SqliteRow,
-    column_name: &str,
-) -> InfrastructureResult<u32> {
+pub(super) fn read_required_optional_u32(database_row: &SqliteRow, column_name: &str) -> InfrastructureResult<u32> {
     let stored_value: i64 = read_required_optional_column(database_row, column_name)?;
 
     u32::try_from(stored_value).map_err(|source| {
@@ -107,10 +97,7 @@ pub(super) fn read_required_optional_u32(
     })
 }
 
-pub(super) fn read_nonnegative_u64(
-    database_row: &SqliteRow,
-    column_name: &str,
-) -> InfrastructureResult<u64> {
+pub(super) fn read_nonnegative_u64(database_row: &SqliteRow, column_name: &str) -> InfrastructureResult<u64> {
     let stored_value: i64 = read_column(database_row, column_name)?;
 
     u64::try_from(stored_value).map_err(|source| {

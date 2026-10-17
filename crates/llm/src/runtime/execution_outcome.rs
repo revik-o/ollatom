@@ -1,6 +1,6 @@
 use crate::{
-    FailedRun, LlmError, LlmRunOutcome, PartialResponse, ProviderRunOutcome, ToolExecutionRecord,
-    Usage, events::EventDispatcher,
+    FailedRun, LlmError, LlmRunOutcome, PartialResponse, ProviderRunOutcome, ToolExecutionRecord, Usage,
+    events::EventDispatcher,
 };
 
 pub(super) struct HostResults {
@@ -22,13 +22,10 @@ pub(super) fn attach_host_results(
     host_results: HostResults,
 ) -> ProviderRunOutcome {
     let (usage, tool_executions) = match &mut provider_outcome {
-        ProviderRunOutcome::Completed(response) => {
-            (&mut response.usage, &mut response.tool_executions)
+        ProviderRunOutcome::Completed(response) => (&mut response.usage, &mut response.tool_executions),
+        ProviderRunOutcome::Cancelled(partial_response) => {
+            (&mut partial_response.usage, &mut partial_response.tool_executions)
         }
-        ProviderRunOutcome::Cancelled(partial_response) => (
-            &mut partial_response.usage,
-            &mut partial_response.tool_executions,
-        ),
     };
 
     usage.child_usage.extend(host_results.child_usage);
@@ -48,9 +45,7 @@ pub(super) async fn cancelled_outcome(
         Ok(provider_outcome) => match attach_host_results(provider_outcome, host_results) {
             ProviderRunOutcome::Completed(response) => LlmRunOutcome::Cancelled(response.into()),
 
-            ProviderRunOutcome::Cancelled(partial_response) => {
-                LlmRunOutcome::Cancelled(partial_response)
-            }
+            ProviderRunOutcome::Cancelled(partial_response) => LlmRunOutcome::Cancelled(partial_response),
         },
         Err(_) => {
             let streamed_output = event_dispatcher.streamed_output().await;
@@ -115,10 +110,7 @@ pub(super) async fn failed_outcome(
     })
 }
 
-pub(super) fn empty_cancelled_outcome(
-    provider_id: crate::ProviderId,
-    model_id: crate::ModelId,
-) -> LlmRunOutcome {
+pub(super) fn empty_cancelled_outcome(provider_id: crate::ProviderId, model_id: crate::ModelId) -> LlmRunOutcome {
     LlmRunOutcome::Cancelled(PartialResponse {
         provider: provider_id,
         model: model_id,

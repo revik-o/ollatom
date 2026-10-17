@@ -17,10 +17,7 @@ pub(crate) async fn add_message_from_llm(
     }
 
     for action_input in &action_inputs {
-        validate_batch_action_status_events(
-            &action_input.initial_status,
-            &action_input.status_events,
-        )?;
+        validate_batch_action_status_events(&action_input.initial_status, &action_input.status_events)?;
     }
 
     let message = insert_llm_message(
@@ -82,12 +79,11 @@ pub(crate) async fn complete_llm_message(
 
     validate_in_progress_llm_message(&message)?;
 
-    let action_count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM llm_actions WHERE message_id = ?")
-            .bind(message_id.as_bytes().to_vec())
-            .fetch_one(&mut **database_transaction)
-            .await
-            .map_err(|source| database_operation_error("failed to count LLM actions", source))?;
+    let action_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM llm_actions WHERE message_id = ?")
+        .bind(message_id.as_bytes().to_vec())
+        .fetch_one(&mut **database_transaction)
+        .await
+        .map_err(|source| database_operation_error("failed to count LLM actions", source))?;
 
     if completed_message_contents.trim().is_empty() && action_count == 0 {
         return Err(invalid_message_operation(
@@ -120,13 +116,7 @@ pub(crate) async fn finish_llm_message_unsuccessfully(
 
     validate_in_progress_llm_message(&message)?;
     cancel_unfinished_actions(database_transaction, message_id).await?;
-    update_llm_message_state(
-        database_transaction,
-        message_id,
-        final_state,
-        final_message_contents,
-    )
-    .await?;
+    update_llm_message_state(database_transaction, message_id, final_state, final_message_contents).await?;
 
     load_message_by_id(database_transaction, message_id).await
 }
@@ -139,10 +129,8 @@ pub(crate) async fn insert_llm_message(
     llm_message_state: LlmMessageState,
 ) -> InfrastructureResult<Message> {
     let message_id = MessageId::new();
-    let sequence_number =
-        allocate_next_active_message_sequence_number(database_transaction, chat_id).await?;
-    let response_round_number =
-        allocate_next_llm_response_round_number(database_transaction, user_message_id).await?;
+    let sequence_number = allocate_next_active_message_sequence_number(database_transaction, chat_id).await?;
+    let response_round_number = allocate_next_llm_response_round_number(database_transaction, user_message_id).await?;
     let created_at = OffsetDateTime::now_utc();
     let created_at_text = format_timestamp(created_at)?;
 

@@ -38,10 +38,7 @@ async fn optimization_compacts_history_without_losing_the_active_goal_or_recent_
     let mut context_optimized_event = None;
 
     while let Some(sequenced_event) = events.next().await {
-        if matches!(
-            sequenced_event.event(),
-            Some(RunEvent::ContextOptimized { .. })
-        ) {
+        if matches!(sequenced_event.event(), Some(RunEvent::ContextOptimized { .. })) {
             context_optimized_event = sequenced_event.into_event();
         }
     }
@@ -76,10 +73,7 @@ async fn optimization_compacts_history_without_losing_the_active_goal_or_recent_
     assert!(!optimizer_request.options.context.optimization);
     assert_eq!(optimizer_request.limits.provider_rounds, 1);
     assert_eq!(optimizer_request.limits.total_tool_calls, 0);
-    assert_ne!(
-        optimizer_request.system_prompt.as_deref(),
-        Some("outer system")
-    );
+    assert_ne!(optimizer_request.system_prompt.as_deref(), Some("outer system"));
 }
 
 #[tokio::test]
@@ -103,10 +97,7 @@ async fn disabled_optimization_returns_lossless_history_without_a_child_request(
     let mut optimization_event_was_emitted = false;
 
     while let Some(sequenced_event) = events.next().await {
-        optimization_event_was_emitted |= matches!(
-            sequenced_event.event(),
-            Some(RunEvent::ContextOptimized { .. })
-        );
+        optimization_event_was_emitted |= matches!(sequenced_event.event(), Some(RunEvent::ContextOptimized { .. }));
     }
 
     let outcome = provider.optimization_outcome();

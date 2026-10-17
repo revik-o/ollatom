@@ -1,8 +1,6 @@
 use crate::api::application_infrastructure;
 #[cfg(target_os = "linux")]
-use crate::api::gtk_window_controls::{
-    GtkWindowControls, GtkWindowControlsSide, parse_gtk_window_controls,
-};
+use crate::api::gtk_window_controls::{GtkWindowControls, GtkWindowControlsSide, parse_gtk_window_controls};
 use infrastructure::JsonConfigurationStore;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -143,9 +141,7 @@ pub(crate) fn initialize(application: &mut tauri::App) -> Result<(), Box<dyn Err
 }
 
 #[tauri::command]
-pub(crate) async fn wait_for_background_ready(
-    startup: State<'_, StartupState>,
-) -> Result<StartupSnapshot, String> {
+pub(crate) async fn wait_for_background_ready(startup: State<'_, StartupState>) -> Result<StartupSnapshot, String> {
     startup.resources().await?;
     startup.snapshot()
 }

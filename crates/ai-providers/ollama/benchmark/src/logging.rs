@@ -55,8 +55,7 @@ impl StageLogger {
     }
 
     pub fn write_event(&self, sequenced_event: &SequencedEvent) -> io::Result<()> {
-        let event_data =
-            serde_json::to_value(&sequenced_event.event).map_err(event_serialization_error)?;
+        let event_data = serde_json::to_value(&sequenced_event.event).map_err(event_serialization_error)?;
         let serialized_event = match &sequenced_event.event {
             RunEvent::Tool(ToolEvent::Planned { call }) => serde_json::json!({
                 "run_id": sequenced_event.run_id,
@@ -85,9 +84,7 @@ impl StageLogger {
             }),
             RunEvent::Tool(ToolEvent::Finished { output }) => {
                 let (call_id, content, error) = match output {
-                    ToolOutput::Success { call_id, content } => {
-                        (call_id, content.clone(), serde_json::Value::Null)
-                    }
+                    ToolOutput::Success { call_id, content } => (call_id, content.clone(), serde_json::Value::Null),
                     ToolOutput::Failure { call_id, error } => (
                         call_id,
                         serde_json::Value::Null,
@@ -112,9 +109,7 @@ impl StageLogger {
                 "event_data": event_data,
             }),
         };
-        self.write_line(
-            serde_json::to_string(&serialized_event).map_err(event_serialization_error)?,
-        )
+        self.write_line(serde_json::to_string(&serialized_event).map_err(event_serialization_error)?)
     }
 }
 
@@ -145,16 +140,14 @@ pub enum AgentStageBuildStatus {
 impl ModelToolActivity {
     pub fn record(&mut self, event: &RunEvent) {
         match event {
-            RunEvent::Tool(ToolEvent::Planned { call })
-            | RunEvent::Tool(ToolEvent::Started { call }) => {
+            RunEvent::Tool(ToolEvent::Planned { call }) | RunEvent::Tool(ToolEvent::Started { call }) => {
                 if self.tool_call_identifiers.insert(call.id.clone()) {
                     self.invocation_count = self.invocation_count.saturating_add(1);
                 }
 
                 if is_node_command_call(call) {
                     if self.node_command_call_identifiers.insert(call.id.clone()) {
-                        self.node_command_attempt_count =
-                            self.node_command_attempt_count.saturating_add(1);
+                        self.node_command_attempt_count = self.node_command_attempt_count.saturating_add(1);
                     }
 
                     if let Some(program) = command_arguments(call).get(2) {
@@ -176,45 +169,32 @@ impl ModelToolActivity {
                 }
             }
             RunEvent::Tool(ToolEvent::Finished { output }) => {
-                if self
-                    .node_command_call_identifiers
-                    .contains(output.call_id())
+                if self.node_command_call_identifiers.contains(output.call_id())
                     && self
                         .finished_node_command_call_identifiers
                         .insert(output.call_id().to_owned())
                     && self
                         .node_command_programs
                         .get(output.call_id())
-                        .is_some_and(|program| {
-                            tool_output_indicates_unavailable_tool(output, program)
-                        })
+                        .is_some_and(|program| tool_output_indicates_unavailable_tool(output, program))
                 {
-                    self.unavailable_node_command_attempt_count = self
-                        .unavailable_node_command_attempt_count
-                        .saturating_add(1);
+                    self.unavailable_node_command_attempt_count =
+                        self.unavailable_node_command_attempt_count.saturating_add(1);
                 }
 
                 if self.build_call_identifiers.contains(output.call_id())
-                    && self
-                        .finished_build_call_identifiers
-                        .insert(output.call_id().to_owned())
+                    && self.finished_build_call_identifiers.insert(output.call_id().to_owned())
                 {
                     if tool_output_is_successful_build(output) {
                         self.successful_build_count = self.successful_build_count.saturating_add(1);
                     }
                 }
 
-                if self
-                    .rustc_version_call_identifiers
-                    .contains(output.call_id())
-                {
+                if self.rustc_version_call_identifiers.contains(output.call_id()) {
                     self.rustc_version_output = tool_output_version(output, "rustc ");
                 }
 
-                if self
-                    .cargo_version_call_identifiers
-                    .contains(output.call_id())
-                {
+                if self.cargo_version_call_identifiers.contains(output.call_id()) {
                     self.cargo_version_output = tool_output_version(output, "cargo ");
                 }
             }
@@ -222,10 +202,7 @@ impl ModelToolActivity {
         }
     }
 
-    pub fn require_successful_agent_stage(
-        &self,
-        stage_number: u8,
-    ) -> Result<AgentStageBuildStatus, String> {
+    pub fn require_successful_agent_stage(&self, stage_number: u8) -> Result<AgentStageBuildStatus, String> {
         if self.invocation_count == 0 {
             return Err(format!("stage {stage_number} had no model tool invocation"));
         }
@@ -246,16 +223,15 @@ impl ModelToolActivity {
         ))
     }
 
-    pub fn require_rust_toolchain_versions(
-        &self,
-        stage_number: u8,
-    ) -> Result<(&str, &str), String> {
-        let rustc_version = self.rustc_version_output.as_deref().ok_or_else(|| {
-            format!("stage {stage_number} did not print the rustc version through mise")
-        })?;
-        let cargo_version = self.cargo_version_output.as_deref().ok_or_else(|| {
-            format!("stage {stage_number} did not print the cargo version through mise")
-        })?;
+    pub fn require_rust_toolchain_versions(&self, stage_number: u8) -> Result<(&str, &str), String> {
+        let rustc_version = self
+            .rustc_version_output
+            .as_deref()
+            .ok_or_else(|| format!("stage {stage_number} did not print the rustc version through mise"))?;
+        let cargo_version = self
+            .cargo_version_output
+            .as_deref()
+            .ok_or_else(|| format!("stage {stage_number} did not print the cargo version through mise"))?;
 
         Ok((rustc_version, cargo_version))
     }
@@ -312,21 +288,14 @@ fn is_mise_version_call(call: &llm::ToolCall, executable: &str) -> bool {
 }
 
 fn command_program(call: &llm::ToolCall) -> Option<&str> {
-    call.arguments
-        .get("program")
-        .and_then(serde_json::Value::as_str)
+    call.arguments.get("program").and_then(serde_json::Value::as_str)
 }
 
 fn command_arguments(call: &llm::ToolCall) -> Vec<&str> {
     call.arguments
         .get("arguments")
         .and_then(serde_json::Value::as_array)
-        .map(|arguments| {
-            arguments
-                .iter()
-                .filter_map(serde_json::Value::as_str)
-                .collect()
-        })
+        .map(|arguments| arguments.iter().filter_map(serde_json::Value::as_str).collect())
         .unwrap_or_default()
 }
 

@@ -1,6 +1,6 @@
 use super::{
-    CALLBACK_QUEUE_CAPACITY, EventCallback, EventCallbacks, RunEvent, RunEventDeliveryFailure,
-    RunEventSink, RunEventStream, RunId, SequencedEvent, StreamedOutput, ToolEvent,
+    CALLBACK_QUEUE_CAPACITY, EventCallback, EventCallbacks, RunEvent, RunEventDeliveryFailure, RunEventSink,
+    RunEventStream, RunId, SequencedEvent, StreamedOutput, ToolEvent,
 };
 use crate::{AssistantRound, LlmError};
 use std::sync::Arc;
@@ -102,8 +102,7 @@ impl EventDispatcher {
                 callback_senders: OnceCell::new(),
                 event_queue,
                 overall_deadline,
-                event_delivery_timeout: event_delivery_timeout
-                    .unwrap_or(DEFAULT_EVENT_DELIVERY_TIMEOUT),
+                event_delivery_timeout: event_delivery_timeout.unwrap_or(DEFAULT_EVENT_DELIVERY_TIMEOUT),
             },
             stream,
         )
@@ -112,10 +111,7 @@ impl EventDispatcher {
         self.emit_with_durable_ack(event).await.1
     }
 
-    pub(crate) async fn emit_with_durable_ack(
-        &self,
-        event: RunEvent,
-    ) -> (bool, Result<(), LlmError>) {
+    pub(crate) async fn emit_with_durable_ack(&self, event: RunEvent) -> (bool, Result<(), LlmError>) {
         let event_delivery_deadline = Instant::now().checked_add(self.event_delivery_timeout);
         let mut state = match self.lock_for_event_delivery(event_delivery_deadline).await {
             Ok(state) => state,
@@ -125,9 +121,7 @@ impl EventDispatcher {
         if state.terminal {
             return (
                 false,
-                Err(LlmError::ProviderProtocol(
-                    "event emitted after terminal event".into(),
-                )),
+                Err(LlmError::ProviderProtocol("event emitted after terminal event".into())),
             );
         }
 
@@ -154,20 +148,13 @@ impl EventDispatcher {
         let next_sequence = match sequenced_event.sequence.checked_add(1) {
             Some(next_sequence) => next_sequence,
             None => {
-                return (
-                    false,
-                    Err(LlmError::ProviderProtocol("event sequence overflow".into())),
-                );
+                return (false, Err(LlmError::ProviderProtocol("event sequence overflow".into())));
             }
         };
 
         if let Some(event_sink) = &self.event_sink
             && let Err(error) = self
-                .persist_before_deadline(
-                    event_sink,
-                    sequenced_event.clone(),
-                    event_delivery_deadline,
-                )
+                .persist_before_deadline(event_sink, sequenced_event.clone(), event_delivery_deadline)
                 .await
         {
             state.pending_delivery = Some(sequenced_event.clone());
@@ -192,8 +179,7 @@ impl EventDispatcher {
                     .iter()
                     .cloned()
                     .map(|callback| {
-                        let (callback_sender, mut callback_receiver) =
-                            mpsc::channel(CALLBACK_QUEUE_CAPACITY);
+                        let (callback_sender, mut callback_receiver) = mpsc::channel(CALLBACK_QUEUE_CAPACITY);
 
                         tokio::spawn(async move {
                             while let Some(callback_event) = callback_receiver.recv().await {

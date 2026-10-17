@@ -123,9 +123,7 @@ fn select_model_entry<'a>(
     }
 }
 
-fn index_running_models(
-    running_models: &[NativeModelListEntry],
-) -> HashMap<&str, &NativeModelListEntry> {
+fn index_running_models(running_models: &[NativeModelListEntry]) -> HashMap<&str, &NativeModelListEntry> {
     let mut running_by_name = HashMap::new();
 
     for running_model in running_models {
@@ -143,16 +141,13 @@ fn find_running_model<'a>(
     model_tag: &NativeModelListEntry,
     running_by_name: &HashMap<&'a str, &'a NativeModelListEntry>,
 ) -> Option<&'a NativeModelListEntry> {
-    running_by_name
-        .get(model_tag.name.as_str())
-        .copied()
-        .or_else(|| {
-            model_tag
-                .model
-                .as_deref()
-                .and_then(|model_identifier| running_by_name.get(model_identifier))
-                .copied()
-        })
+    running_by_name.get(model_tag.name.as_str()).copied().or_else(|| {
+        model_tag
+            .model
+            .as_deref()
+            .and_then(|model_identifier| running_by_name.get(model_identifier))
+            .copied()
+    })
 }
 
 fn append_unlisted_running_models(
@@ -178,11 +173,7 @@ fn append_unlisted_running_models(
             continue;
         }
 
-        if !model_matches_scope(
-            scope,
-            native_model_is_remote(None, Some(running_model)),
-            true,
-        ) {
+        if !model_matches_scope(scope, native_model_is_remote(None, Some(running_model)), true) {
             continue;
         }
 

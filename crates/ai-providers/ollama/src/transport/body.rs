@@ -13,9 +13,7 @@ pub(super) async fn read_bounded_json_body(
                     return Err(llm::LlmError::Cancelled);
                 }
                 llm::ControlledFutureOutcome::TimedOut => unreachable!(),
-                llm::ControlledFutureOutcome::Completed(result) => {
-                    result.map_err(protocol_error)?
-                }
+                llm::ControlledFutureOutcome::Completed(result) => result.map_err(protocol_error)?,
             }
         } else {
             response.chunk().await.map_err(protocol_error)?
@@ -28,9 +26,7 @@ pub(super) async fn read_bounded_json_body(
         let updated_byte_count = response_body
             .len()
             .checked_add(response_chunk.len())
-            .ok_or_else(|| {
-                llm::LlmError::ProviderProtocol("Ollama response size overflow".into())
-            })?;
+            .ok_or_else(|| llm::LlmError::ProviderProtocol("Ollama response size overflow".into()))?;
 
         if updated_byte_count > MAXIMUM_JSON_RESPONSE_BYTE_COUNT {
             return Err(llm::LlmError::ProviderProtocol(

@@ -100,9 +100,8 @@ impl LlmProvider for OptimizationProvider {
         _stop: StopToken,
     ) -> BoxFuture<'_, Result<ProviderRunOutcome, LlmError>> {
         self.recorded_requests.lock().unwrap().push(request.clone());
-        let is_summary_request = request.limits.provider_rounds == 1
-            && request.limits.total_tool_calls == 0
-            && request.tools.is_empty();
+        let is_summary_request =
+            request.limits.provider_rounds == 1 && request.limits.total_tool_calls == 0 && request.tools.is_empty();
         let history = self.history.clone();
         let optimization_outcome = self.optimization_outcome.clone();
         let summary_call_count = self.summary_call_count.clone();
@@ -120,8 +119,7 @@ impl LlmProvider for OptimizationProvider {
                     total_tokens: Some(7),
                     ..Usage::default()
                 };
-                host.emit(RunEvent::ResponseDelta("compact summary".into()))
-                    .await?;
+                host.emit(RunEvent::ResponseDelta("compact summary".into())).await?;
                 host.emit(RunEvent::Usage(usage.clone())).await?;
                 let finish_reason = *summary_finish_reason.lock().unwrap();
                 return Ok(ProviderRunOutcome::Completed(response_with_finish_reason(
@@ -152,25 +150,16 @@ impl LlmProvider for OptimizationProvider {
 pub fn optimization_history() -> Vec<ConversationMessage> {
     vec![
         message(ConversationRole::User, ContentBlock::text("prior goal")),
-        message(
-            ConversationRole::Assistant,
-            ContentBlock::text("prior answer"),
-        ),
+        message(ConversationRole::Assistant, ContentBlock::text("prior answer")),
         message(ConversationRole::User, ContentBlock::text("active goal")),
         tool_call_message("old-call"),
         tool_result_message("old-call"),
-        message(
-            ConversationRole::Assistant,
-            ContentBlock::text("older state"),
-        ),
+        message(ConversationRole::Assistant, ContentBlock::text("older state")),
         tool_call_message("recent-call-one"),
         tool_result_message("recent-call-one"),
         tool_call_message("recent-call-two"),
         tool_result_message("recent-call-two"),
-        message(
-            ConversationRole::Assistant,
-            ContentBlock::text("recent state"),
-        ),
+        message(ConversationRole::Assistant, ContentBlock::text("recent state")),
     ]
 }
 

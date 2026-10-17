@@ -47,10 +47,7 @@ impl StartupState {
             .map_err(|_| "window startup state is unavailable".to_owned())
     }
 
-    pub(super) fn update_backdrop(
-        &self,
-        backdrop: BackdropKind,
-    ) -> Result<StartupSnapshot, String> {
+    pub(super) fn update_backdrop(&self, backdrop: BackdropKind) -> Result<StartupSnapshot, String> {
         let mut snapshot = self
             .snapshot
             .lock()

@@ -1,9 +1,8 @@
 use crate::{
-    AskUserRequest, AvailabilityReport, BoxFuture, ContextOptimizationOutcome,
-    ContextOptimizationRequest, ConversationMessage, InvokeSubagentRequest, LlmError, LlmOptions,
-    LlmResponse, ModelId, ModelInfo, ModelScope, PartialResponse, ProviderCapabilities, ProviderId,
-    QuestionAnswer, RunEvent, RunId, StopToken, SubagentOutcome, ToolCall, ToolDefinition,
-    ToolOutput, TransportOptions, UserMessage,
+    AskUserRequest, AvailabilityReport, BoxFuture, ContextOptimizationOutcome, ContextOptimizationRequest,
+    ConversationMessage, InvokeSubagentRequest, LlmError, LlmOptions, LlmResponse, ModelId, ModelInfo, ModelScope,
+    PartialResponse, ProviderCapabilities, ProviderId, QuestionAnswer, RunEvent, RunId, StopToken, SubagentOutcome,
+    ToolCall, ToolDefinition, ToolOutput, TransportOptions, UserMessage,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -80,21 +79,11 @@ pub trait ProviderRunHost: Send + Sync {
 
     fn begin_round(&self, round: u16) -> BoxFuture<'_, Result<(), LlmError>>;
 
-    fn execute_tool_round(
-        &self,
-        round: u16,
-        calls: Vec<ToolCall>,
-    ) -> BoxFuture<'_, Result<Vec<ToolOutput>, LlmError>>;
+    fn execute_tool_round(&self, round: u16, calls: Vec<ToolCall>) -> BoxFuture<'_, Result<Vec<ToolOutput>, LlmError>>;
 
-    fn ask_user(
-        &self,
-        request: AskUserRequest,
-    ) -> BoxFuture<'_, Result<Vec<QuestionAnswer>, LlmError>>;
+    fn ask_user(&self, request: AskUserRequest) -> BoxFuture<'_, Result<Vec<QuestionAnswer>, LlmError>>;
 
-    fn invoke_subagent(
-        &self,
-        request: InvokeSubagentRequest,
-    ) -> BoxFuture<'_, Result<SubagentOutcome, LlmError>>;
+    fn invoke_subagent(&self, request: InvokeSubagentRequest) -> BoxFuture<'_, Result<SubagentOutcome, LlmError>>;
 
     fn optimize_context(
         &self,

@@ -18,9 +18,7 @@ pub(super) fn inferred_value<ValueType>(value: ValueType) -> NormalizedValue<Val
     }
 }
 
-pub(super) fn optional_api_reported_value<ValueType>(
-    value: Option<ValueType>,
-) -> NormalizedValue<ValueType> {
+pub(super) fn optional_api_reported_value<ValueType>(value: Option<ValueType>) -> NormalizedValue<ValueType> {
     match value {
         Some(value) => api_reported_value(value),
         None => unknown_value(),
@@ -49,17 +47,13 @@ pub(super) fn normalized_display_name(
     }
 }
 
-pub(super) fn normalized_context_window(
-    sources: &ModelInformationSources<'_>,
-) -> NormalizedValue<u32> {
+pub(super) fn normalized_context_window(sources: &ModelInformationSources<'_>) -> NormalizedValue<u32> {
     let context_window = first_unsigned_integer([
         sources
             .architecture_information
             .and_then(|value| value.get("context_length")),
         sources.model_details.get("context_length"),
-        sources
-            .model_tag
-            .and_then(|value| value.get("context_length")),
+        sources.model_tag.and_then(|value| value.get("context_length")),
     ])
     .or_else(|| {
         sources
@@ -72,17 +66,13 @@ pub(super) fn normalized_context_window(
     optional_api_reported_value(context_window)
 }
 
-pub(super) fn normalized_maximum_output_tokens(
-    sources: &ModelInformationSources<'_>,
-) -> NormalizedValue<u32> {
+pub(super) fn normalized_maximum_output_tokens(sources: &ModelInformationSources<'_>) -> NormalizedValue<u32> {
     let maximum_output_tokens = first_unsigned_integer([
         sources
             .architecture_information
             .and_then(|value| value.get("max_output_tokens")),
         sources.model_details.get("max_output_tokens"),
-        sources
-            .details
-            .and_then(|value| value.get("max_output_tokens")),
+        sources.details.and_then(|value| value.get("max_output_tokens")),
     ])
     .or_else(|| {
         sources
@@ -95,17 +85,11 @@ pub(super) fn normalized_maximum_output_tokens(
     optional_api_reported_value(maximum_output_tokens)
 }
 
-pub(super) fn normalized_quantization(
-    sources: &ModelInformationSources<'_>,
-) -> NormalizedValue<String> {
+pub(super) fn normalized_quantization(sources: &ModelInformationSources<'_>) -> NormalizedValue<String> {
     optional_api_reported_value(first_string([
-        sources
-            .details
-            .and_then(|value| value.get("quantization_level")),
+        sources.details.and_then(|value| value.get("quantization_level")),
         sources.details.and_then(|value| value.get("quantization")),
-        sources
-            .model_tag
-            .and_then(|value| value.get("quantization_level")),
+        sources.model_tag.and_then(|value| value.get("quantization_level")),
     ]))
 }
 
@@ -124,8 +108,7 @@ pub(super) fn normalized_owner(
 
     match reported_owner {
         Some(owner) => api_reported_value(owner),
-        None => match super::metadata_values::derive_owner_from_model_id(model_identifier.as_str())
-        {
+        None => match super::metadata_values::derive_owner_from_model_id(model_identifier.as_str()) {
             Some(owner) => inferred_value(owner),
             None => unknown_value(),
         },

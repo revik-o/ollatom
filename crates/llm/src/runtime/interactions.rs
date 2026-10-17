@@ -1,6 +1,6 @@
 use crate::{
-    InteractionId, InteractionReply, InteractionRequest, LlmError, RunEvent, StopToken,
-    events::EventDispatcher, ids::allocate_monotonic_identifier,
+    InteractionId, InteractionReply, InteractionRequest, LlmError, RunEvent, StopToken, events::EventDispatcher,
+    ids::allocate_monotonic_identifier,
 };
 use std::{
     collections::BTreeMap,
@@ -20,8 +20,7 @@ struct PendingInteractionGuard<'hub> {
 
 impl Drop for PendingInteractionGuard<'_> {
     fn drop(&mut self) {
-        self.interaction_hub
-            .remove_pending_interaction(self.interaction_id);
+        self.interaction_hub.remove_pending_interaction(self.interaction_id);
     }
 }
 
@@ -42,8 +41,7 @@ impl InteractionHub {
     where
         CreateRequest: FnOnce(InteractionId) -> InteractionRequest,
     {
-        let interaction_id =
-            InteractionId(allocate_monotonic_identifier(&self.next_id, "interaction")?);
+        let interaction_id = InteractionId(allocate_monotonic_identifier(&self.next_id, "interaction")?);
         let (reply_sender, reply_receiver) = oneshot::channel();
 
         self.pending
@@ -57,9 +55,7 @@ impl InteractionHub {
         };
 
         event_dispatcher
-            .emit(RunEvent::InteractionRequested(create_request(
-                interaction_id,
-            )))
+            .emit(RunEvent::InteractionRequested(create_request(interaction_id)))
             .await?;
 
         tokio::select! {
@@ -70,11 +66,7 @@ impl InteractionHub {
         }
     }
 
-    pub fn resolve_interaction(
-        &self,
-        interaction_id: InteractionId,
-        reply: InteractionReply,
-    ) -> Result<(), LlmError> {
+    pub fn resolve_interaction(&self, interaction_id: InteractionId, reply: InteractionReply) -> Result<(), LlmError> {
         let reply_sender = self
             .pending
             .lock()

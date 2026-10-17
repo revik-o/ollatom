@@ -109,12 +109,8 @@ impl BenchmarkArtifacts {
     }
 
     pub fn require_owned_project(&self) -> io::Result<()> {
-        let metadata = fs::symlink_metadata(&self.project_root).map_err(|error| {
-            io::Error::new(
-                error.kind(),
-                format!("benchmark project is unavailable: {error}"),
-            )
-        })?;
+        let metadata = fs::symlink_metadata(&self.project_root)
+            .map_err(|error| io::Error::new(error.kind(), format!("benchmark project is unavailable: {error}")))?;
 
         Self::require_regular_project_directory(&metadata)?;
         self.require_ownership_marker()
@@ -224,10 +220,7 @@ impl BenchmarkArtifacts {
     }
 
     fn write_temporary_ownership_marker(temporary_marker: &Path) -> io::Result<()> {
-        let mut marker_file = OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(temporary_marker)?;
+        let mut marker_file = OpenOptions::new().create_new(true).write(true).open(temporary_marker)?;
 
         marker_file.write_all(OWNERSHIP_MARKER_CONTENT.as_bytes())?;
         marker_file.sync_all()
@@ -239,10 +232,8 @@ impl BenchmarkArtifacts {
             .unwrap_or_default()
             .as_nanos();
 
-        self.ownership_marker.with_extension(format!(
-            "benchmark-owned.{}.{timestamp}.tmp",
-            std::process::id()
-        ))
+        self.ownership_marker
+            .with_extension(format!("benchmark-owned.{}.{timestamp}.tmp", std::process::id()))
     }
 }
 

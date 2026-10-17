@@ -1,7 +1,7 @@
 use crate::{
-    AskUserRequest, AssistantRound, ContextOptimizationOutcome, ContextOptimizationRequest,
-    FinishReason, InvokeSubagentRequest, LlmError, ProviderRunHost, QuestionAnswer, RunEvent,
-    StopToken, SubagentOutcome, ToolCall, ToolOutput, Usage,
+    AskUserRequest, AssistantRound, ContextOptimizationOutcome, ContextOptimizationRequest, FinishReason,
+    InvokeSubagentRequest, LlmError, ProviderRunHost, QuestionAnswer, RunEvent, StopToken, SubagentOutcome, ToolCall,
+    ToolOutput, Usage,
 };
 use tokio::sync::Mutex;
 
@@ -20,10 +20,7 @@ impl ContextOptimizationProviderHost {
         }
     }
 
-    pub(super) async fn complete_response(
-        &self,
-        context_optimization_response: &mut crate::LlmResponse,
-    ) {
+    pub(super) async fn complete_response(&self, context_optimization_response: &mut crate::LlmResponse) {
         let streamed_round = self.streamed_round.lock().await.clone();
         let latest_usage = self.latest_usage.lock().await.clone();
 
@@ -38,12 +35,8 @@ impl ContextOptimizationProviderHost {
                 streamed_round.usage = latest_usage.clone();
             }
 
-            context_optimization_response
-                .assistant_rounds
-                .push(streamed_round);
-        } else if let Some(assistant_round) =
-            context_optimization_response.assistant_rounds.last_mut()
-        {
+            context_optimization_response.assistant_rounds.push(streamed_round);
+        } else if let Some(assistant_round) = context_optimization_response.assistant_rounds.last_mut() {
             if assistant_round.text.is_empty() {
                 assistant_round.text = streamed_round.text;
             }
@@ -80,11 +73,7 @@ impl ProviderRunHost for ContextOptimizationProviderHost {
 
             match event {
                 RunEvent::ResponseDelta(response_delta) => {
-                    self.streamed_round
-                        .lock()
-                        .await
-                        .text
-                        .push_str(&response_delta);
+                    self.streamed_round.lock().await.text.push_str(&response_delta);
                 }
                 RunEvent::ReasoningSummaryDelta(reasoning_delta) => {
                     self.streamed_round

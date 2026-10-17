@@ -4,14 +4,13 @@ use crate::{
     content_history::native_messages_from_history,
     provider::OllamaProvider,
     request::{
-        build_options, context_input_limit, estimate_serialized_tokens, model_is_gemma_four,
-        validate_model_features,
+        build_options, context_input_limit, estimate_serialized_tokens, model_is_gemma_four, validate_model_features,
     },
     run_request::{ConversationHistory, optimize_context_if_needed},
 };
 use llm::{
-    ContextOverflowPolicy, LlmError, LocalOptionPhase, OptionHandlingMode, ProviderRunHost,
-    ProviderRunRequest, RunEvent, StopToken,
+    ContextOverflowPolicy, LlmError, LocalOptionPhase, OptionHandlingMode, ProviderRunHost, ProviderRunRequest,
+    RunEvent, StopToken,
 };
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -85,9 +84,7 @@ async fn emit_omitted_option_warnings(
 ) -> Result<(), LlmError> {
     if request.options.reasoning.budget_tokens.is_some() {
         if request.options.handling == OptionHandlingMode::Strict {
-            return Err(LlmError::UnsupportedOption(
-                "reasoning.budget_tokens".into(),
-            ));
+            return Err(LlmError::UnsupportedOption("reasoning.budget_tokens".into()));
         }
 
         host.emit(RunEvent::Warning(
@@ -96,8 +93,7 @@ async fn emit_omitted_option_warnings(
         .await?;
     }
 
-    if request.options.context.input_token_budget.is_some()
-        && request.options.handling == OptionHandlingMode::BestEffort
+    if request.options.context.input_token_budget.is_some() && request.options.handling == OptionHandlingMode::BestEffort
     {
         host.emit(RunEvent::Warning(
             "input token budgets are not supported by Ollama and were omitted".into(),

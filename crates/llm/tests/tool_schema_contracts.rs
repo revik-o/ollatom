@@ -1,6 +1,6 @@
 use llm::{
-    AuthorizationGrant, BoxFuture, LlmError, Tool, ToolCall, ToolDefinition, ToolFailure,
-    ToolOutput, ToolPlan, ToolRegistry,
+    AuthorizationGrant, BoxFuture, LlmError, Tool, ToolCall, ToolDefinition, ToolFailure, ToolOutput, ToolPlan,
+    ToolRegistry,
 };
 use std::sync::{
     Arc,

@@ -5,9 +5,8 @@ use super::{
     transport::response_error,
 };
 use llm::{
-    AssistantRound, ContextOptimizationRequest, ConversationMessage, ConversationRole, LlmError,
-    ProviderRunHost, ProviderRunRequest, StopToken, ToolCall, ToolOutput,
-    append_tool_round_to_history,
+    AssistantRound, ContextOptimizationRequest, ConversationMessage, ConversationRole, LlmError, ProviderRunHost,
+    ProviderRunRequest, StopToken, ToolCall, ToolOutput, append_tool_round_to_history,
 };
 use reqwest::{Method, Response};
 use serde_json::{Map, Value, json};
@@ -21,12 +20,11 @@ pub(super) fn create_native_chat_request_body(
     native_options: &Map<String, Value>,
     native_reasoning: Option<&Value>,
 ) -> Result<Value, LlmError> {
-    let mut request_body =
-        json!({"model": request.model.as_str(), "messages": native_messages, "stream": true});
+    let mut request_body = json!({"model": request.model.as_str(), "messages": native_messages, "stream": true});
 
     if !native_tools.is_empty() {
-        request_body["tools"] = serde_json::to_value(native_tools)
-            .map_err(|error| LlmError::ProviderProtocol(error.to_string()))?;
+        request_body["tools"] =
+            serde_json::to_value(native_tools).map_err(|error| LlmError::ProviderProtocol(error.to_string()))?;
     }
 
     let mut generation_options = native_options.clone();
@@ -58,9 +56,7 @@ pub(super) async fn send_native_chat_request(
     stop: &StopToken,
     request_body: Value,
 ) -> Result<Response, LlmError> {
-    let request_builder = if let Some(connection_timeout_milliseconds) =
-        request.options.transport.connect_timeout_ms
-    {
+    let request_builder = if let Some(connection_timeout_milliseconds) = request.options.transport.connect_timeout_ms {
         provider.request_with_connection_timeout(
             Method::POST,
             "api/chat",
@@ -72,24 +68,20 @@ pub(super) async fn send_native_chat_request(
 
     let send_request = provider.send_request(request_builder.json(&request_body), Some(stop), None);
 
-    let response =
-        if let Some(timeout_milliseconds) = request.options.transport.stream_idle_timeout_ms {
-            match stop
-                .run_until_cancelled_or_timeout(
-                    Duration::from_millis(timeout_milliseconds),
-                    send_request,
-                )
-                .await
-            {
-                llm::ControlledFutureOutcome::Completed(response) => response?,
-                llm::ControlledFutureOutcome::Cancelled => return Err(LlmError::Cancelled),
-                llm::ControlledFutureOutcome::TimedOut => {
-                    return Err(LlmError::Timeout("Ollama stream idle timeout".into()));
-                }
+    let response = if let Some(timeout_milliseconds) = request.options.transport.stream_idle_timeout_ms {
+        match stop
+            .run_until_cancelled_or_timeout(Duration::from_millis(timeout_milliseconds), send_request)
+            .await
+        {
+            llm::ControlledFutureOutcome::Completed(response) => response?,
+            llm::ControlledFutureOutcome::Cancelled => return Err(LlmError::Cancelled),
+            llm::ControlledFutureOutcome::TimedOut => {
+                return Err(LlmError::Timeout("Ollama stream idle timeout".into()));
             }
-        } else {
-            send_request.await?
-        };
+        }
+    } else {
+        send_request.await?
+    };
 
     if !response.status().is_success() {
         return Err(response_error(response.status(), Some(&request.model)));
@@ -150,11 +142,7 @@ pub(super) async fn optimize_context_if_needed(
     };
 
     if !request.options.context.optimization
-        || !context_pressure_reached(
-            observed_input_tokens,
-            estimated_additional_tokens,
-            input_token_limit,
-        )
+        || !context_pressure_reached(observed_input_tokens, estimated_additional_tokens, input_token_limit)
     {
         return Ok(false);
     }

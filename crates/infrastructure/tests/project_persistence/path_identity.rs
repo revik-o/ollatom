@@ -55,10 +55,7 @@ async fn project_aliases_resolve_to_one_physical_identity() {
 
     #[cfg(unix)]
     {
-        let symlink_alias = test_infrastructure
-            .temporary_directory
-            .path()
-            .join("project-symlink");
+        let symlink_alias = test_infrastructure.temporary_directory.path().join("project-symlink");
         std::os::unix::fs::symlink(&first_path, &symlink_alias).unwrap();
         assert_eq!(
             test_infrastructure
@@ -98,19 +95,13 @@ async fn project_path_updates_reject_different_directories() {
         .await
         .unwrap_err();
 
-    assert_eq!(
-        update_error.kind(),
-        InfrastructureErrorKind::InvalidProjectPath
-    );
+    assert_eq!(update_error.kind(), InfrastructureErrorKind::InvalidProjectPath);
 }
 
 #[tokio::test]
 async fn missing_project_directories_are_rejected() {
     let test_infrastructure = create_initialized_test_infrastructure().await;
-    let missing_path = test_infrastructure
-        .temporary_directory
-        .path()
-        .join("missing-project");
+    let missing_path = test_infrastructure.temporary_directory.path().join("missing-project");
     let error = test_infrastructure
         .infrastructure
         .execute_db_actions(async |transaction| {
@@ -163,11 +154,7 @@ async fn empty_and_missing_project_updates_preserve_state() {
         .unwrap();
     let unchanged_project = test_infrastructure
         .infrastructure
-        .execute_db_actions(async |transaction| {
-            transaction
-                .update_project(ProjectUpdateOptions::new(project.id))
-                .await
-        })
+        .execute_db_actions(async |transaction| transaction.update_project(ProjectUpdateOptions::new(project.id)).await)
         .await
         .unwrap()
         .unwrap();

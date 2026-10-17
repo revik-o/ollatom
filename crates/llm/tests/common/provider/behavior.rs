@@ -10,15 +10,11 @@ pub(super) async fn execute_behavior(
     match behavior {
         ProviderBehavior::Complete => {
             host.emit(RunEvent::ResponseDelta("ok".into())).await?;
-            Ok(ProviderRunOutcome::Completed(completed_response(
-                &request, "ok",
-            )))
+            Ok(ProviderRunOutcome::Completed(completed_response(&request, "ok")))
         }
         ProviderBehavior::WaitForCancellation => {
             stop.cancelled().await;
-            Ok(ProviderRunOutcome::Cancelled(partial_response(
-                &request, "partial",
-            )))
+            Ok(ProviderRunOutcome::Cancelled(partial_response(&request, "partial")))
         }
         ProviderBehavior::StreamUntilCancellation => {
             stream_partial_response(&host).await?;
@@ -58,8 +54,7 @@ pub(super) async fn execute_behavior(
             }
         }
         ProviderBehavior::StreamAndFailAfterToolRound(tool_call) => {
-            host.emit(RunEvent::ResponseDelta("partial answer".into()))
-                .await?;
+            host.emit(RunEvent::ResponseDelta("partial answer".into())).await?;
             host.emit(RunEvent::ReasoningSummaryDelta("partial reasoning".into()))
                 .await?;
             host.emit(RunEvent::Usage(Usage {
@@ -84,16 +79,12 @@ pub(super) async fn execute_behavior(
                 host.begin_round(round).await?;
             }
 
-            Ok(ProviderRunOutcome::Completed(completed_response(
-                &request, "rounds",
-            )))
+            Ok(ProviderRunOutcome::Completed(completed_response(&request, "rounds")))
         }
         ProviderBehavior::ReturnMultipleAssistantRounds => {
-            host.emit(RunEvent::ResponseDelta("first round".into()))
-                .await?;
+            host.emit(RunEvent::ResponseDelta("first round".into())).await?;
             host.begin_round(2).await?;
-            host.emit(RunEvent::ResponseDelta("second round".into()))
-                .await?;
+            host.emit(RunEvent::ResponseDelta("second round".into())).await?;
 
             let mut response = completed_response(&request, "");
             response.assistant_rounds = vec![
@@ -123,8 +114,7 @@ pub(super) async fn execute_behavior(
 
 async fn stream_partial_response(host: &Arc<dyn ProviderRunHost>) -> Result<(), LlmError> {
     host.emit(RunEvent::ResponseDelta("partial".into())).await?;
-    host.emit(RunEvent::ReasoningSummaryDelta("summary".into()))
-        .await?;
+    host.emit(RunEvent::ReasoningSummaryDelta("summary".into())).await?;
     host.emit(RunEvent::Usage(Usage {
         source: UsageSource::ApiReported,
         total_tokens: Some(3),

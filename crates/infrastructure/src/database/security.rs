@@ -52,9 +52,7 @@ pub(super) fn validate_database_file_path(database_file_path: &Path) -> Infrastr
     Ok(())
 }
 
-pub(super) fn prepare_private_database_location(
-    database_file_path: &Path,
-) -> InfrastructureResult<()> {
+pub(super) fn prepare_private_database_location(database_file_path: &Path) -> InfrastructureResult<()> {
     let database_directory_path = database_file_path.parent().ok_or_else(|| {
         InfrastructureError::new(
             InfrastructureErrorKind::InvalidDatabaseFilePath,
@@ -82,9 +80,7 @@ pub(super) fn prepare_private_database_location(
 }
 
 #[cfg(unix)]
-fn open_or_create_private_database_file(
-    database_file_path: &Path,
-) -> InfrastructureResult<std::fs::File> {
+fn open_or_create_private_database_file(database_file_path: &Path) -> InfrastructureResult<std::fs::File> {
     let mut create_options = std::fs::OpenOptions::new();
     create_options
         .read(true)
@@ -120,9 +116,7 @@ fn open_or_create_private_database_file(
 }
 
 #[cfg(windows)]
-fn open_or_create_private_database_file(
-    database_file_path: &Path,
-) -> InfrastructureResult<std::fs::File> {
+fn open_or_create_private_database_file(database_file_path: &Path) -> InfrastructureResult<std::fs::File> {
     const FILE_GENERIC_READ: u32 = 0x0012_0089;
     const FILE_GENERIC_WRITE: u32 = 0x0012_0116;
     const FILE_READ_CONTROL: u32 = 0x0002_0000;
@@ -170,9 +164,7 @@ fn open_or_create_private_database_file(
 }
 
 #[cfg(not(any(unix, windows)))]
-fn open_or_create_private_database_file(
-    database_file_path: &Path,
-) -> InfrastructureResult<std::fs::File> {
+fn open_or_create_private_database_file(database_file_path: &Path) -> InfrastructureResult<std::fs::File> {
     Err(InfrastructureError::new(
         InfrastructureErrorKind::DatabaseConfigurationFailed,
         format!(

@@ -1,8 +1,7 @@
 use super::ModelRunState;
 use crate::{
     content_history::native_messages_from_history, request::estimate_serialized_tokens,
-    run_request::optimize_context_if_needed, streaming::RoundResult,
-    streaming_tools::normalize_tool_call,
+    run_request::optimize_context_if_needed, streaming::RoundResult, streaming_tools::normalize_tool_call,
 };
 use llm::{AssistantRound, LlmError, ProviderRunHost, ProviderRunRequest, RunEvent};
 use std::sync::Arc;
@@ -42,15 +41,11 @@ pub(crate) async fn continue_after_tool_round(
     assistant_round.tool_calls.clone_from(&tool_calls);
     emit_provider_round_finished(host, assistant_round).await?;
 
-    let tool_outputs = host
-        .execute_tool_round(round_number, tool_calls.clone())
-        .await?;
+    let tool_outputs = host.execute_tool_round(round_number, tool_calls.clone()).await?;
 
-    model_run_state.conversation_history.append_round(
-        assistant_round,
-        &tool_calls,
-        &tool_outputs,
-    )?;
+    model_run_state
+        .conversation_history
+        .append_round(assistant_round, &tool_calls, &tool_outputs)?;
 
     if round_number < request.limits.provider_rounds {
         let observed_input_tokens = observed_or_estimated_input_tokens(

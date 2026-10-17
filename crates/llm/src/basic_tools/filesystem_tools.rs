@@ -1,7 +1,6 @@
 use super::{BasicToolConfiguration, filesystem_listing, filesystem_operations, tool_support};
 use crate::{
-    AuthorizationGrant, BoxFuture, FilesystemAccess, Tool, ToolCall, ToolDefinition, ToolFailure,
-    ToolOutput, ToolPlan,
+    AuthorizationGrant, BoxFuture, FilesystemAccess, Tool, ToolCall, ToolDefinition, ToolFailure, ToolOutput, ToolPlan,
 };
 use serde_json::json;
 use std::sync::Arc;
@@ -31,10 +30,7 @@ impl FilesystemTool {
             Self::new(configuration.clone(), FilesystemToolOperation::ListFiles),
             Self::new(configuration.clone(), FilesystemToolOperation::ReadFile),
             Self::new(configuration.clone(), FilesystemToolOperation::WriteFile),
-            Self::new(
-                configuration.clone(),
-                FilesystemToolOperation::CreateDirectory,
-            ),
+            Self::new(configuration.clone(), FilesystemToolOperation::CreateDirectory),
             Self::new(configuration.clone(), FilesystemToolOperation::RenamePath),
             Self::new(configuration, FilesystemToolOperation::DeletePath),
         ]
@@ -107,68 +103,43 @@ impl Tool for FilesystemTool {
                 )),
             ),
             FilesystemToolOperation::ReadFile => {
-                let file = operations::resolve_workspace_file(
-                    &self.configuration,
-                    &tool_call.arguments,
-                    "path",
-                )?;
+                let file = operations::resolve_workspace_file(&self.configuration, &tool_call.arguments, "path")?;
 
                 (
                     vec![tool_support::filesystem_capability(
-                        self.configuration
-                            .root_directory()
-                            .join(file.relative_path().as_path()),
+                        self.configuration.root_directory().join(file.relative_path().as_path()),
                         FilesystemAccess::Read,
                     )],
                     Some(filesystem::WorkspaceCapability::File(file)),
                 )
             }
             FilesystemToolOperation::WriteFile => {
-                let file = operations::resolve_workspace_file(
-                    &self.configuration,
-                    &tool_call.arguments,
-                    "path",
-                )?;
+                let file = operations::resolve_workspace_file(&self.configuration, &tool_call.arguments, "path")?;
 
                 (
                     vec![tool_support::filesystem_capability(
-                        self.configuration
-                            .root_directory()
-                            .join(file.relative_path().as_path()),
+                        self.configuration.root_directory().join(file.relative_path().as_path()),
                         FilesystemAccess::Modify,
                     )],
                     Some(filesystem::WorkspaceCapability::File(file)),
                 )
             }
             FilesystemToolOperation::CreateDirectory => {
-                let file = operations::resolve_workspace_file(
-                    &self.configuration,
-                    &tool_call.arguments,
-                    "path",
-                )?;
+                let file = operations::resolve_workspace_file(&self.configuration, &tool_call.arguments, "path")?;
 
                 (
                     vec![tool_support::filesystem_capability(
-                        self.configuration
-                            .root_directory()
-                            .join(file.relative_path().as_path()),
+                        self.configuration.root_directory().join(file.relative_path().as_path()),
                         FilesystemAccess::Create,
                     )],
                     Some(filesystem::WorkspaceCapability::File(file)),
                 )
             }
             FilesystemToolOperation::RenamePath => {
-                let source = operations::resolve_workspace_file(
-                    &self.configuration,
-                    &tool_call.arguments,
-                    "source",
-                )?;
+                let source = operations::resolve_workspace_file(&self.configuration, &tool_call.arguments, "source")?;
 
-                let destination = operations::resolve_workspace_file(
-                    &self.configuration,
-                    &tool_call.arguments,
-                    "destination",
-                )?;
+                let destination =
+                    operations::resolve_workspace_file(&self.configuration, &tool_call.arguments, "destination")?;
 
                 (
                     vec![
@@ -185,24 +156,15 @@ impl Tool for FilesystemTool {
                             FilesystemAccess::Create,
                         ),
                     ],
-                    Some(filesystem::WorkspaceCapability::Rename {
-                        source,
-                        destination,
-                    }),
+                    Some(filesystem::WorkspaceCapability::Rename { source, destination }),
                 )
             }
             FilesystemToolOperation::DeletePath => {
-                let file = operations::resolve_workspace_file(
-                    &self.configuration,
-                    &tool_call.arguments,
-                    "path",
-                )?;
+                let file = operations::resolve_workspace_file(&self.configuration, &tool_call.arguments, "path")?;
 
                 (
                     vec![tool_support::filesystem_capability(
-                        self.configuration
-                            .root_directory()
-                            .join(file.relative_path().as_path()),
+                        self.configuration.root_directory().join(file.relative_path().as_path()),
                         FilesystemAccess::Delete,
                     )],
                     Some(filesystem::WorkspaceCapability::File(file)),

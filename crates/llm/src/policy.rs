@@ -73,9 +73,8 @@ pub struct CommandPattern {
 impl CommandPattern {
     pub fn new(source: impl Into<String>) -> Result<Self, LlmError> {
         let source = source.into();
-        let anchored = Regex::new(&format!(r"\A(?:{source})\z")).map_err(|error| {
-            LlmError::InvalidRequest(format!("invalid trusted command regex: {error}"))
-        })?;
+        let anchored = Regex::new(&format!(r"\A(?:{source})\z"))
+            .map_err(|error| LlmError::InvalidRequest(format!("invalid trusted command regex: {error}")))?;
 
         Ok(Self { source, anchored })
     }
@@ -89,40 +88,24 @@ impl CommandPattern {
     }
 
     pub fn matches_command(&self, program: &str, arguments: &[String]) -> bool {
-        self.matches(&crate::policy_matching::normalize_command(
-            program, arguments,
-        ))
+        self.matches(&crate::policy_matching::normalize_command(program, arguments))
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RequiredCapability {
-    Filesystem {
-        path: PathBuf,
-        access: FilesystemAccess,
-    },
-    Command {
-        program: String,
-        arguments: Vec<String>,
-    },
-    Network {
-        host: String,
-    },
+    Filesystem { path: PathBuf, access: FilesystemAccess },
+    Command { program: String, arguments: Vec<String> },
+    Network { host: String },
     UserInteraction,
-    InvokeSubagent {
-        profile: String,
-    },
+    InvokeSubagent { profile: String },
 }
 
-pub type ApprovalHandler =
-    Arc<dyn Fn(ApprovalRequest) -> BoxFuture<'static, ApprovalDecision> + Send + Sync>;
+pub type ApprovalHandler = Arc<dyn Fn(ApprovalRequest) -> BoxFuture<'static, ApprovalDecision> + Send + Sync>;
 
 pub trait ToolAuthorizer: Send + Sync {
-    fn authorize(
-        &self,
-        request: ApprovalRequest,
-    ) -> BoxFuture<'_, Result<ApprovalDecision, LlmError>>;
+    fn authorize(&self, request: ApprovalRequest) -> BoxFuture<'_, Result<ApprovalDecision, LlmError>>;
 }
 
 #[must_use]
@@ -199,10 +182,7 @@ impl RunPolicy {
         self.trusted_folders.push(folder);
     }
 
-    pub(crate) fn add_trusted_command(
-        &mut self,
-        pattern: impl Into<String>,
-    ) -> Result<(), LlmError> {
+    pub(crate) fn add_trusted_command(&mut self, pattern: impl Into<String>) -> Result<(), LlmError> {
         self.trusted_commands.push(CommandPattern::new(pattern)?);
 
         Ok(())

@@ -7,15 +7,13 @@ pub fn built_in_tool_definition(name: &str) -> Option<ToolDefinition> {
     match name {
         ASK_USER_TOOL_NAME => Some(ToolDefinition {
             name: ASK_USER_TOOL_NAME.into(),
-            description: "Ask the user one or more typed questions and wait for their answers."
-                .into(),
+            description: "Ask the user one or more typed questions and wait for their answers.".into(),
             input_schema: serde_json::json!({"type":"object","required":["questions"],"properties":{"questions":{"type":"array"}}}),
             authorization_requirement: crate::ToolAuthorizationRequirement::CapabilityPolicy,
         }),
         INVOKE_SUBAGENT_TOOL_NAME => Some(ToolDefinition {
             name: INVOKE_SUBAGENT_TOOL_NAME.into(),
-            description: "Invoke a developer-configured subagent profile for a bounded task."
-                .into(),
+            description: "Invoke a developer-configured subagent profile for a bounded task.".into(),
             input_schema: serde_json::json!({"type":"object","required":["task","profile"],"properties":{"task":{"type":"string"},"profile":{"type":"string"}}}),
             authorization_requirement: crate::ToolAuthorizationRequirement::CapabilityPolicy,
         }),
@@ -27,9 +25,7 @@ pub fn parse_ask_user_request(arguments: serde_json::Value) -> Result<AskUserReq
     parse_and_validate_tool_request(arguments)
 }
 
-pub fn parse_invoke_subagent_request(
-    arguments: serde_json::Value,
-) -> Result<InvokeSubagentRequest, LlmError> {
+pub fn parse_invoke_subagent_request(arguments: serde_json::Value) -> Result<InvokeSubagentRequest, LlmError> {
     parse_and_validate_tool_request(arguments)
 }
 
@@ -49,14 +45,12 @@ impl ValidatedToolRequest for InvokeSubagentRequest {
     }
 }
 
-fn parse_and_validate_tool_request<Request>(
-    arguments: serde_json::Value,
-) -> Result<Request, LlmError>
+fn parse_and_validate_tool_request<Request>(arguments: serde_json::Value) -> Result<Request, LlmError>
 where
     Request: ValidatedToolRequest,
 {
-    let request: Request = serde_json::from_value(arguments)
-        .map_err(|error| LlmError::InvalidToolArguments(error.to_string()))?;
+    let request: Request =
+        serde_json::from_value(arguments).map_err(|error| LlmError::InvalidToolArguments(error.to_string()))?;
 
     request.validate_request()?;
 

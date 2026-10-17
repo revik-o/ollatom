@@ -1,7 +1,7 @@
 use super::host::RunHost;
 use crate::{
-    ApprovalDecision, ApprovalRequest, AuthorizationGrant, InteractionReply, InteractionRequest,
-    LlmError, RunEvent, ToolEvent, ToolPlan,
+    ApprovalDecision, ApprovalRequest, AuthorizationGrant, InteractionReply, InteractionRequest, LlmError, RunEvent,
+    ToolEvent, ToolPlan,
 };
 use std::future::Future;
 
@@ -22,8 +22,7 @@ impl RunHost {
             .filter(|capability| !self.policy.permits(capability))
             .cloned()
             .collect::<Vec<_>>();
-        let authorization_is_satisfied =
-            missing_capabilities.is_empty() && !requires_explicit_user_approval;
+        let authorization_is_satisfied = missing_capabilities.is_empty() && !requires_explicit_user_approval;
 
         if authorization_is_satisfied {
             return Ok(Some(AuthorizationGrant::issue(
@@ -56,24 +55,13 @@ impl RunHost {
 
         let approval_decision = self.request_approval_decision(approval_request).await?;
 
-        Ok((approval_decision == ApprovalDecision::AllowOnce).then(|| {
-            AuthorizationGrant::issue(
-                execution_stop_token,
-                tool_plan.required_capabilities.clone(),
-            )
-        }))
+        Ok((approval_decision == ApprovalDecision::AllowOnce)
+            .then(|| AuthorizationGrant::issue(execution_stop_token, tool_plan.required_capabilities.clone())))
     }
 
-    async fn request_approval_decision(
-        &self,
-        approval_request: ApprovalRequest,
-    ) -> Result<ApprovalDecision, LlmError> {
+    async fn request_approval_decision(&self, approval_request: ApprovalRequest) -> Result<ApprovalDecision, LlmError> {
         if let Some(authorizer) = &self.authorizer {
-            return await_unless_stopped(
-                &self.stop,
-                authorizer.authorize(approval_request.clone()),
-            )
-            .await?;
+            return await_unless_stopped(&self.stop, authorizer.authorize(approval_request.clone())).await?;
         }
 
         if let Some(approval_handler) = self.policy.approval() {
@@ -85,8 +73,7 @@ impl RunHost {
                 id: crate::InteractionId(0),
                 request: approval_request,
             };
-            let interaction_reply =
-                await_unless_stopped(&self.stop, interaction_callback(interaction_request)).await?;
+            let interaction_reply = await_unless_stopped(&self.stop, interaction_callback(interaction_request)).await?;
             return approval_decision_from(interaction_reply);
         }
 
@@ -131,9 +118,7 @@ where
     }
 }
 
-fn approval_decision_from(
-    interaction_reply: InteractionReply,
-) -> Result<ApprovalDecision, LlmError> {
+fn approval_decision_from(interaction_reply: InteractionReply) -> Result<ApprovalDecision, LlmError> {
     match interaction_reply {
         InteractionReply::Approval(approval_decision) => Ok(approval_decision),
         InteractionReply::UserAnswers(_) => Err(LlmError::ProviderProtocol(

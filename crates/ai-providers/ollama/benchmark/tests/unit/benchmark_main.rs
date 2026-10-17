@@ -20,13 +20,7 @@ fn completed_run(finish_reasons: &[FinishReason]) -> Result<LlmRunOutcome, llm::
 #[test]
 fn benchmark_requires_a_final_normal_stop() {
     assert!(require_completed_outcome(completed_run(&[FinishReason::Stop]), 3).is_ok());
-    assert!(
-        require_completed_outcome(
-            completed_run(&[FinishReason::ToolCalls, FinishReason::Stop]),
-            3,
-        )
-        .is_ok()
-    );
+    assert!(require_completed_outcome(completed_run(&[FinishReason::ToolCalls, FinishReason::Stop]), 3,).is_ok());
 
     for finish_reason in [
         FinishReason::ToolCalls,

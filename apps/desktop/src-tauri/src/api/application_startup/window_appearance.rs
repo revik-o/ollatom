@@ -59,12 +59,7 @@ pub(super) fn apply_backdrop(window: &WebviewWindow, theme: &str) -> BackdropKin
         };
 
         return window
-            .set_effects(
-                EffectsBuilder::new()
-                    .effect(Effect::Acrylic)
-                    .color(tint)
-                    .build(),
-            )
+            .set_effects(EffectsBuilder::new().effect(Effect::Acrylic).color(tint).build())
             .map(|_| BackdropKind::Acrylic)
             .unwrap_or(BackdropKind::Opaque);
     }

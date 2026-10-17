@@ -23,10 +23,7 @@ pub(super) fn window_controls_side(side: GtkWindowControlsSide) -> WindowControl
 pub(super) fn install_gtk_layout_listener(window: &WebviewWindow, handle: AppHandle) {
     use ::gtk::prelude::{GtkSettingsExt, WidgetExt};
 
-    let gtk_settings = window
-        .gtk_window()
-        .ok()
-        .and_then(|window| window.settings());
+    let gtk_settings = window.gtk_window().ok().and_then(|window| window.settings());
 
     let Some(settings) = gtk_settings else {
         return;
@@ -37,8 +34,7 @@ pub(super) fn install_gtk_layout_listener(window: &WebviewWindow, handle: AppHan
         let gtk_window_controls = parse_gtk_window_controls(layout.as_deref());
         let controls_side = window_controls_side(gtk_window_controls.side);
         let state = handle.state::<StartupState>();
-        let updated_snapshot =
-            state.update_linux_controls(controls_side, gtk_window_controls.names);
+        let updated_snapshot = state.update_linux_controls(controls_side, gtk_window_controls.names);
 
         if let Ok(snapshot) = updated_snapshot {
             let _ = handle.emit(WINDOW_APPEARANCE_CHANGED_EVENT, snapshot);

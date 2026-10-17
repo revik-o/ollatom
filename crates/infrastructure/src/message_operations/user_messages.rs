@@ -12,8 +12,7 @@ pub(crate) async fn add_message_from_user(
     validate_attachment_integrity_metadata(&attachment_inputs)?;
 
     let message_id = MessageId::new();
-    let sequence_number =
-        allocate_next_active_message_sequence_number(database_transaction, chat_id).await?;
+    let sequence_number = allocate_next_active_message_sequence_number(database_transaction, chat_id).await?;
     let created_at = OffsetDateTime::now_utc();
     let created_at_text = format_timestamp(created_at)?;
 
@@ -30,13 +29,7 @@ pub(crate) async fn add_message_from_user(
     .await
     .map_err(|source| database_operation_error("failed to add user message", source))?;
 
-    let attachments = insert_attachments(
-        database_transaction,
-        message_id,
-        attachment_inputs,
-        created_at,
-    )
-    .await?;
+    let attachments = insert_attachments(database_transaction, message_id, attachment_inputs, created_at).await?;
 
     Ok(Message {
         id: message_id,
@@ -55,9 +48,7 @@ pub(crate) async fn add_message_from_user(
     })
 }
 
-fn validate_attachment_integrity_metadata(
-    attachment_inputs: &[AttachmentInput],
-) -> InfrastructureResult<()> {
+fn validate_attachment_integrity_metadata(attachment_inputs: &[AttachmentInput]) -> InfrastructureResult<()> {
     for attachment_input in attachment_inputs {
         if let Some(media_type) = attachment_input.media_type.as_deref() {
             validate_nonblank_value("attachment media type", media_type)?;
@@ -93,15 +84,11 @@ pub(crate) async fn edit_message_from_user(
     };
 
     let MessageRoleMetadata::User(user_message_metadata) = &old_message.role_metadata else {
-        return Err(invalid_message_operation(
-            "only a user message can be edited",
-        ));
+        return Err(invalid_message_operation("only a user message can be edited"));
     };
 
     if old_message.validity != MessageValidity::Active {
-        return Err(invalid_message_operation(
-            "only an active user message can be edited",
-        ));
+        return Err(invalid_message_operation("only an active user message can be edited"));
     }
 
     if new_message_contents.trim().is_empty() && old_message.attachments.is_empty() {
@@ -114,12 +101,8 @@ pub(crate) async fn edit_message_from_user(
     let updated_at = OffsetDateTime::now_utc();
     let updated_at_text = format_timestamp(updated_at)?;
 
-    cancel_unfinished_actions_in_active_suffix(
-        database_transaction,
-        old_message.chat_id,
-        old_message.sequence_number,
-    )
-    .await?;
+    cancel_unfinished_actions_in_active_suffix(database_transaction, old_message.chat_id, old_message.sequence_number)
+        .await?;
 
     sqlx::query(
         "UPDATE messages SET validity = 'deprecated', deprecated_at = ? WHERE chat_id = ? AND sequence_number >= ? AND validity = 'active'",
@@ -173,13 +156,8 @@ pub(crate) async fn edit_message_from_user(
         })
         .collect();
 
-    let attachments = insert_attachments(
-        database_transaction,
-        revised_message_id,
-        attachment_inputs,
-        updated_at,
-    )
-    .await?;
+    let attachments =
+        insert_attachments(database_transaction, revised_message_id, attachment_inputs, updated_at).await?;
 
     Ok(Some(Message {
         id: revised_message_id,
@@ -223,9 +201,7 @@ pub(crate) async fn delete_message_from_user(
         .bind(i64::from(message.sequence_number))
         .execute(&mut **database_transaction)
         .await
-        .map_err(|source| {
-            database_operation_error("failed to delete conversation suffix", source)
-        })?;
+        .map_err(|source| database_operation_error("failed to delete conversation suffix", source))?;
 
     Ok(Some(message))
 }

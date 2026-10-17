@@ -1,14 +1,12 @@
 use super::context_optimization_host::ContextOptimizationProviderHost;
 use crate::{
-    ContentBlock, ContextOptimizationOutcome, ContextOptimizationRequest, ContextOverflowPolicy,
-    ConversationMessage, ConversationRole, LlmError, LlmOptions, LlmProvider, ModelId, ProviderId,
-    ProviderRunOutcome, ProviderRunRequest, ReasoningEffort, RunId, RunLimits, StopToken, Usage,
-    UserMessage,
+    ContentBlock, ContextOptimizationOutcome, ContextOptimizationRequest, ContextOverflowPolicy, ConversationMessage,
+    ConversationRole, LlmError, LlmOptions, LlmProvider, ModelId, ProviderId, ProviderRunOutcome, ProviderRunRequest,
+    ReasoningEffort, RunId, RunLimits, StopToken, Usage, UserMessage,
 };
 use std::sync::Arc;
 
-const CONTEXT_OPTIMIZATION_SYSTEM_PROMPT: &str =
-    include_str!("prompts/context_optimization_system_prompt.txt");
+const CONTEXT_OPTIMIZATION_SYSTEM_PROMPT: &str = include_str!("prompts/context_optimization_system_prompt.txt");
 
 pub(super) struct ContextOptimizer {
     provider: Arc<dyn LlmProvider>,
@@ -67,11 +65,10 @@ impl ContextOptimizer {
             return Ok(unchanged_outcome(preserved_history));
         };
 
-        let recent_history_start_index =
-            crate::context_optimization_selection::recent_history_start_index(
-                &preserved_history,
-                active_goal_index.saturating_add(1),
-            );
+        let recent_history_start_index = crate::context_optimization_selection::recent_history_start_index(
+            &preserved_history,
+            active_goal_index.saturating_add(1),
+        );
         let compacted_history = preserved_history
             .iter()
             .enumerate()
@@ -104,12 +101,9 @@ impl ContextOptimizer {
             });
         }
 
-        let retained_history_length = preserved_history
-            .len()
-            .saturating_sub(compacted_history.len());
+        let retained_history_length = preserved_history.len().saturating_sub(compacted_history.len());
 
-        let mut model_visible_history =
-            Vec::with_capacity(retained_history_length.saturating_add(1));
+        let mut model_visible_history = Vec::with_capacity(retained_history_length.saturating_add(1));
 
         model_visible_history.push(ConversationMessage {
             role: ConversationRole::Assistant,
@@ -134,8 +128,7 @@ impl ContextOptimizer {
         compacted_history: &[ConversationMessage],
     ) -> Result<crate::LlmResponse, LlmError> {
         let serialized_active_goal = serialize_context_fragment(active_goal, "active goal")?;
-        let serialized_compacted_history =
-            serialize_context_fragment(compacted_history, "compacted history")?;
+        let serialized_compacted_history = serialize_context_fragment(compacted_history, "compacted history")?;
         let mut optimization_options = self.options.clone();
         optimization_options.context.optimization = false;
         optimization_options.context.input_token_budget = None;
@@ -143,9 +136,7 @@ impl ContextOptimizer {
         optimization_options.reasoning.effort = ReasoningEffort::Auto;
         optimization_options.reasoning.budget_tokens = None;
 
-        let context_optimization_host = Arc::new(ContextOptimizationProviderHost::new(
-            self.stop_token.clone(),
-        ));
+        let context_optimization_host = Arc::new(ContextOptimizationProviderHost::new(self.stop_token.clone()));
 
         let context_optimization_provider_request = ProviderRunRequest {
             run_id: self.run_id,
@@ -178,9 +169,7 @@ impl ContextOptimizer {
 
         match context_optimization_provider_outcome {
             ProviderRunOutcome::Completed(mut response) => {
-                context_optimization_host
-                    .complete_response(&mut response)
-                    .await;
+                context_optimization_host.complete_response(&mut response).await;
 
                 if response.assistant_rounds.len() != 1 {
                     return Err(LlmError::ProviderProtocol(

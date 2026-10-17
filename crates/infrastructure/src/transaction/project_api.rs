@@ -1,11 +1,9 @@
 use super::InfrastructureTransaction;
 use super::store::{
-    BooleanEntitySetting, UsageEntitySetting, create_project, delete_project_by_id,
-    get_project_by_id, get_project_by_name, get_project_by_path, update_project,
+    BooleanEntitySetting, UsageEntitySetting, create_project, delete_project_by_id, get_project_by_id,
+    get_project_by_name, get_project_by_path, update_project,
 };
-use crate::{
-    InfrastructureResult, Project, ProjectId, ProjectInitializationParameters, ProjectUpdateOptions,
-};
+use crate::{InfrastructureResult, Project, ProjectId, ProjectInitializationParameters, ProjectUpdateOptions};
 use std::path::Path;
 
 impl InfrastructureTransaction {
@@ -30,18 +28,13 @@ impl InfrastructureTransaction {
         &mut self,
         project_id: impl Into<ProjectId>,
     ) -> InfrastructureResult<Option<Project>> {
-        let operation_result =
-            get_project_by_id(self.database_transaction_mut()?, project_id.into()).await;
+        let operation_result = get_project_by_id(self.database_transaction_mut()?, project_id.into()).await;
 
         self.record_operation_result(operation_result)
     }
 
-    pub async fn get_project_by_name(
-        &mut self,
-        project_name: &str,
-    ) -> InfrastructureResult<Option<Project>> {
-        let operation_result =
-            get_project_by_name(self.database_transaction_mut()?, project_name).await;
+    pub async fn get_project_by_name(&mut self, project_name: &str) -> InfrastructureResult<Option<Project>> {
+        let operation_result = get_project_by_name(self.database_transaction_mut()?, project_name).await;
 
         self.record_operation_result(operation_result)
     }
@@ -50,8 +43,7 @@ impl InfrastructureTransaction {
         &mut self,
         project_path: impl AsRef<Path>,
     ) -> InfrastructureResult<Option<Project>> {
-        let operation_result =
-            get_project_by_path(self.database_transaction_mut()?, project_path.as_ref()).await;
+        let operation_result = get_project_by_path(self.database_transaction_mut()?, project_path.as_ref()).await;
 
         self.record_operation_result(operation_result)
     }
@@ -60,18 +52,13 @@ impl InfrastructureTransaction {
         &mut self,
         update_options: ProjectUpdateOptions,
     ) -> InfrastructureResult<Option<Project>> {
-        let operation_result =
-            update_project(self.database_transaction_mut()?, update_options).await;
+        let operation_result = update_project(self.database_transaction_mut()?, update_options).await;
 
         self.record_operation_result(operation_result)
     }
 
-    pub async fn delete_project(
-        &mut self,
-        project_id: impl Into<ProjectId>,
-    ) -> InfrastructureResult<Option<Project>> {
-        let operation_result =
-            delete_project_by_id(self.database_transaction_mut()?, project_id.into()).await;
+    pub async fn delete_project(&mut self, project_id: impl Into<ProjectId>) -> InfrastructureResult<Option<Project>> {
+        let operation_result = delete_project_by_id(self.database_transaction_mut()?, project_id.into()).await;
 
         self.record_operation_result(operation_result)
     }

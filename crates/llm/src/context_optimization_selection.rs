@@ -3,27 +3,20 @@ use crate::{ContentBlock, ConversationMessage};
 const RECENT_MODEL_VISIBLE_MESSAGE_COUNT: usize = 6;
 const RECENT_TOOL_ROUND_COUNT: usize = 2;
 
-pub(crate) fn recent_history_start_index(
-    history: &[ConversationMessage],
-    minimum_start_index: usize,
-) -> usize {
+pub(crate) fn recent_history_start_index(history: &[ConversationMessage], minimum_start_index: usize) -> usize {
     let message_count_start_index = history
         .len()
         .saturating_sub(RECENT_MODEL_VISIBLE_MESSAGE_COUNT)
         .max(minimum_start_index);
     let tool_round_start_index =
-        oldest_retained_tool_round_start_index(history, minimum_start_index)
-            .unwrap_or(message_count_start_index);
+        oldest_retained_tool_round_start_index(history, minimum_start_index).unwrap_or(message_count_start_index);
 
     message_count_start_index
         .min(tool_round_start_index)
         .max(minimum_start_index)
 }
 
-fn oldest_retained_tool_round_start_index(
-    history: &[ConversationMessage],
-    minimum_start_index: usize,
-) -> Option<usize> {
+fn oldest_retained_tool_round_start_index(history: &[ConversationMessage], minimum_start_index: usize) -> Option<usize> {
     let mut oldest_retained_start_index = None;
     let mut retained_tool_round_count: usize = 0;
 

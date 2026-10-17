@@ -25,19 +25,12 @@ impl RunHost {
         Ok(())
     }
 
-    pub(super) async fn cached_tool_output(
-        &self,
-        tool_call: &ToolCall,
-    ) -> Result<Option<ToolOutput>, LlmError> {
+    pub(super) async fn cached_tool_output(&self, tool_call: &ToolCall) -> Result<Option<ToolOutput>, LlmError> {
         let host_state = self.state.lock().await;
 
         match host_state.completed_calls.get(&tool_call.id) {
             Some(completed_call)
-                if cached_call_matches(
-                    tool_call,
-                    &completed_call.tool_name,
-                    &completed_call.arguments,
-                ) =>
+                if cached_call_matches(tool_call, &completed_call.tool_name, &completed_call.arguments) =>
             {
                 Ok(Some(completed_call.output.clone()))
             }
@@ -65,9 +58,7 @@ impl RunHost {
             }))
             .await;
 
-        durable_acknowledged
-            .then_some(Ok(()))
-            .unwrap_or(delivery_result)
+        durable_acknowledged.then_some(Ok(())).unwrap_or(delivery_result)
     }
 
     pub(super) async fn finish_tool_output(
@@ -94,11 +85,8 @@ impl RunHost {
         tool_call: &ToolCall,
         failure: ToolFailure,
     ) -> Result<ToolOutput, LlmError> {
-        self.finish_tool_output(
-            tool_call,
-            ToolOutput::failure(tool_call.id.clone(), failure),
-        )
-        .await
+        self.finish_tool_output(tool_call, ToolOutput::failure(tool_call.id.clone(), failure))
+            .await
     }
 
     async fn record_tool_output(&self, tool_call: &ToolCall, tool_output: &ToolOutput) {
@@ -126,10 +114,7 @@ impl RunHost {
         }
     }
 
-    pub(super) async fn emit_undelivered_finished_event(
-        &self,
-        tool_call: &ToolCall,
-    ) -> Result<(), LlmError> {
+    pub(super) async fn emit_undelivered_finished_event(&self, tool_call: &ToolCall) -> Result<(), LlmError> {
         let output = {
             let host_state = self.state.lock().await;
             let Some(completed_call) = host_state.completed_calls.get(&tool_call.id) else {
@@ -139,11 +124,7 @@ impl RunHost {
                 )));
             };
 
-            if !cached_call_matches(
-                tool_call,
-                &completed_call.tool_name,
-                &completed_call.arguments,
-            ) {
+            if !cached_call_matches(tool_call, &completed_call.tool_name, &completed_call.arguments) {
                 return Err(LlmError::ToolProtocol(format!(
                     "duplicate call id {} changed tool name or arguments",
                     tool_call.id
@@ -183,10 +164,6 @@ impl RunHost {
     }
 }
 
-fn cached_call_matches(
-    tool_call: &ToolCall,
-    cached_tool_name: &str,
-    cached_arguments: &serde_json::Value,
-) -> bool {
+fn cached_call_matches(tool_call: &ToolCall, cached_tool_name: &str, cached_arguments: &serde_json::Value) -> bool {
     cached_tool_name == tool_call.name && cached_arguments == &tool_call.arguments
 }

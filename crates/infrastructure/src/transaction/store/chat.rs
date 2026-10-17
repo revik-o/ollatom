@@ -1,12 +1,10 @@
 use super::super::CHAT_COLUMNS;
 use super::get_project_by_id;
-use crate::database::{
-    database_operation_error, format_timestamp, validate_nonblank_value, validate_usage_percentage,
-};
+use crate::database::{database_operation_error, format_timestamp, validate_nonblank_value, validate_usage_percentage};
 use crate::mapping::map_chat_row;
 use crate::{
-    Chat, ChatId, ChatInitializationParameters, ChatUpdateOptions, InfrastructureError,
-    InfrastructureErrorKind, InfrastructureResult, ProjectId,
+    Chat, ChatId, ChatInitializationParameters, ChatUpdateOptions, InfrastructureError, InfrastructureErrorKind,
+    InfrastructureResult, ProjectId,
 };
 use sqlx::{AssertSqlSafe, Sqlite, Transaction};
 use time::OffsetDateTime;
@@ -27,10 +25,7 @@ pub(crate) async fn create_chat(
         initialization_parameters.gpu_usage_percentage,
     )?;
 
-    if get_project_by_id(database_transaction, project_id)
-        .await?
-        .is_none()
-    {
+    if get_project_by_id(database_transaction, project_id).await?.is_none() {
         return Err(InfrastructureError::new(
             InfrastructureErrorKind::InvalidEntityReference,
             format!("project '{project_id}' does not exist"),
@@ -85,8 +80,7 @@ pub(crate) async fn update_chat(
     database_transaction: &mut Transaction<'static, Sqlite>,
     update_options: ChatUpdateOptions,
 ) -> InfrastructureResult<Option<Chat>> {
-    let Some(existing_chat) = get_chat_by_id(database_transaction, update_options.chat_id).await?
-    else {
+    let Some(existing_chat) = get_chat_by_id(database_transaction, update_options.chat_id).await? else {
         return Ok(None);
     };
 
@@ -100,14 +94,8 @@ pub(crate) async fn update_chat(
         .apply_to(&existing_chat.execution_settings);
 
     validate_nonblank_value("chat name", &chat_name)?;
-    validate_usage_percentage(
-        "chat CPU usage percentage",
-        execution_settings.cpu_usage_percentage,
-    )?;
-    validate_usage_percentage(
-        "chat GPU usage percentage",
-        execution_settings.gpu_usage_percentage,
-    )?;
+    validate_usage_percentage("chat CPU usage percentage", execution_settings.cpu_usage_percentage)?;
+    validate_usage_percentage("chat GPU usage percentage", execution_settings.gpu_usage_percentage)?;
 
     let updated_at = OffsetDateTime::now_utc();
     let updated_at_text = format_timestamp(updated_at)?;

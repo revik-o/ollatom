@@ -5,14 +5,11 @@ use super::{
 use crate::{LlmError, ToolRegistry};
 use std::sync::Arc;
 
-pub fn register_basic_tools(
-    mut configuration: BasicToolConfiguration,
-) -> Result<ToolRegistry, LlmError> {
+pub fn register_basic_tools(mut configuration: BasicToolConfiguration) -> Result<ToolRegistry, LlmError> {
     configuration.validate()?;
 
-    std::fs::create_dir_all(&configuration.root_directory).map_err(|error| {
-        LlmError::InvalidRequest(format!("basic tool root is unavailable: {error}"))
-    })?;
+    std::fs::create_dir_all(&configuration.root_directory)
+        .map_err(|error| LlmError::InvalidRequest(format!("basic tool root is unavailable: {error}")))?;
 
     let root_directory = configuration.root_directory.clone();
 
@@ -26,9 +23,7 @@ pub fn register_basic_tools(
     })
     .join()
     .map_err(|_| LlmError::InvalidRequest("basic tool workspace initialization panicked".into()))?
-    .map_err(|error| {
-        LlmError::InvalidRequest(format!("basic tool root is unavailable: {error}"))
-    })?;
+    .map_err(|error| LlmError::InvalidRequest(format!("basic tool root is unavailable: {error}")))?;
 
     configuration.root_directory = workspace_directory.canonical_directory_path().to_owned();
     configuration.workspace_directory = Some(workspace_directory);

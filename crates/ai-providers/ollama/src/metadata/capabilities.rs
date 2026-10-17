@@ -1,6 +1,4 @@
-use llm::{
-    CapabilitySupport, LocalOptionPhase, ModelCapability, ProviderCapabilities, ReasoningEffort,
-};
+use llm::{CapabilitySupport, LocalOptionPhase, ModelCapability, ProviderCapabilities, ReasoningEffort};
 use std::collections::BTreeMap;
 
 pub(crate) fn provider_capabilities() -> ProviderCapabilities {
@@ -12,10 +10,7 @@ pub(crate) fn provider_capabilities() -> ProviderCapabilities {
         (ModelCapability::Audio, CapabilitySupport::Unknown),
         (ModelCapability::Reasoning, CapabilitySupport::Unknown),
         (ModelCapability::Files, CapabilitySupport::Unsupported),
-        (
-            ModelCapability::StructuredOutput,
-            CapabilitySupport::Unsupported,
-        ),
+        (ModelCapability::StructuredOutput, CapabilitySupport::Unsupported),
     ]);
     let reasoning_efforts = BTreeMap::from([
         (ReasoningEffort::Auto, CapabilitySupport::Supported),
@@ -35,21 +30,12 @@ pub(crate) fn provider_capabilities() -> ProviderCapabilities {
         "repeat_penalty",
         "stop_sequences",
     ]);
-    let local_runtime_options = supported_options([
-        "context_size",
-        "evaluation_batch_size",
-        "threads",
-        "keep_alive_seconds",
-    ]);
-    let local_option_phases = [
-        "context_size",
-        "evaluation_batch_size",
-        "threads",
-        "keep_alive_seconds",
-    ]
-    .into_iter()
-    .map(|name| (name.to_string(), LocalOptionPhase::PerRequest))
-    .collect();
+    let local_runtime_options =
+        supported_options(["context_size", "evaluation_batch_size", "threads", "keep_alive_seconds"]);
+    let local_option_phases = ["context_size", "evaluation_batch_size", "threads", "keep_alive_seconds"]
+        .into_iter()
+        .map(|name| (name.to_string(), LocalOptionPhase::PerRequest))
+        .collect();
 
     ProviderCapabilities {
         features,
@@ -60,9 +46,7 @@ pub(crate) fn provider_capabilities() -> ProviderCapabilities {
     }
 }
 
-fn supported_options<const COUNT: usize>(
-    names: [&str; COUNT],
-) -> BTreeMap<String, CapabilitySupport> {
+fn supported_options<const COUNT: usize>(names: [&str; COUNT]) -> BTreeMap<String, CapabilitySupport> {
     names
         .into_iter()
         .map(|name| (name.to_string(), CapabilitySupport::Supported))

@@ -1,8 +1,7 @@
 use super::{availability, metadata::provider_capabilities, models, provider::OllamaProvider, run};
 use llm::{
-    AvailabilityReport, BoxFuture, LlmError, LlmProvider, ModelId, ModelInfo, ModelScope,
-    ProviderCapabilities, ProviderRunHost, ProviderRunOutcome, ProviderRunRequest, StopToken,
-    TransportOptions,
+    AvailabilityReport, BoxFuture, LlmError, LlmProvider, ModelId, ModelInfo, ModelScope, ProviderCapabilities,
+    ProviderRunHost, ProviderRunOutcome, ProviderRunRequest, StopToken, TransportOptions,
 };
 use std::sync::Arc;
 

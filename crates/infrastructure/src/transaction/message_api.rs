@@ -60,11 +60,9 @@ impl InfrastructureTransaction {
         &mut self,
         message_id: impl Into<MessageId>,
     ) -> InfrastructureResult<Option<Message>> {
-        let operation_result = crate::message_operations::delete_message_from_user(
-            self.database_transaction_mut()?,
-            message_id.into(),
-        )
-        .await;
+        let operation_result =
+            crate::message_operations::delete_message_from_user(self.database_transaction_mut()?, message_id.into())
+                .await;
 
         self.record_operation_result(operation_result)
     }

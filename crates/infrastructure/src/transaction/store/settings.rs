@@ -14,15 +14,11 @@ pub(crate) enum BooleanEntitySetting {
 impl BooleanEntitySetting {
     const fn update_statement(self) -> &'static str {
         match self {
-            Self::ProjectThinking => {
-                "UPDATE projects SET llm_thinking_enabled = ?, updated_at = ? WHERE id = ?"
-            }
+            Self::ProjectThinking => "UPDATE projects SET llm_thinking_enabled = ?, updated_at = ? WHERE id = ?",
             Self::ProjectContextOptimization => {
                 "UPDATE projects SET llm_context_optimization_enabled = ?, updated_at = ? WHERE id = ?"
             }
-            Self::ChatThinking => {
-                "UPDATE chats SET llm_thinking_enabled = ?, updated_at = ? WHERE id = ?"
-            }
+            Self::ChatThinking => "UPDATE chats SET llm_thinking_enabled = ?, updated_at = ? WHERE id = ?",
             Self::ChatContextOptimization => {
                 "UPDATE chats SET llm_context_optimization_enabled = ?, updated_at = ? WHERE id = ?"
             }
@@ -41,18 +37,10 @@ pub(crate) enum UsageEntitySetting {
 impl UsageEntitySetting {
     const fn update_statement(self) -> &'static str {
         match self {
-            Self::ProjectCpu => {
-                "UPDATE projects SET cpu_usage_percentage = ?, updated_at = ? WHERE id = ?"
-            }
-            Self::ProjectGpu => {
-                "UPDATE projects SET gpu_usage_percentage = ?, updated_at = ? WHERE id = ?"
-            }
-            Self::ChatCpu => {
-                "UPDATE chats SET cpu_usage_percentage = ?, updated_at = ? WHERE id = ?"
-            }
-            Self::ChatGpu => {
-                "UPDATE chats SET gpu_usage_percentage = ?, updated_at = ? WHERE id = ?"
-            }
+            Self::ProjectCpu => "UPDATE projects SET cpu_usage_percentage = ?, updated_at = ? WHERE id = ?",
+            Self::ProjectGpu => "UPDATE projects SET gpu_usage_percentage = ?, updated_at = ? WHERE id = ?",
+            Self::ChatCpu => "UPDATE chats SET cpu_usage_percentage = ?, updated_at = ? WHERE id = ?",
+            Self::ChatGpu => "UPDATE chats SET gpu_usage_percentage = ?, updated_at = ? WHERE id = ?",
         }
     }
 

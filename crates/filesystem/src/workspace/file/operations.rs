@@ -13,49 +13,29 @@ impl WorkspaceFile {
         &self.relative_path
     }
 
-    pub async fn read_regular_file_bytes_bounded(
-        &self,
-        maximum_byte_count: u64,
-    ) -> Result<Vec<u8>, FilesystemError> {
+    pub async fn read_regular_file_bytes_bounded(&self, maximum_byte_count: u64) -> Result<Vec<u8>, FilesystemError> {
         let this = self.clone();
 
         tokio::task::spawn_blocking(move || this.read_bounded_blocking(maximum_byte_count))
             .await
             .map_err(|source| {
-                FilesystemError::throw_filesystem_operation_task_failed(
-                    self.relative_path.0.clone(),
-                    source,
-                )
+                FilesystemError::throw_filesystem_operation_task_failed(self.relative_path.0.clone(), source)
             })?
     }
 
-    pub async fn read_regular_file_text_bounded(
-        &self,
-        maximum_byte_count: u64,
-    ) -> Result<String, FilesystemError> {
-        let bytes = self
-            .read_regular_file_bytes_bounded(maximum_byte_count)
-            .await?;
+    pub async fn read_regular_file_text_bounded(&self, maximum_byte_count: u64) -> Result<String, FilesystemError> {
+        let bytes = self.read_regular_file_bytes_bounded(maximum_byte_count).await?;
 
-        String::from_utf8(bytes).map_err(|source| {
-            io_error(
-                &self.relative_path.0,
-                Error::new(ErrorKind::InvalidData, source),
-            )
-        })
+        String::from_utf8(bytes)
+            .map_err(|source| io_error(&self.relative_path.0, Error::new(ErrorKind::InvalidData, source)))
     }
 
     pub async fn write_regular_file_bytes(&self, contents: Vec<u8>) -> Result<(), FilesystemError> {
-        self.write_regular_file_bytes_with_mode(contents, false)
-            .await
+        self.write_regular_file_bytes_with_mode(contents, false).await
     }
 
-    pub async fn append_regular_file_bytes(
-        &self,
-        contents: Vec<u8>,
-    ) -> Result<(), FilesystemError> {
-        self.write_regular_file_bytes_with_mode(contents, true)
-            .await
+    pub async fn append_regular_file_bytes(&self, contents: Vec<u8>) -> Result<(), FilesystemError> {
+        self.write_regular_file_bytes_with_mode(contents, true).await
     }
 
     pub async fn create_directory_all(&self) -> Result<(), FilesystemError> {
@@ -95,10 +75,7 @@ impl WorkspaceFile {
         })
         .await
         .map_err(|source| {
-            FilesystemError::throw_filesystem_operation_task_failed(
-                self.relative_path.0.clone(),
-                source,
-            )
+            FilesystemError::throw_filesystem_operation_task_failed(self.relative_path.0.clone(), source)
         })?
     }
 
@@ -129,16 +106,10 @@ impl WorkspaceFile {
         })
         .await
         .map_err(|source| {
-            FilesystemError::throw_filesystem_operation_task_failed(
-                self.relative_path.0.clone(),
-                source,
-            )
+            FilesystemError::throw_filesystem_operation_task_failed(self.relative_path.0.clone(), source)
         })?
     }
-    pub async fn rename_without_replacement(
-        &self,
-        destination: &WorkspaceFile,
-    ) -> Result<(), FilesystemError> {
+    pub async fn rename_without_replacement(&self, destination: &WorkspaceFile) -> Result<(), FilesystemError> {
         let source = self.clone();
         let destination = destination.clone();
 
@@ -167,10 +138,7 @@ impl WorkspaceFile {
         })
         .await
         .map_err(|source| {
-            FilesystemError::throw_filesystem_operation_task_failed(
-                self.relative_path.0.clone(),
-                source,
-            )
+            FilesystemError::throw_filesystem_operation_task_failed(self.relative_path.0.clone(), source)
         })?
     }
     fn read_bounded_blocking(&self, maximum_byte_count: u64) -> Result<Vec<u8>, FilesystemError> {
@@ -210,11 +178,7 @@ impl WorkspaceFile {
         Ok(bytes)
     }
 
-    async fn write_regular_file_bytes_with_mode(
-        &self,
-        contents: Vec<u8>,
-        append: bool,
-    ) -> Result<(), FilesystemError> {
+    async fn write_regular_file_bytes_with_mode(&self, contents: Vec<u8>, append: bool) -> Result<(), FilesystemError> {
         let this = self.clone();
 
         tokio::task::spawn_blocking(move || {
@@ -247,10 +211,7 @@ impl WorkspaceFile {
         })
         .await
         .map_err(|source| {
-            FilesystemError::throw_filesystem_operation_task_failed(
-                self.relative_path.0.clone(),
-                source,
-            )
+            FilesystemError::throw_filesystem_operation_task_failed(self.relative_path.0.clone(), source)
         })?
     }
     pub(super) fn open_parent(&self) -> Result<(Dir, OsString), FilesystemError> {

@@ -27,8 +27,7 @@ pub enum ConfigurationCommitStatus {
 
 #[derive(Debug, Default)]
 pub(crate) struct ConfigurationCommitRegistry {
-    statuses:
-        Mutex<HashMap<ConfigurationCommitIdentifier, watch::Receiver<ConfigurationCommitStatus>>>,
+    statuses: Mutex<HashMap<ConfigurationCommitIdentifier, watch::Receiver<ConfigurationCommitStatus>>>,
 }
 
 #[derive(Debug)]

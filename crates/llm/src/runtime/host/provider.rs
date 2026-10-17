@@ -1,8 +1,8 @@
 use super::RunHost;
 use crate::{
-    AskUserRequest, ContextOptimizationOutcome, ContextOptimizationRequest, InteractionReply,
-    InteractionRequest, InvokeSubagentRequest, LlmError, ProviderRunHost, QuestionAnswer, RunEvent,
-    SubagentOutcome, ToolCall, ToolOutput, Usage,
+    AskUserRequest, ContextOptimizationOutcome, ContextOptimizationRequest, InteractionReply, InteractionRequest,
+    InvokeSubagentRequest, LlmError, ProviderRunHost, QuestionAnswer, RunEvent, SubagentOutcome, ToolCall, ToolOutput,
+    Usage,
 };
 
 impl ProviderRunHost for RunHost {
@@ -42,9 +42,7 @@ impl ProviderRunHost for RunHost {
             let round_is_not_next = state.round.checked_add(1) != Some(round);
 
             if round_is_out_of_range || round_is_not_next {
-                return Err(LlmError::LoopLimit(format!(
-                    "invalid provider round {round}"
-                )));
+                return Err(LlmError::LoopLimit(format!("invalid provider round {round}")));
             }
 
             drop(state);
@@ -97,10 +95,7 @@ impl ProviderRunHost for RunHost {
         })
     }
 
-    fn ask_user(
-        &self,
-        request: AskUserRequest,
-    ) -> crate::BoxFuture<'_, Result<Vec<QuestionAnswer>, LlmError>> {
+    fn ask_user(&self, request: AskUserRequest) -> crate::BoxFuture<'_, Result<Vec<QuestionAnswer>, LlmError>> {
         Box::pin(async move {
             if !self.is_tool_selected(crate::builtins::ASK_USER_TOOL_NAME) {
                 return Err(LlmError::ProviderProtocol(
@@ -128,9 +123,7 @@ impl ProviderRunHost for RunHost {
             };
 
             let InteractionReply::UserAnswers(question_answers) = interaction_reply else {
-                return Err(LlmError::ProviderProtocol(
-                    "ask_user received an approval reply".into(),
-                ));
+                return Err(LlmError::ProviderProtocol("ask_user received an approval reply".into()));
             };
 
             expected_request.validate_answers(&question_answers)?;
@@ -164,10 +157,7 @@ impl ProviderRunHost for RunHost {
             let original_message_count = context_optimization_request.history.len();
             let observed_input_tokens = context_optimization_request.observed_input_tokens;
             let input_token_limit = context_optimization_request.input_token_limit;
-            let context_optimization_outcome = self
-                .context_optimizer
-                .optimize(context_optimization_request)
-                .await?;
+            let context_optimization_outcome = self.context_optimizer.optimize(context_optimization_request).await?;
 
             if context_optimization_outcome.usage != Usage::default() {
                 self.state
@@ -181,9 +171,7 @@ impl ProviderRunHost for RunHost {
                 self.events
                     .emit(RunEvent::ContextOptimized {
                         original_message_count,
-                        optimized_message_count: context_optimization_outcome
-                            .model_visible_history
-                            .len(),
+                        optimized_message_count: context_optimization_outcome.model_visible_history.len(),
                         observed_input_tokens,
                         input_token_limit,
                     })

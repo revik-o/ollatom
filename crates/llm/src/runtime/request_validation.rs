@@ -2,15 +2,10 @@ use super::LlmRuntime;
 use crate::{LlmError, ToolDefinition};
 use std::collections::BTreeSet;
 
-pub(super) fn validate_policy(
-    definitions: &[ToolDefinition],
-    has_approval_path: bool,
-) -> Result<(), LlmError> {
-    let requires_explicit_user_approval = definitions.iter().any(|definition| {
-        definition
-            .authorization_requirement
-            .requires_explicit_user_approval()
-    });
+pub(super) fn validate_policy(definitions: &[ToolDefinition], has_approval_path: bool) -> Result<(), LlmError> {
+    let requires_explicit_user_approval = definitions
+        .iter()
+        .any(|definition| definition.authorization_requirement.requires_explicit_user_approval());
 
     if requires_explicit_user_approval && !has_approval_path {
         return Err(LlmError::InvalidRequest(
@@ -47,10 +42,7 @@ pub(super) fn resolve_selected_tool_definitions(
         .collect()
 }
 
-pub(super) fn validate_tool_limits(
-    names: &BTreeSet<String>,
-    limits: crate::RunLimits,
-) -> Result<(), LlmError> {
+pub(super) fn validate_tool_limits(names: &BTreeSet<String>, limits: crate::RunLimits) -> Result<(), LlmError> {
     let tools_are_selected = !names.is_empty();
     let tool_calls_are_disabled = limits.total_tool_calls == 0 || limits.tool_calls_per_round == 0;
 

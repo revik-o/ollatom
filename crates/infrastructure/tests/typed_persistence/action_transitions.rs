@@ -4,11 +4,7 @@ use super::*;
 async fn invalid_action_transition_marks_manual_transaction_failed() {
     let test_infrastructure = create_initialized_test_infrastructure().await;
     let (_, chat) = create_project_with_chat(&test_infrastructure.infrastructure).await;
-    let mut transaction = test_infrastructure
-        .infrastructure
-        .make_transaction()
-        .await
-        .unwrap();
+    let mut transaction = test_infrastructure.infrastructure.make_transaction().await.unwrap();
     let user_message = transaction
         .add_message_from_user("Question", Vec::new(), &chat)
         .await

@@ -11,16 +11,10 @@ pub(super) fn record_completed_frame_usage(
     let round_output_tokens = completed_frame.eval_count;
     let round_reasoning_tokens = completed_frame.reasoning_tokens;
 
-    if round_input_tokens.is_some()
-        || round_output_tokens.is_some()
-        || round_reasoning_tokens.is_some()
-    {
-        let accumulated_input_tokens =
-            add_usage_value(aggregate_usage.input_tokens, round_input_tokens)?;
-        let accumulated_output_tokens =
-            add_usage_value(aggregate_usage.output_tokens, round_output_tokens)?;
-        let accumulated_reasoning_tokens =
-            add_usage_value(aggregate_usage.reasoning_tokens, round_reasoning_tokens)?;
+    if round_input_tokens.is_some() || round_output_tokens.is_some() || round_reasoning_tokens.is_some() {
+        let accumulated_input_tokens = add_usage_value(aggregate_usage.input_tokens, round_input_tokens)?;
+        let accumulated_output_tokens = add_usage_value(aggregate_usage.output_tokens, round_output_tokens)?;
+        let accumulated_reasoning_tokens = add_usage_value(aggregate_usage.reasoning_tokens, round_reasoning_tokens)?;
 
         let accumulated_total_tokens = total_token_count(
             accumulated_input_tokens,
@@ -28,11 +22,7 @@ pub(super) fn record_completed_frame_usage(
             accumulated_reasoning_tokens,
         )?;
 
-        let round_total_tokens = total_token_count(
-            round_input_tokens,
-            round_output_tokens,
-            round_reasoning_tokens,
-        )?;
+        let round_total_tokens = total_token_count(round_input_tokens, round_output_tokens, round_reasoning_tokens)?;
 
         aggregate_usage.source = UsageSource::ApiReported;
         aggregate_usage.input_tokens = accumulated_input_tokens;
@@ -54,10 +44,7 @@ pub(super) fn record_completed_frame_usage(
     Ok(())
 }
 
-fn add_usage_value(
-    accumulated_value: Option<u64>,
-    additional_value: Option<u64>,
-) -> Result<Option<u64>, llm::LlmError> {
+fn add_usage_value(accumulated_value: Option<u64>, additional_value: Option<u64>) -> Result<Option<u64>, llm::LlmError> {
     additional_value.map_or(Ok(accumulated_value), |additional_value| {
         accumulated_value
             .unwrap_or(0)

@@ -1,6 +1,5 @@
 use filesystem::{
-    AtomicCommitStatus, AtomicMetadataPolicy, FilesystemError, WorkspaceDirectory, create_file,
-    create_folder,
+    AtomicCommitStatus, AtomicMetadataPolicy, FilesystemError, WorkspaceDirectory, create_file, create_folder,
 };
 use tempfile::tempdir;
 

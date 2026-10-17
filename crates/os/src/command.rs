@@ -27,25 +27,33 @@ use tokio::{
 #[path = "command_windows.rs"]
 pub(crate) mod command_windows;
 
+#[path = "command/api.rs"]
 mod api;
+#[path = "command/authorization.rs"]
 mod authorization;
+#[path = "command/environment.rs"]
 mod environment;
+#[path = "command/execution.rs"]
 mod execution;
+#[path = "command/identity.rs"]
 mod identity;
+#[path = "command/monitor.rs"]
 mod monitor;
+#[path = "command/output.rs"]
 mod output;
+#[path = "command/process.rs"]
 mod process;
+#[path = "command/sandbox.rs"]
 mod sandbox;
 
 pub use api::{
     execute_command, execute_command_in_directory, execute_command_in_directory_with_arguments,
-    execute_command_in_directory_with_arguments_and_options, parse_posix_command,
-    prepare_sandboxed_command, prepare_sandboxed_command_with_options,
+    execute_command_in_directory_with_arguments_and_options, parse_posix_command, prepare_sandboxed_command,
+    prepare_sandboxed_command_with_options,
 };
 use authorization::{
-    open_authorized_executable, open_authorized_workspace, resolve_trusted_executable,
-    validate_authorization_identity, validate_pinned_executable_path,
-    validate_pinned_workspace_path,
+    open_authorized_executable, open_authorized_workspace, resolve_trusted_executable, validate_authorization_identity,
+    validate_pinned_executable_path, validate_pinned_workspace_path,
 };
 use environment::build_sanitized_environment;
 
@@ -59,10 +67,7 @@ use identity::windows_file_identity;
 
 use identity::{directory_identity, display_command, executable_identity};
 use monitor::monitor_command;
-use output::{
-    append_output, command_semaphore, join_output_reader, output_drain_deadline,
-    spawn_output_reader,
-};
+use output::{append_output, command_semaphore, join_output_reader, output_drain_deadline, spawn_output_reader};
 
 #[cfg(not(windows))]
 use process::{configure_process_group, terminate_process_tree, terminate_remaining_descendants};
@@ -197,11 +202,7 @@ impl SandboxedCommandOptions {
         self
     }
 
-    pub fn environment_variable(
-        mut self,
-        name: impl Into<OsString>,
-        value: impl Into<OsString>,
-    ) -> Self {
+    pub fn environment_variable(mut self, name: impl Into<OsString>, value: impl Into<OsString>) -> Self {
         self.environment_variables.insert(name.into(), value.into());
         self
     }

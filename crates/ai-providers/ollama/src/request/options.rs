@@ -1,12 +1,7 @@
-use llm::{
-    ContextOverflowPolicy, LlmError, LocalOptionPhase, OptionHandlingMode, ProviderRunRequest,
-    ReasoningEffort,
-};
+use llm::{ContextOverflowPolicy, LlmError, LocalOptionPhase, OptionHandlingMode, ProviderRunRequest, ReasoningEffort};
 use serde_json::{Map, Value, json};
 
-pub(crate) fn build_options(
-    request: &ProviderRunRequest,
-) -> Result<(Map<String, Value>, Option<Value>), LlmError> {
+pub(crate) fn build_options(request: &ProviderRunRequest) -> Result<(Map<String, Value>, Option<Value>), LlmError> {
     let options = &request.options;
     let mut native_options = Map::new();
 
@@ -55,9 +50,7 @@ pub(crate) fn build_options(
         )));
     }
 
-    if options.context.input_token_budget.is_some()
-        && options.handling == OptionHandlingMode::Strict
-    {
+    if options.context.input_token_budget.is_some() && options.handling == OptionHandlingMode::Strict {
         return Err(LlmError::UnsupportedOption("input_token_budget".into()));
     }
 
@@ -67,10 +60,7 @@ pub(crate) fn build_options(
         ReasoningEffort::Auto => None,
         ReasoningEffort::None => Some(json!(false)),
         ReasoningEffort::Minimal | ReasoningEffort::ExtraHigh => {
-            return Err(LlmError::UnsupportedEffort(format!(
-                "{:?}",
-                options.reasoning.effort
-            )));
+            return Err(LlmError::UnsupportedEffort(format!("{:?}", options.reasoning.effort)));
         }
         ReasoningEffort::Low => Some(json!("low")),
         ReasoningEffort::Medium => Some(json!("medium")),
@@ -89,12 +79,8 @@ fn configure_native_context_overflow(
     let native_truncation = match context_options.overflow_policy {
         Some(ContextOverflowPolicy::TruncateOldest) => Some(true),
         Some(ContextOverflowPolicy::Error) => Some(false),
-        Some(ContextOverflowPolicy::Summarize)
-            if request.options.handling == OptionHandlingMode::Strict =>
-        {
-            return Err(LlmError::UnsupportedOption(
-                "context_overflow:summarize".into(),
-            ));
+        Some(ContextOverflowPolicy::Summarize) if request.options.handling == OptionHandlingMode::Strict => {
+            return Err(LlmError::UnsupportedOption("context_overflow:summarize".into()));
         }
         Some(ContextOverflowPolicy::Summarize) => None,
         None if context_options.optimization => Some(false),

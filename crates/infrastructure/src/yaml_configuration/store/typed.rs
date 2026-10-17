@@ -1,9 +1,6 @@
 use super::super::YamlConfigurationError;
 use super::super::document::{deserialize_yaml_configuration, serialize_yaml_configuration};
-use super::{
-    ConfigurationCommitHandle, ConfigurationCommitIdentifier, ConfigurationCommitStatus,
-    TypedYamlFile,
-};
+use super::{ConfigurationCommitHandle, ConfigurationCommitIdentifier, ConfigurationCommitStatus, TypedYamlFile};
 use serde::{Serialize, de::DeserializeOwned};
 use std::path::Path;
 use std::sync::Arc;
@@ -41,24 +38,17 @@ where
         &self,
         configuration: &Configuration,
     ) -> Result<ConfigurationCommitHandle, YamlConfigurationError> {
-        let runtime = tokio::runtime::Handle::try_current().map_err(|source| {
-            YamlConfigurationError::Coordination {
-                path: self.file.file_path.clone(),
-                source: std::io::Error::other(source),
-            }
+        let runtime = tokio::runtime::Handle::try_current().map_err(|source| YamlConfigurationError::Coordination {
+            path: self.file.file_path.clone(),
+            source: std::io::Error::other(source),
         })?;
 
-        let configuration_contents =
-            serialize_yaml_configuration(configuration, &self.file.file_path)?;
-        let (operation_identifier, completion_sender, completion_receiver) =
-            self.file.register_commit()?;
+        let configuration_contents = serialize_yaml_configuration(configuration, &self.file.file_path)?;
+        let (operation_identifier, completion_sender, completion_receiver) = self.file.register_commit()?;
         let configuration_file = self.file.clone();
 
         runtime.spawn(async move {
-            let status = match configuration_file
-                .replace_contents(configuration_contents)
-                .await
-            {
+            let status = match configuration_file.replace_contents(configuration_contents).await {
                 Ok(()) => ConfigurationCommitStatus::Succeeded,
                 Err(error) => ConfigurationCommitStatus::Failed(error.to_string()),
             };
@@ -79,12 +69,10 @@ where
         match handle.wait().await {
             ConfigurationCommitStatus::Succeeded => Ok(()),
             ConfigurationCommitStatus::Pending => unreachable!(),
-            ConfigurationCommitStatus::Failed(message) => {
-                Err(YamlConfigurationError::ConfigurationCommitFailed {
-                    operation_identifier: operation_identifier.0,
-                    message,
-                })
-            }
+            ConfigurationCommitStatus::Failed(message) => Err(YamlConfigurationError::ConfigurationCommitFailed {
+                operation_identifier: operation_identifier.0,
+                message,
+            }),
         }
     }
 }

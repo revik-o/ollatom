@@ -24,11 +24,7 @@ async fn concurrent_user_messages_receive_unique_active_sequences() {
             infrastructure
                 .execute_db_actions(async |transaction| {
                     transaction
-                        .add_message_from_user(
-                            format!("Concurrent question {writer_number}"),
-                            Vec::new(),
-                            &chat,
-                        )
+                        .add_message_from_user(format!("Concurrent question {writer_number}"), Vec::new(), &chat)
                         .await
                 })
                 .await

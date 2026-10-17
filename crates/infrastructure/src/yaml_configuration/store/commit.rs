@@ -1,7 +1,6 @@
 use super::super::YamlConfigurationError;
 use super::{
-    ConfigurationCommitHandle, ConfigurationCommitIdentifier, ConfigurationCommitRegistry,
-    ConfigurationCommitStatus,
+    ConfigurationCommitHandle, ConfigurationCommitIdentifier, ConfigurationCommitRegistry, ConfigurationCommitStatus,
 };
 use std::path::Path;
 use tokio::sync::watch;
@@ -48,13 +47,10 @@ impl ConfigurationCommitRegistry {
         ),
         YamlConfigurationError,
     > {
-        let mut statuses =
-            self.statuses
-                .lock()
-                .map_err(|_| YamlConfigurationError::Coordination {
-                    path: file_path.to_owned(),
-                    source: std::io::Error::other("commit result registry is poisoned"),
-                })?;
+        let mut statuses = self.statuses.lock().map_err(|_| YamlConfigurationError::Coordination {
+            path: file_path.to_owned(),
+            source: std::io::Error::other("commit result registry is poisoned"),
+        })?;
 
         if statuses.len() >= MAX_UNACKNOWLEDGED_CONFIGURATION_COMMITS {
             return Err(YamlConfigurationError::ConfigurationCommitRegistryFull {
@@ -64,8 +60,7 @@ impl ConfigurationCommitRegistry {
         }
 
         let operation_identifier = next_configuration_commit_identifier(file_path)?;
-        let (completion_sender, completion_receiver) =
-            watch::channel(ConfigurationCommitStatus::Pending);
+        let (completion_sender, completion_receiver) = watch::channel(ConfigurationCommitStatus::Pending);
 
         statuses.insert(operation_identifier, completion_receiver.clone());
 
@@ -77,13 +72,10 @@ impl ConfigurationCommitRegistry {
         operation_identifier: ConfigurationCommitIdentifier,
         file_path: &Path,
     ) -> Result<Option<ConfigurationCommitStatus>, YamlConfigurationError> {
-        let statuses = self
-            .statuses
-            .lock()
-            .map_err(|_| YamlConfigurationError::Coordination {
-                path: file_path.to_owned(),
-                source: std::io::Error::other("commit result registry is poisoned"),
-            })?;
+        let statuses = self.statuses.lock().map_err(|_| YamlConfigurationError::Coordination {
+            path: file_path.to_owned(),
+            source: std::io::Error::other("commit result registry is poisoned"),
+        })?;
 
         Ok(statuses
             .get(&operation_identifier)
@@ -95,13 +87,10 @@ impl ConfigurationCommitRegistry {
         operation_identifier: ConfigurationCommitIdentifier,
         file_path: &Path,
     ) -> Result<Option<ConfigurationCommitStatus>, YamlConfigurationError> {
-        let mut statuses =
-            self.statuses
-                .lock()
-                .map_err(|_| YamlConfigurationError::Coordination {
-                    path: file_path.to_owned(),
-                    source: std::io::Error::other("commit result registry is poisoned"),
-                })?;
+        let mut statuses = self.statuses.lock().map_err(|_| YamlConfigurationError::Coordination {
+            path: file_path.to_owned(),
+            source: std::io::Error::other("commit result registry is poisoned"),
+        })?;
 
         let Some(status) = statuses
             .get(&operation_identifier)
@@ -117,10 +106,7 @@ impl ConfigurationCommitRegistry {
         Ok(Some(status))
     }
 
-    pub(super) fn acknowledge_identifier(
-        &self,
-        operation_identifier: ConfigurationCommitIdentifier,
-    ) {
+    pub(super) fn acknowledge_identifier(&self, operation_identifier: ConfigurationCommitIdentifier) {
         let Ok(mut statuses) = self.statuses.lock() else {
             return;
         };

@@ -41,9 +41,7 @@ async fn action_details_are_validated_before_insert_and_parent_completion() {
     for action_details in invalid_details {
         let validation_error = infrastructure
             .execute_db_actions(async |transaction| {
-                let user_message = transaction
-                    .add_message_from_user("Question", Vec::new(), &chat)
-                    .await?;
+                let user_message = transaction.add_message_from_user("Question", Vec::new(), &chat).await?;
                 let llm_message = transaction
                     .begin_llm_message_by_chat_id_and_user_message_id(chat.id, user_message.id)
                     .await?;
@@ -62,14 +60,10 @@ async fn action_details_are_validated_before_insert_and_parent_completion() {
             .await
             .unwrap_err();
 
-        assert_eq!(
-            validation_error.kind(),
-            InfrastructureErrorKind::EntityValidationFailed
-        );
+        assert_eq!(validation_error.kind(), InfrastructureErrorKind::EntityValidationFailed);
     }
 
-    let (_, llm_message_id, action_id) =
-        create_pending_command_action(&infrastructure, &chat).await;
+    let (_, llm_message_id, action_id) = create_pending_command_action(&infrastructure, &chat).await;
     let invalid_database_details = [
         (
             "file_change",
@@ -87,30 +81,20 @@ async fn action_details_are_validated_before_insert_and_parent_completion() {
             "tool_call",
             r#"{"kind":"tool_call","tool_name":"search","arguments":[]}"#,
         ),
-        (
-            "command",
-            r#"{"kind":"tool_call","tool_name":"search","arguments":{}}"#,
-        ),
+        ("command", r#"{"kind":"tool_call","tool_name":"search","arguments":{}}"#),
     ];
     for (action_kind, action_details_json) in invalid_database_details {
         assert!(
-            insert_raw_action(
-                &infrastructure,
-                llm_message_id,
-                2,
-                action_kind,
-                action_details_json,
-            )
-            .await
-            .is_err()
+            insert_raw_action(&infrastructure, llm_message_id, 2, action_kind, action_details_json,)
+                .await
+                .is_err()
         );
     }
 
-    let incomplete_message_completion =
-        sqlx::query("UPDATE messages SET llm_message_state = 'completed' WHERE id = ?")
-            .bind(llm_message_id.as_bytes().to_vec())
-            .execute(&infrastructure.connection_pool)
-            .await;
+    let incomplete_message_completion = sqlx::query("UPDATE messages SET llm_message_state = 'completed' WHERE id = ?")
+        .bind(llm_message_id.as_bytes().to_vec())
+        .execute(&infrastructure.connection_pool)
+        .await;
     assert!(incomplete_message_completion.is_err());
 
     infrastructure
@@ -137,19 +121,17 @@ async fn action_details_are_validated_before_insert_and_parent_completion() {
         })
         .await
         .unwrap();
-    let completion_result =
-        sqlx::query("UPDATE messages SET llm_message_state = 'completed' WHERE id = ?")
-            .bind(llm_message_id.as_bytes().to_vec())
-            .execute(&infrastructure.connection_pool)
-            .await;
+    let completion_result = sqlx::query("UPDATE messages SET llm_message_state = 'completed' WHERE id = ?")
+        .bind(llm_message_id.as_bytes().to_vec())
+        .execute(&infrastructure.connection_pool)
+        .await;
     assert!(completion_result.is_ok());
 }
 
 #[tokio::test]
 async fn database_rejects_incomplete_actions_on_insert() {
     let (_temporary_directory, infrastructure, chat) = create_test_chat().await;
-    let (user_message_id, llm_message_id, _) =
-        create_pending_command_action(&infrastructure, &chat).await;
+    let (user_message_id, llm_message_id, _) = create_pending_command_action(&infrastructure, &chat).await;
     let incomplete_action_id = uuid::Uuid::new_v4().as_bytes().to_vec();
 
     let incomplete_action_insert = sqlx::query(
@@ -171,12 +153,11 @@ async fn database_rejects_incomplete_actions_on_insert() {
     .await;
     assert!(invalid_parent_action_insert.is_err());
 
-    let incomplete_action_count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM llm_actions WHERE id = ?")
-            .bind(&incomplete_action_id)
-            .fetch_one(&infrastructure.connection_pool)
-            .await
-            .unwrap();
+    let incomplete_action_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM llm_actions WHERE id = ?")
+        .bind(&incomplete_action_id)
+        .fetch_one(&infrastructure.connection_pool)
+        .await
+        .unwrap();
     assert_eq!(incomplete_action_count, 0);
 }
 
@@ -190,11 +171,10 @@ async fn deleting_parent_chat_cascades_through_the_action_aggregate() {
         .await
         .unwrap();
 
-    let remaining_action_count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM llm_actions WHERE id = ?")
-            .bind(action_id.as_bytes().to_vec())
-            .fetch_one(&infrastructure.connection_pool)
-            .await
-            .unwrap();
+    let remaining_action_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM llm_actions WHERE id = ?")
+        .bind(action_id.as_bytes().to_vec())
+        .fetch_one(&infrastructure.connection_pool)
+        .await
+        .unwrap();
     assert_eq!(remaining_action_count, 0);
 }

@@ -39,15 +39,13 @@ impl EventDispatcher {
     }
 
     fn remaining_event_delivery_time(&self, event_delivery_deadline: Option<Instant>) -> Duration {
-        let event_delivery_remaining = event_delivery_deadline
-            .map_or(self.event_delivery_timeout, |deadline| {
-                deadline.saturating_duration_since(Instant::now())
-            });
+        let event_delivery_remaining = event_delivery_deadline.map_or(self.event_delivery_timeout, |deadline| {
+            deadline.saturating_duration_since(Instant::now())
+        });
 
-        self.overall_deadline
-            .map_or(event_delivery_remaining, |deadline| {
-                event_delivery_remaining.min(deadline.saturating_duration_since(Instant::now()))
-            })
+        self.overall_deadline.map_or(event_delivery_remaining, |deadline| {
+            event_delivery_remaining.min(deadline.saturating_duration_since(Instant::now()))
+        })
     }
 
     fn event_delivery_timeout_error(&self, operation: &str) -> LlmError {

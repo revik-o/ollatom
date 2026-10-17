@@ -1,7 +1,6 @@
 use super::super::YamlConfigurationError;
 use super::super::document::{
-    add_value_to_configuration_document, read_configuration_document,
-    serialize_configuration_document,
+    add_value_to_configuration_document, read_configuration_document, serialize_configuration_document,
 };
 use super::{ConfigurationCommitIdentifier, ConfigurationCommitStatus, ConfigurationFile};
 use filesystem::FilePointer;
@@ -48,12 +47,8 @@ impl ConfigurationFile {
         self.coordinator.commit_registry.register(&self.file_path)
     }
 
-    async fn acquire_mutation_locks(
-        &self,
-    ) -> Result<(OwnedMutexGuard<()>, File), YamlConfigurationError> {
-        let coordinator_guard = Arc::clone(&self.coordinator.mutation_lock)
-            .lock_owned()
-            .await;
+    async fn acquire_mutation_locks(&self) -> Result<(OwnedMutexGuard<()>, File), YamlConfigurationError> {
+        let coordinator_guard = Arc::clone(&self.coordinator.mutation_lock).lock_owned().await;
 
         let lock_file_path = self.lock_file_path.clone();
         let lock_file = tokio::task::spawn_blocking(move || {
@@ -83,26 +78,17 @@ impl ConfigurationFile {
         let mut configuration_document = read_configuration_document(&self.file_pointer).await?;
 
         for (configuration_key, configuration_value) in parameters {
-            add_value_to_configuration_document(
-                &mut configuration_document,
-                &configuration_key,
-                configuration_value,
-            )?;
+            add_value_to_configuration_document(&mut configuration_document, &configuration_key, configuration_value)?;
         }
 
         persist_configuration_document(&self.file_pointer, &configuration_document).await
     }
 
-    pub(super) async fn replace_contents(
-        &self,
-        configuration_contents: String,
-    ) -> Result<(), YamlConfigurationError> {
+    pub(super) async fn replace_contents(&self, configuration_contents: String) -> Result<(), YamlConfigurationError> {
         let (_coordinator_guard, _lock_file) = self.acquire_mutation_locks().await?;
 
         self.refresh_current_file().await?;
-        self.file_pointer
-            .write_text_atomically(configuration_contents)
-            .await?;
+        self.file_pointer.write_text_atomically(configuration_contents).await?;
 
         Ok(())
     }
@@ -113,14 +99,10 @@ impl ConfigurationFile {
     }
 }
 
-fn open_private_configuration_lock_file(
-    lock_file_path: &Path,
-) -> Result<File, YamlConfigurationError> {
-    filesystem::open_or_create_owner_only_file(lock_file_path).map_err(|source| {
-        YamlConfigurationError::Coordination {
-            path: lock_file_path.to_owned(),
-            source,
-        }
+fn open_private_configuration_lock_file(lock_file_path: &Path) -> Result<File, YamlConfigurationError> {
+    filesystem::open_or_create_owner_only_file(lock_file_path).map_err(|source| YamlConfigurationError::Coordination {
+        path: lock_file_path.to_owned(),
+        source,
     })
 }
 
@@ -128,12 +110,9 @@ async fn persist_configuration_document(
     file_pointer: &FilePointer,
     configuration_document: &Value,
 ) -> Result<(), YamlConfigurationError> {
-    let configuration_contents =
-        serialize_configuration_document(configuration_document, file_pointer.path())?;
+    let configuration_contents = serialize_configuration_document(configuration_document, file_pointer.path())?;
 
-    file_pointer
-        .write_text_atomically(configuration_contents)
-        .await?;
+    file_pointer.write_text_atomically(configuration_contents).await?;
 
     Ok(())
 }

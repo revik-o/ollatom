@@ -15,10 +15,7 @@ pub enum FilesystemError {
     #[error("'{path}' is not a regular file")]
     NotRegularFile { path: PathBuf },
     #[error("file '{path}' exceeds the {maximum_byte_count}-byte limit")]
-    FileSizeLimitExceeded {
-        path: PathBuf,
-        maximum_byte_count: u64,
-    },
+    FileSizeLimitExceeded { path: PathBuf, maximum_byte_count: u64 },
     #[error("destination '{path}' already exists")]
     DestinationAlreadyExists { path: PathBuf },
     #[error("atomic metadata policy is not supported for '{path}'")]
@@ -47,10 +44,7 @@ impl FilesystemError {
         }
     }
 
-    pub(crate) fn throw_filesystem_operation_task_failed(
-        path: impl Into<PathBuf>,
-        source: JoinError,
-    ) -> Self {
+    pub(crate) fn throw_filesystem_operation_task_failed(path: impl Into<PathBuf>, source: JoinError) -> Self {
         Self::FilesystemOperationTaskFailed {
             path: path.into(),
             source,

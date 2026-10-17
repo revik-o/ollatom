@@ -14,9 +14,7 @@ pub(super) fn system_root_directory() -> Result<PathBuf, CommandError> {
         .map_err(|error| CommandError::SandboxUnavailable(error.to_string()))?;
 
     if !system_root_metadata.is_dir() {
-        return Err(CommandError::SandboxUnavailable(
-            "SystemRoot is not a directory".into(),
-        ));
+        return Err(CommandError::SandboxUnavailable("SystemRoot is not a directory".into()));
     }
 
     Ok(system_root_path)
@@ -34,9 +32,7 @@ pub(super) fn build_windows_environment(
 
     let system_root = system_root_directory()?.into_os_string();
 
-    let system_directory = PathBuf::from(&system_root)
-        .join("System32")
-        .into_os_string();
+    let system_directory = PathBuf::from(&system_root).join("System32").into_os_string();
 
     let mut executable_search_directories = vec![system_directory];
 
@@ -78,9 +74,7 @@ pub(super) fn build_windows_command_line(
     executable_path: &Path,
     arguments: &[OsString],
 ) -> Result<String, CommandError> {
-    let executable = executable_path
-        .to_str()
-        .ok_or(CommandError::InvalidCommand)?;
+    let executable = executable_path.to_str().ok_or(CommandError::InvalidCommand)?;
 
     let arguments = arguments
         .iter()
@@ -89,10 +83,7 @@ pub(super) fn build_windows_command_line(
 
     let command_parts = std::iter::once(executable).chain(arguments);
 
-    Ok(command_parts
-        .map(quote_windows_argument)
-        .collect::<Vec<_>>()
-        .join(" "))
+    Ok(command_parts.map(quote_windows_argument).collect::<Vec<_>>().join(" "))
 }
 
 pub(crate) fn quote_windows_argument(argument: &str) -> String {
@@ -106,8 +97,7 @@ pub(crate) fn quote_windows_argument(argument: &str) -> String {
         if character == '\\' {
             backslash_count = backslash_count.saturating_add(1);
         } else if character == '"' {
-            quoted_argument
-                .push_str(&"\\".repeat(backslash_count.saturating_mul(2).saturating_add(1)));
+            quoted_argument.push_str(&"\\".repeat(backslash_count.saturating_mul(2).saturating_add(1)));
             quoted_argument.push('"');
             backslash_count = 0;
         } else {

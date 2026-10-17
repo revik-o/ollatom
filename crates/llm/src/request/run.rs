@@ -8,8 +8,7 @@ use std::{
 pub struct LlmRun {
     pub(crate) id: RunId,
     pub(crate) stop_handle: StopHandle,
-    pub(crate) outcome_future:
-        Pin<Box<dyn Future<Output = Result<LlmRunOutcome, LlmError>> + Send>>,
+    pub(crate) outcome_future: Pin<Box<dyn Future<Output = Result<LlmRunOutcome, LlmError>> + Send>>,
     pub(crate) event_stream: Option<RunEventStream>,
     pub(crate) finished: bool,
     pub(crate) detached: bool,

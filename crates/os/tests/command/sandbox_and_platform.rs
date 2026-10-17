@@ -61,8 +61,7 @@ fn command_parser_rejects_unclosed_quotes() {
 #[tokio::test]
 async fn appcontainer_command_captures_output_and_completes() {
     let workspace_directory = tempfile::tempdir().unwrap();
-    let authorization =
-        prepare_windows_test_command(workspace_directory.path(), ["/C", "echo ollatom"]);
+    let authorization = prepare_windows_test_command(workspace_directory.path(), ["/C", "echo ollatom"]);
     let command_entity = execute_sandboxed_command(authorization).unwrap();
     let outcome = tokio::time::timeout(Duration::from_secs(20), command_entity)
         .await

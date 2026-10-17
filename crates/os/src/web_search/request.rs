@@ -67,8 +67,7 @@ pub(super) async fn web_search(search_query: impl Into<String>) -> WebSearchResp
         }
     };
 
-    let error =
-        (!(200..300).contains(&status_code)).then_some(WebSearchError::HttpStatus(status_code));
+    let error = (!(200..300).contains(&status_code)).then_some(WebSearchError::HttpStatus(status_code));
 
     WebSearchResponse {
         input: search_query,
@@ -154,9 +153,10 @@ fn build_pinned_client(validated_addresses: &[SocketAddr]) -> Result<Client, Web
 }
 
 async fn read_bounded_response_body(mut response: Response) -> Result<Vec<u8>, WebSearchError> {
-    if response.content_length().is_some_and(|content_length| {
-        content_length > u64::try_from(MAXIMUM_RESPONSE_SIZE_BYTES).unwrap_or(u64::MAX)
-    }) {
+    if response
+        .content_length()
+        .is_some_and(|content_length| content_length > u64::try_from(MAXIMUM_RESPONSE_SIZE_BYTES).unwrap_or(u64::MAX))
+    {
         return Err(WebSearchError::ResponseTooLarge);
     }
 

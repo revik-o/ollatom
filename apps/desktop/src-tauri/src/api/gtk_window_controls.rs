@@ -48,8 +48,5 @@ fn is_window_control_name(name: &str) -> bool {
 }
 
 fn has_window_controls(layout_side: &str) -> bool {
-    layout_side
-        .split(',')
-        .map(str::trim)
-        .any(is_window_control_name)
+    layout_side.split(',').map(str::trim).any(is_window_control_name)
 }

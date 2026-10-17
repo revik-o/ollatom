@@ -27,8 +27,7 @@ pub(crate) async fn validate_llm_reply_target(
 ) -> InfrastructureResult<()> {
     validate_chat_exists(database_transaction, chat_id).await?;
 
-    let Some(user_message) = load_message_by_id(database_transaction, user_message_id).await?
-    else {
+    let Some(user_message) = load_message_by_id(database_transaction, user_message_id).await? else {
         return Err(InfrastructureError::new(
             InfrastructureErrorKind::InvalidEntityReference,
             format!("user message '{user_message_id}' does not exist"),
@@ -61,15 +60,10 @@ pub(crate) fn validate_message_contents_and_attachments(
     Ok(())
 }
 
-pub(crate) fn validate_attachment_inputs(
-    attachment_inputs: &[AttachmentInput],
-) -> InfrastructureResult<()> {
+pub(crate) fn validate_attachment_inputs(attachment_inputs: &[AttachmentInput]) -> InfrastructureResult<()> {
     for attachment_input in attachment_inputs {
         validate_nonblank_value("attachment file name", &attachment_input.file_name)?;
-        validate_nonblank_value(
-            "attachment storage reference",
-            &attachment_input.storage_reference,
-        )?;
+        validate_nonblank_value("attachment storage reference", &attachment_input.storage_reference)?;
 
         i64::try_from(attachment_input.byte_length).map_err(|source| {
             InfrastructureError::new(
@@ -115,10 +109,7 @@ pub(crate) fn validate_action_status_event_sequence(
     }
 
     for status_event_pair in status_events.windows(2) {
-        validate_action_status_transition(
-            status_event_pair[0].status,
-            status_event_pair[1].status,
-        )?;
+        validate_action_status_transition(status_event_pair[0].status, status_event_pair[1].status)?;
     }
 
     Ok(())
@@ -130,10 +121,7 @@ pub(crate) fn validate_action_status_transition(
 ) -> InfrastructureResult<()> {
     let is_valid_transition = match previous_status {
         LlmActionStatus::Pending => {
-            matches!(
-                next_status,
-                LlmActionStatus::Running | LlmActionStatus::Cancelled
-            )
+            matches!(next_status, LlmActionStatus::Running | LlmActionStatus::Cancelled)
         }
         LlmActionStatus::Running => matches!(
             next_status,
@@ -145,9 +133,7 @@ pub(crate) fn validate_action_status_transition(
     if !is_valid_transition {
         return Err(InfrastructureError::new(
             InfrastructureErrorKind::InvalidLlmActionStatusTransition,
-            format!(
-                "invalid LLM action status transition from {previous_status:?} to {next_status:?}"
-            ),
+            format!("invalid LLM action status transition from {previous_status:?} to {next_status:?}"),
         ));
     }
 
@@ -162,9 +148,7 @@ pub(crate) fn validate_in_progress_llm_message(message: &Message) -> Infrastruct
     if message.validity != MessageValidity::Active
         || llm_message_metadata.llm_message_state != LlmMessageState::InProgress
     {
-        return Err(invalid_message_operation(
-            "LLM message is not active and in progress",
-        ));
+        return Err(invalid_message_operation("LLM message is not active and in progress"));
     }
 
     Ok(())

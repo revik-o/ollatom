@@ -3,8 +3,8 @@ use super::super::document::{
     read_configuration_document, read_value_from_configuration_document, validate_configuration_key,
 };
 use super::{
-    ConfigurationCommitHandle, ConfigurationCommitIdentifier, ConfigurationCommitStatus,
-    JsonConfigurationStore, JsonConfigurationUpdate,
+    ConfigurationCommitHandle, ConfigurationCommitIdentifier, ConfigurationCommitStatus, JsonConfigurationStore,
+    JsonConfigurationUpdate,
 };
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -32,10 +32,7 @@ impl JsonConfigurationStore {
             .add_parameter(configuration_key, configuration_value)
     }
 
-    pub async fn read_parameter(
-        &self,
-        configuration_key: &str,
-    ) -> Result<Option<Value>, YamlConfigurationError> {
+    pub async fn read_parameter(&self, configuration_key: &str) -> Result<Option<Value>, YamlConfigurationError> {
         validate_configuration_key(configuration_key)?;
         let _coordinator_guard = self.file.coordinator.mutation_lock.lock().await;
         let configuration_document = read_configuration_document(&self.file.file_pointer).await?;
@@ -70,23 +67,19 @@ impl JsonConfigurationUpdate {
 
         validate_configuration_key(&configuration_key)?;
 
-        self.parameters
-            .insert(configuration_key, configuration_value.into());
+        self.parameters.insert(configuration_key, configuration_value.into());
 
         Ok(self)
     }
 
     pub fn commit(self) -> Result<ConfigurationCommitHandle, YamlConfigurationError> {
-        let runtime = tokio::runtime::Handle::try_current().map_err(|source| {
-            YamlConfigurationError::Coordination {
-                path: self.configuration_store.file.file_path.clone(),
-                source: std::io::Error::other(source),
-            }
+        let runtime = tokio::runtime::Handle::try_current().map_err(|source| YamlConfigurationError::Coordination {
+            path: self.configuration_store.file.file_path.clone(),
+            source: std::io::Error::other(source),
         })?;
 
         let configuration_file = self.configuration_store.file.clone();
-        let (operation_identifier, completion_sender, completion_receiver) =
-            configuration_file.register_commit()?;
+        let (operation_identifier, completion_sender, completion_receiver) = configuration_file.register_commit()?;
 
         runtime.spawn(async move {
             let status = match configuration_file.apply_parameters(self.parameters).await {

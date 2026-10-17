@@ -23,9 +23,7 @@ pub(super) async fn terminate_process_tree(
 }
 
 #[cfg(unix)]
-pub(super) fn terminate_remaining_descendants(
-    process_identifier: Option<u32>,
-) -> Result<(), CommandError> {
+pub(super) fn terminate_remaining_descendants(process_identifier: Option<u32>) -> Result<(), CommandError> {
     let Some(process_identifier) = process_identifier else {
         return Ok(());
     };
@@ -54,9 +52,7 @@ pub(super) async fn terminate_process_tree(
 }
 
 #[cfg(all(not(unix), not(windows)))]
-pub(super) fn terminate_remaining_descendants(
-    _process_identifier: Option<u32>,
-) -> Result<(), CommandError> {
+pub(super) fn terminate_remaining_descendants(_process_identifier: Option<u32>) -> Result<(), CommandError> {
     Ok(())
 }
 

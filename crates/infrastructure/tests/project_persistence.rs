@@ -1,8 +1,7 @@
 mod support;
 
 use infrastructure::{
-    ExecutionSettingsUpdate, InfrastructureErrorKind, ProjectId, ProjectInitializationParameters,
-    ProjectUpdateOptions,
+    ExecutionSettingsUpdate, InfrastructureErrorKind, ProjectId, ProjectInitializationParameters, ProjectUpdateOptions,
 };
 use std::path::{Component, Path, PathBuf};
 use support::{TestInfrastructure, create_initialized_test_infrastructure};

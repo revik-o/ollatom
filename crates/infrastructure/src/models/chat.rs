@@ -42,10 +42,7 @@ impl ChatUpdateOptions {
         self
     }
 
-    pub fn with_execution_settings(
-        mut self,
-        execution_settings: super::ExecutionSettingsUpdate,
-    ) -> Self {
+    pub fn with_execution_settings(mut self, execution_settings: super::ExecutionSettingsUpdate) -> Self {
         self.execution_settings = execution_settings;
         self
     }
@@ -58,23 +55,17 @@ impl ChatUpdateOptions {
     }
 
     pub fn with_llm_context_optimization_enabled(mut self, is_enabled: bool) -> Self {
-        self.execution_settings = self
-            .execution_settings
-            .with_context_optimization_enabled(is_enabled);
+        self.execution_settings = self.execution_settings.with_context_optimization_enabled(is_enabled);
         self
     }
 
     pub fn with_cpu_usage_percentage(mut self, cpu_usage_percentage: u8) -> Self {
-        self.execution_settings = self
-            .execution_settings
-            .with_cpu_usage_percentage(cpu_usage_percentage);
+        self.execution_settings = self.execution_settings.with_cpu_usage_percentage(cpu_usage_percentage);
         self
     }
 
     pub fn with_gpu_usage_percentage(mut self, gpu_usage_percentage: u8) -> Self {
-        self.execution_settings = self
-            .execution_settings
-            .with_gpu_usage_percentage(gpu_usage_percentage);
+        self.execution_settings = self.execution_settings.with_gpu_usage_percentage(gpu_usage_percentage);
         self
     }
 

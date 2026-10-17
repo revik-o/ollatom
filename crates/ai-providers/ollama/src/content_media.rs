@@ -15,10 +15,7 @@ pub(super) struct AttachmentBudget {
 }
 
 impl AttachmentBudget {
-    pub(super) fn new(
-        maximum_attachment_size_bytes: u64,
-        maximum_aggregate_attachment_size_bytes: u64,
-    ) -> Self {
+    pub(super) fn new(maximum_attachment_size_bytes: u64, maximum_aggregate_attachment_size_bytes: u64) -> Self {
         Self {
             maximum_attachment_size_bytes,
             maximum_aggregate_attachment_size_bytes,
@@ -41,9 +38,7 @@ impl AttachmentBudget {
 
     fn charge(&mut self, attachment_size_bytes: u64) -> Result<(), LlmError> {
         if attachment_size_bytes > self.maximum_attachment_size_bytes {
-            return Err(LlmError::InvalidRequest(
-                "attachment exceeds size limit".into(),
-            ));
+            return Err(LlmError::InvalidRequest("attachment exceeds size limit".into()));
         }
 
         let aggregate_attachment_size_bytes = self
@@ -64,10 +59,7 @@ impl AttachmentBudget {
 
 impl Default for AttachmentBudget {
     fn default() -> Self {
-        Self::new(
-            MAXIMUM_ATTACHMENT_SIZE_BYTES,
-            MAXIMUM_AGGREGATE_ATTACHMENT_SIZE_BYTES,
-        )
+        Self::new(MAXIMUM_ATTACHMENT_SIZE_BYTES, MAXIMUM_AGGREGATE_ATTACHMENT_SIZE_BYTES)
     }
 }
 
@@ -106,9 +98,7 @@ fn attachment_kind(media_type: &str) -> Result<AttachmentKind, LlmError> {
     } else if media_type.starts_with("audio/") {
         Ok(AttachmentKind::Audio)
     } else {
-        Err(LlmError::UnsupportedOption(format!(
-            "media type {media_type}"
-        )))
+        Err(LlmError::UnsupportedOption(format!("media type {media_type}")))
     }
 }
 
@@ -121,13 +111,13 @@ pub(super) async fn read_attachment(
     let path_ref = Path::new(path);
     let parent = path_ref.parent().unwrap_or_else(|| Path::new("."));
 
-    let file_name = path_ref.file_name().ok_or_else(|| {
-        LlmError::InvalidRequest("attachment path must name a regular file".into())
-    })?;
+    let file_name = path_ref
+        .file_name()
+        .ok_or_else(|| LlmError::InvalidRequest("attachment path must name a regular file".into()))?;
 
-    let workspace = WorkspaceDirectory::open(parent).await.map_err(|error| {
-        LlmError::InvalidRequest(format!("cannot open attachment directory: {error}"))
-    })?;
+    let workspace = WorkspaceDirectory::open(parent)
+        .await
+        .map_err(|error| LlmError::InvalidRequest(format!("cannot open attachment directory: {error}")))?;
 
     let attachment = workspace
         .file(PathBuf::from(file_name))
@@ -139,9 +129,7 @@ pub(super) async fn read_attachment(
         .read_regular_file_bytes_bounded(maximum_read_size_bytes)
         .await
         .map_err(|error| match error {
-            FilesystemError::FileSizeLimitExceeded { .. }
-                if attachment_budget.aggregate_limit_would_be_exceeded() =>
-            {
+            FilesystemError::FileSizeLimitExceeded { .. } if attachment_budget.aggregate_limit_would_be_exceeded() => {
                 LlmError::InvalidRequest("aggregate attachments exceed size limit".into())
             }
             FilesystemError::FileSizeLimitExceeded { .. } => {

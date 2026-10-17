@@ -10,16 +10,12 @@ impl RunHost {
             return Err(LlmError::Cancelled);
         }
 
-        let subagent_profile = self
-            .profiles
-            .get(&subagent_request.profile)
-            .cloned()
-            .ok_or_else(|| {
-                LlmError::InvalidToolArguments(format!(
-                    "unknown subagent profile {}",
-                    subagent_request.profile.as_str()
-                ))
-            })?;
+        let subagent_profile = self.profiles.get(&subagent_request.profile).cloned().ok_or_else(|| {
+            LlmError::InvalidToolArguments(format!(
+                "unknown subagent profile {}",
+                subagent_request.profile.as_str()
+            ))
+        })?;
         {
             let mut host_state = self.state.lock().await;
             let reached_depth_limit = self.limits.subagent_depth == 0;
@@ -70,11 +66,7 @@ impl RunHost {
             subagent_result = subagent_future => subagent_result,
         }?;
 
-        self.state
-            .lock()
-            .await
-            .child_usage
-            .push(subagent_outcome.usage.clone());
+        self.state.lock().await.child_usage.push(subagent_outcome.usage.clone());
 
         Ok(subagent_outcome)
     }

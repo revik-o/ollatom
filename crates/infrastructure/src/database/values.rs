@@ -4,10 +4,7 @@ use std::path::{Path, PathBuf};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use uuid::Uuid;
 
-pub(crate) fn database_operation_error(
-    operation: &str,
-    source: sqlx::Error,
-) -> InfrastructureError {
+pub(crate) fn database_operation_error(operation: &str, source: sqlx::Error) -> InfrastructureError {
     let error_kind = match &source {
         sqlx::Error::Database(database_error)
             if matches!(
@@ -44,9 +41,7 @@ pub(crate) fn parse_timestamp(timestamp: &str) -> InfrastructureResult<OffsetDat
     })
 }
 
-pub(crate) fn parse_optional_timestamp(
-    timestamp: Option<String>,
-) -> InfrastructureResult<Option<OffsetDateTime>> {
+pub(crate) fn parse_optional_timestamp(timestamp: Option<String>) -> InfrastructureResult<Option<OffsetDateTime>> {
     timestamp.as_deref().map(parse_timestamp).transpose()
 }
 
@@ -59,10 +54,7 @@ pub(crate) fn parse_uuid(identifier_bytes: Vec<u8>) -> InfrastructureResult<Uuid
     })
 }
 
-pub(crate) fn validate_nonblank_value(
-    field_name: &str,
-    field_value: &str,
-) -> InfrastructureResult<()> {
+pub(crate) fn validate_nonblank_value(field_name: &str, field_value: &str) -> InfrastructureResult<()> {
     if field_value.trim().is_empty() {
         return Err(InfrastructureError::new(
             InfrastructureErrorKind::EntityValidationFailed,
@@ -73,10 +65,7 @@ pub(crate) fn validate_nonblank_value(
     Ok(())
 }
 
-pub(crate) fn validate_usage_percentage(
-    field_name: &str,
-    usage_percentage: u8,
-) -> InfrastructureResult<()> {
+pub(crate) fn validate_usage_percentage(field_name: &str, usage_percentage: u8) -> InfrastructureResult<()> {
     if usage_percentage > 100 {
         return Err(InfrastructureError::new(
             InfrastructureErrorKind::EntityValidationFailed,

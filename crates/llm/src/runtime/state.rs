@@ -1,9 +1,9 @@
 use super::builder::LlmRuntimeBuilder;
 use super::interactions::InteractionHub;
 use crate::{
-    InteractionId, InteractionReply, IntoProviderId, LlmError, LlmProvider, ModelId, ProviderId,
-    RequestBuilder, RunEventSink, StopHandle, SubagentProfileRegistry, ToolRegistry,
-    ids::allocate_monotonic_identifier, subagent::SharedSubagentRunner,
+    InteractionId, InteractionReply, IntoProviderId, LlmError, LlmProvider, ModelId, ProviderId, RequestBuilder,
+    RunEventSink, StopHandle, SubagentProfileRegistry, ToolRegistry, ids::allocate_monotonic_identifier,
+    subagent::SharedSubagentRunner,
 };
 use std::{
     collections::BTreeMap,
@@ -37,10 +37,7 @@ impl LlmRuntime {
         LlmRuntimeBuilder::new()
     }
 
-    pub fn request<P: IntoProviderId>(
-        &self,
-        provider: P,
-    ) -> RequestBuilder<crate::MissingUserMessage> {
+    pub fn request<P: IntoProviderId>(&self, provider: P) -> RequestBuilder<crate::MissingUserMessage> {
         RequestBuilder::new(Some(self.clone()), provider)
     }
 
@@ -54,14 +51,8 @@ impl LlmRuntime {
         })
     }
 
-    pub fn resolve_interaction(
-        &self,
-        interaction_id: InteractionId,
-        reply: InteractionReply,
-    ) -> Result<(), LlmError> {
-        self.inner
-            .interactions
-            .resolve_interaction(interaction_id, reply)
+    pub fn resolve_interaction(&self, interaction_id: InteractionId, reply: InteractionReply) -> Result<(), LlmError> {
+        self.inner.interactions.resolve_interaction(interaction_id, reply)
     }
 
     pub(crate) fn next_run_id(&self) -> Result<crate::RunId, LlmError> {
@@ -71,11 +62,7 @@ impl LlmRuntime {
         )?))
     }
 
-    pub(crate) fn register_run(
-        &self,
-        run_id: crate::RunId,
-        stop_handle: StopHandle,
-    ) -> Result<(), LlmError> {
+    pub(crate) fn register_run(&self, run_id: crate::RunId, stop_handle: StopHandle) -> Result<(), LlmError> {
         self.inner
             .active
             .lock()
@@ -91,10 +78,7 @@ impl LlmRuntime {
         }
     }
 
-    pub(crate) fn provider_registration(
-        &self,
-        provider: &ProviderId,
-    ) -> Result<&ProviderRegistration, LlmError> {
+    pub(crate) fn provider_registration(&self, provider: &ProviderId) -> Result<&ProviderRegistration, LlmError> {
         self.inner
             .providers
             .get(provider)

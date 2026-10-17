@@ -1,8 +1,7 @@
 use super::RequestData;
 use crate::{
-    AllowedPermissions, ApprovalDecision, ApprovalRequest, ConversationMessage, IntoModelId,
-    IntoProviderId, LlmError, LlmOptions, LlmRun, ProviderId, ReasoningEffort, RunLimits,
-    RunPolicy, TrustedFolder, UserMessage,
+    AllowedPermissions, ApprovalDecision, ApprovalRequest, ConversationMessage, IntoModelId, IntoProviderId, LlmError,
+    LlmOptions, LlmRun, ProviderId, ReasoningEffort, RunLimits, RunPolicy, TrustedFolder, UserMessage,
 };
 use std::{future::Future, marker::PhantomData, path::PathBuf, sync::Arc};
 
@@ -96,18 +95,13 @@ impl<State> RequestBuilder<State> {
         FolderPath: Into<PathBuf>,
     {
         for path in paths {
-            self.data
-                .policy
-                .add_trusted_folder(TrustedFolder::standard(path));
+            self.data.policy.add_trusted_folder(TrustedFolder::standard(path));
         }
 
         self
     }
 
-    pub fn trusted_folder_grants(
-        mut self,
-        folders: impl IntoIterator<Item = TrustedFolder>,
-    ) -> Self {
+    pub fn trusted_folder_grants(mut self, folders: impl IntoIterator<Item = TrustedFolder>) -> Self {
         for folder in folders {
             self.data.policy.add_trusted_folder(folder);
         }
@@ -175,9 +169,10 @@ impl<State> RequestBuilder<State> {
 
     pub(crate) fn provider_id(&self) -> Result<&ProviderId, LlmError> {
         self.data.provider.as_ref().ok_or_else(|| {
-            self.data.validation_error.clone().unwrap_or_else(|| {
-                LlmError::InvalidRequest("request does not contain a provider".into())
-            })
+            self.data
+                .validation_error
+                .clone()
+                .unwrap_or_else(|| LlmError::InvalidRequest("request does not contain a provider".into()))
         })
     }
 
@@ -189,10 +184,7 @@ impl<State> RequestBuilder<State> {
 }
 
 impl RequestBuilder<MissingUserMessage> {
-    pub fn user_message(
-        mut self,
-        message: impl Into<UserMessage>,
-    ) -> RequestBuilder<HasUserMessage> {
+    pub fn user_message(mut self, message: impl Into<UserMessage>) -> RequestBuilder<HasUserMessage> {
         self.data.user_message = Some(message.into());
 
         RequestBuilder {
@@ -203,9 +195,8 @@ impl RequestBuilder<MissingUserMessage> {
 }
 impl RequestBuilder<HasUserMessage> {
     pub fn send(self) -> Result<LlmRun, LlmError> {
-        let runtime_handle = tokio::runtime::Handle::try_current().map_err(|_| {
-            LlmError::InvalidRequest("LLM execution requires a Tokio runtime".into())
-        })?;
+        let runtime_handle = tokio::runtime::Handle::try_current()
+            .map_err(|_| LlmError::InvalidRequest("LLM execution requires a Tokio runtime".into()))?;
 
         crate::runtime::execution::start_run(runtime_handle, self.data)
     }

@@ -1,6 +1,4 @@
-use crate::{
-    InfrastructureError, InfrastructureErrorKind, InfrastructureResult, ProjectFilesystemIdentity,
-};
+use crate::{InfrastructureError, InfrastructureErrorKind, InfrastructureResult, ProjectFilesystemIdentity};
 use filesystem::{DirectoryIdentity, WorkspaceDirectory};
 use std::path::{Path, PathBuf};
 
@@ -40,11 +38,7 @@ pub(super) async fn resolve_project_directory(
             file_identifier: *file_identifier,
         },
     };
-    Ok((
-        canonical_directory_path,
-        canonical_path_text,
-        filesystem_identity,
-    ))
+    Ok((canonical_directory_path, canonical_path_text, filesystem_identity))
 }
 
 pub(super) fn filesystem_identity_columns(
@@ -62,18 +56,11 @@ pub(super) fn filesystem_identity_columns(
         ProjectFilesystemIdentity::Windows {
             volume_identifier,
             file_identifier,
-        } => (
-            "windows",
-            volume_identifier.clone(),
-            file_identifier.to_vec(),
-        ),
+        } => ("windows", volume_identifier.clone(), file_identifier.to_vec()),
     }
 }
 
-pub(super) fn invalid_project_path(
-    path: &Path,
-    reason: impl std::fmt::Display,
-) -> InfrastructureError {
+pub(super) fn invalid_project_path(path: &Path, reason: impl std::fmt::Display) -> InfrastructureError {
     InfrastructureError::new(
         InfrastructureErrorKind::InvalidProjectPath,
         format!("invalid project directory '{}': {reason}", path.display()),

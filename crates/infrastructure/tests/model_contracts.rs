@@ -31,14 +31,8 @@ fn all_identifier_types_support_uuid_and_serde_contracts() {
 
 #[test]
 fn defaults_builders_roles_and_action_models_round_trip() {
-    assert_eq!(
-        ProjectInitializationParameters::default().cpu_usage_percentage,
-        100
-    );
-    assert_eq!(
-        ChatInitializationParameters::default().gpu_usage_percentage,
-        100
-    );
+    assert_eq!(ProjectInitializationParameters::default().cpu_usage_percentage, 100);
+    assert_eq!(ChatInitializationParameters::default().gpu_usage_percentage, 100);
 
     let execution_settings_update = ExecutionSettingsUpdate::default()
         .with_large_language_model_thinking_enabled(true)

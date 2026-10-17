@@ -11,9 +11,7 @@ pub(super) async fn list_files(
     stop: crate::StopToken,
 ) -> Result<Value, ToolFailure> {
     let worker_stop = stop.clone();
-    let mut worker = tokio::task::spawn_blocking(move || {
-        collect_relative_file_paths(&configuration, &worker_stop)
-    });
+    let mut worker = tokio::task::spawn_blocking(move || collect_relative_file_paths(&configuration, &worker_stop));
 
     tokio::select! {
         result = &mut worker => result.map_err(|error| ToolFailure::Execution(error.to_string()))?,
@@ -63,10 +61,7 @@ fn collect_directory_entries(
 ) -> io::Result<()> {
     for directory_entry in fs::read_dir(current_directory)? {
         if stop.is_stopped() {
-            return Err(io::Error::new(
-                io::ErrorKind::Interrupted,
-                "file listing cancelled",
-            ));
+            return Err(io::Error::new(io::ErrorKind::Interrupted, "file listing cancelled"));
         }
 
         let directory_entry = directory_entry?;
@@ -80,10 +75,7 @@ fn collect_directory_entries(
         if entry_metadata.is_dir() {
             let directory_name = directory_entry.file_name().to_string_lossy().into_owned();
 
-            if configuration
-                .excluded_directory_names()
-                .contains(&directory_name)
-            {
+            if configuration.excluded_directory_names().contains(&directory_name) {
                 continue;
             }
 
@@ -106,8 +98,7 @@ fn collect_directory_entries(
                 )
                 .ok_or_else(|| io::Error::other("file listing size limit exceeded"))?;
 
-            if relative_file_paths.len() >= MAXIMUM_FILE_COUNT
-                || *serialized_byte_count > MAXIMUM_SERIALIZED_BYTE_COUNT
+            if relative_file_paths.len() >= MAXIMUM_FILE_COUNT || *serialized_byte_count > MAXIMUM_SERIALIZED_BYTE_COUNT
             {
                 return Err(io::Error::other("file listing limit exceeded"));
             }

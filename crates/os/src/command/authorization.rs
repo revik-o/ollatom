@@ -22,8 +22,7 @@ pub(super) fn open_authorized_executable(
 pub(super) fn open_authorized_workspace(
     authorization: &SandboxedCommandAuthorization,
 ) -> Result<std::fs::File, CommandError> {
-    let pinned_workspace =
-        open_directory_without_replacement(&authorization.filesystem_policy.workspace_directory)?;
+    let pinned_workspace = open_directory_without_replacement(&authorization.filesystem_policy.workspace_directory)?;
 
     validate_pinned_workspace_path(authorization, &pinned_workspace)?;
 
@@ -44,8 +43,7 @@ pub(super) fn validate_pinned_executable_path(
     if executable_path_metadata.file_type().is_symlink()
         || !executable_path_metadata.is_file()
         || !pinned_metadata.is_file()
-        || executable_identity(&authorization.executable_path, &pinned_metadata)?
-            != authorization.executable_identity
+        || executable_identity(&authorization.executable_path, &pinned_metadata)? != authorization.executable_identity
         || executable_identity(&authorization.executable_path, &executable_path_metadata)?
             != authorization.executable_identity
     {
@@ -65,17 +63,14 @@ pub(super) fn validate_pinned_workspace_path(
         .metadata()
         .map_err(|error| CommandError::InvalidAuthorization(error.to_string()))?;
 
-    let workspace_path_metadata =
-        std::fs::symlink_metadata(&authorization.filesystem_policy.workspace_directory)
-            .map_err(|error| CommandError::InvalidAuthorization(error.to_string()))?;
+    let workspace_path_metadata = std::fs::symlink_metadata(&authorization.filesystem_policy.workspace_directory)
+        .map_err(|error| CommandError::InvalidAuthorization(error.to_string()))?;
 
     if workspace_path_metadata.file_type().is_symlink()
         || !workspace_path_metadata.is_dir()
         || !pinned_metadata.is_dir()
-        || directory_identity(
-            &authorization.filesystem_policy.workspace_directory,
-            &pinned_metadata,
-        )? != authorization.working_directory_identity
+        || directory_identity(&authorization.filesystem_policy.workspace_directory, &pinned_metadata)?
+            != authorization.working_directory_identity
         || directory_identity(
             &authorization.filesystem_policy.workspace_directory,
             &workspace_path_metadata,
@@ -89,9 +84,7 @@ pub(super) fn validate_pinned_workspace_path(
     Ok(())
 }
 
-pub(super) fn open_executable_without_replacement(
-    path: &Path,
-) -> Result<std::fs::File, CommandError> {
+pub(super) fn open_executable_without_replacement(path: &Path) -> Result<std::fs::File, CommandError> {
     #[cfg(windows)]
     {
         use std::os::windows::fs::OpenOptionsExt;
@@ -105,14 +98,11 @@ pub(super) fn open_executable_without_replacement(
 
     #[cfg(not(windows))]
     {
-        std::fs::File::open(path)
-            .map_err(|error| CommandError::InvalidAuthorization(error.to_string()))
+        std::fs::File::open(path).map_err(|error| CommandError::InvalidAuthorization(error.to_string()))
     }
 }
 
-pub(super) fn open_directory_without_replacement(
-    path: &Path,
-) -> Result<std::fs::File, CommandError> {
+pub(super) fn open_directory_without_replacement(path: &Path) -> Result<std::fs::File, CommandError> {
     #[cfg(windows)]
     {
         use std::os::windows::fs::OpenOptionsExt;
@@ -127,8 +117,7 @@ pub(super) fn open_directory_without_replacement(
 
     #[cfg(not(windows))]
     {
-        std::fs::File::open(path)
-            .map_err(|error| CommandError::InvalidAuthorization(error.to_string()))
+        std::fs::File::open(path).map_err(|error| CommandError::InvalidAuthorization(error.to_string()))
     }
 }
 
@@ -159,9 +148,5 @@ pub(super) fn resolve_trusted_executable(
         .map(|directory| directory.join(executable))
         .find(|candidate| candidate.is_file())
         .and_then(|candidate| std::fs::canonicalize(candidate).ok())
-        .ok_or_else(|| {
-            CommandError::InvalidAuthorization(
-                "executable was not found in the trusted PATH".into(),
-            )
-        })
+        .ok_or_else(|| CommandError::InvalidAuthorization("executable was not found in the trusted PATH".into()))
 }

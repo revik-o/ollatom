@@ -8,22 +8,21 @@ pub(crate) async fn insert_llm_action(
     initial_status_event_input: LlmActionStatusEventInput,
     status_event_inputs: Vec<LlmActionStatusEventInput>,
 ) -> InfrastructureResult<LlmAction> {
-    details.validate().map_err(|message| {
-        InfrastructureError::new(InfrastructureErrorKind::EntityValidationFailed, message)
-    })?;
+    details
+        .validate()
+        .map_err(|message| InfrastructureError::new(InfrastructureErrorKind::EntityValidationFailed, message))?;
     let mut status_sequence = Vec::new();
 
     status_sequence.push(initial_status_event_input.clone());
     status_sequence.extend(status_event_inputs.iter().cloned());
     validate_action_status_event_sequence(&status_sequence)?;
 
-    let sequence_number: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(MAX(sequence_number), 0) + 1 FROM llm_actions WHERE message_id = ?",
-    )
-    .bind(message_id.as_bytes().to_vec())
-    .fetch_one(&mut **database_transaction)
-    .await
-    .map_err(|source| database_operation_error("failed to allocate LLM action sequence", source))?;
+    let sequence_number: i64 =
+        sqlx::query_scalar("SELECT COALESCE(MAX(sequence_number), 0) + 1 FROM llm_actions WHERE message_id = ?")
+            .bind(message_id.as_bytes().to_vec())
+            .fetch_one(&mut **database_transaction)
+            .await
+            .map_err(|source| database_operation_error("failed to allocate LLM action sequence", source))?;
 
     let llm_action_id = LlmActionId::new();
     let sequence_number = u32::try_from(sequence_number).map_err(|source| {
@@ -75,13 +74,7 @@ pub(crate) async fn insert_llm_action(
                 )
             })?;
         status_events.push(
-            insert_action_status_event(
-                database_transaction,
-                llm_action_id,
-                sequence_number,
-                status_event_input,
-            )
-            .await?,
+            insert_action_status_event(database_transaction, llm_action_id, sequence_number, status_event_input).await?,
         );
     }
 

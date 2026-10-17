@@ -42,10 +42,7 @@ async fn rejects_relative_database_file_path() {
 #[tokio::test]
 async fn rejects_missing_database_parent_directory() {
     let temporary_directory = create_private_temporary_directory();
-    let database_file_path = temporary_directory
-        .path()
-        .join("missing")
-        .join("ollatom.sqlite3");
+    let database_file_path = temporary_directory.path().join("missing").join("ollatom.sqlite3");
     let initialization_error = Infrastructure::init(database_file_path).await.unwrap_err();
 
     assert_eq!(
@@ -57,9 +54,7 @@ async fn rejects_missing_database_parent_directory() {
 #[tokio::test]
 async fn rejects_directory_database_file_path() {
     let temporary_directory = create_private_temporary_directory();
-    let initialization_error = Infrastructure::init(temporary_directory.path())
-        .await
-        .unwrap_err();
+    let initialization_error = Infrastructure::init(temporary_directory.path()).await.unwrap_err();
 
     assert_eq!(
         initialization_error.kind(),
@@ -150,14 +145,8 @@ async fn hardens_database_directory_before_creating_database_files() {
 
     let infrastructure = Infrastructure::init(&database_file_path).await.unwrap();
 
-    assert_eq!(
-        fs::metadata(&database_directory_path).unwrap().mode() & 0o777,
-        0o700
-    );
-    assert_eq!(
-        fs::metadata(&database_file_path).unwrap().mode() & 0o777,
-        0o600
-    );
+    assert_eq!(fs::metadata(&database_directory_path).unwrap().mode() & 0o777, 0o700);
+    assert_eq!(fs::metadata(&database_file_path).unwrap().mode() & 0o777, 0o600);
     drop(infrastructure);
 }
 
@@ -171,9 +160,7 @@ async fn refuses_database_symlinks_without_modifying_the_target() {
     fs::write(&target_file_path, original_contents).unwrap();
     symlink(&target_file_path, &database_symlink_path).unwrap();
 
-    let initialization_error = Infrastructure::init(&database_symlink_path)
-        .await
-        .unwrap_err();
+    let initialization_error = Infrastructure::init(&database_symlink_path).await.unwrap_err();
 
     assert_eq!(
         initialization_error.kind(),
@@ -200,10 +187,6 @@ async fn rejects_database_initialization_without_private_acl_support() {
 fn create_private_temporary_directory() -> TempDir {
     let temporary_directory = tempdir().unwrap();
     #[cfg(unix)]
-    fs::set_permissions(
-        temporary_directory.path(),
-        fs::Permissions::from_mode(0o700),
-    )
-    .unwrap();
+    fs::set_permissions(temporary_directory.path(), fs::Permissions::from_mode(0o700)).unwrap();
     temporary_directory
 }

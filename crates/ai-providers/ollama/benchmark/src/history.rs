@@ -1,6 +1,6 @@
 use llm::{
-    ContentBlock, ConversationMessage, ConversationRole, LlmError, RunEvent, ToolCall, ToolEvent,
-    ToolOutput, append_tool_round_to_history,
+    ContentBlock, ConversationMessage, ConversationRole, LlmError, RunEvent, ToolCall, ToolEvent, ToolOutput,
+    append_tool_round_to_history,
 };
 
 #[derive(Default)]
@@ -28,9 +28,7 @@ impl ConversationHistoryRecorder {
             }
             RunEvent::ReasoningSummaryDelta(reasoning_delta) => {
                 self.current_round.started = true;
-                self.current_round
-                    .reasoning_summary
-                    .push_str(reasoning_delta);
+                self.current_round.reasoning_summary.push_str(reasoning_delta);
             }
             RunEvent::Tool(ToolEvent::Planned { call }) => {
                 self.current_round.started = true;
@@ -46,10 +44,7 @@ impl ConversationHistoryRecorder {
         Ok(())
     }
 
-    pub fn into_conversation_history(
-        mut self,
-        stage_prompt: &str,
-    ) -> Result<Vec<ConversationMessage>, LlmError> {
+    pub fn into_conversation_history(mut self, stage_prompt: &str) -> Result<Vec<ConversationMessage>, LlmError> {
         self.finish_current_provider_round()?;
         let mut conversation_history = Vec::with_capacity(self.completed_rounds.len());
         conversation_history.reserve(1);

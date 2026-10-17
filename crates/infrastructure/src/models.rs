@@ -7,15 +7,13 @@ mod project;
 pub use chat::{Chat, ChatInitializationParameters, ChatUpdateOptions};
 pub use execution_settings::{ExecutionSettings, ExecutionSettingsUpdate};
 pub use llm_action::{
-    CommandActionDetails, FileChangeDetails, FileChangeOperation, LlmAction, LlmActionDetails,
-    LlmActionInitialStatus, LlmActionInput, LlmActionStatus, LlmActionStatusEvent,
-    LlmActionStatusEventInput, ToolCallActionDetails,
+    CommandActionDetails, FileChangeDetails, FileChangeOperation, LlmAction, LlmActionDetails, LlmActionInitialStatus,
+    LlmActionInput, LlmActionStatus, LlmActionStatusEvent, LlmActionStatusEventInput, ToolCallActionDetails,
 };
 pub use message::{
-    Attachment, AttachmentInput, LlmMessageMetadata, LlmMessageState, Message, MessageRole,
-    MessageRoleMetadata, MessageValidity, UserMessageMetadata,
+    Attachment, AttachmentInput, LlmMessageMetadata, LlmMessageState, Message, MessageRole, MessageRoleMetadata,
+    MessageValidity, UserMessageMetadata,
 };
 pub use project::{
-    DatabaseSchemaVersion, Project, ProjectFilesystemIdentity, ProjectInitializationParameters,
-    ProjectUpdateOptions,
+    DatabaseSchemaVersion, Project, ProjectFilesystemIdentity, ProjectInitializationParameters, ProjectUpdateOptions,
 };

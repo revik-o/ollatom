@@ -184,10 +184,7 @@ async fn invalid_tool_arguments_are_returned_to_the_model() {
         name: "echo".into(),
         arguments: serde_json::json!({}),
     };
-    let provider = ScriptedProvider::new(
-        BuiltInProvider::Ollama,
-        ProviderBehavior::ExecuteToolRound(vec![call]),
-    );
+    let provider = ScriptedProvider::new(BuiltInProvider::Ollama, ProviderBehavior::ExecuteToolRound(vec![call]));
     let executions = Arc::new(AtomicUsize::new(0));
     let mut tools = ToolRegistry::new();
     tools

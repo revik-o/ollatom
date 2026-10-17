@@ -1,12 +1,10 @@
 use os::{CommandError, execute_command};
 #[cfg(any(unix, windows))]
-use os::{
-    CommandInvocation, SandboxNetworkPolicy, execute_sandboxed_command, prepare_sandboxed_command,
-};
+use os::{CommandInvocation, SandboxNetworkPolicy, execute_sandboxed_command, prepare_sandboxed_command};
 #[cfg(unix)]
 use std::{
-    collections::BTreeMap, ffi::OsString, path::PathBuf, process::Command as ProcessCommand,
-    sync::OnceLock, time::Duration,
+    collections::BTreeMap, ffi::OsString, path::PathBuf, process::Command as ProcessCommand, sync::OnceLock,
+    time::Duration,
 };
 #[cfg(windows)]
 use std::{collections::BTreeMap, ffi::OsString, path::PathBuf, time::Duration};
@@ -40,10 +38,7 @@ fn unique_completion_marker() -> PathBuf {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    std::env::temp_dir().join(format!(
-        "ollatom-os-descendant-{}-{unique_suffix}",
-        std::process::id()
-    ))
+    std::env::temp_dir().join(format!("ollatom-os-descendant-{}-{unique_suffix}", std::process::id()))
 }
 
 #[cfg(unix)]
@@ -52,14 +47,7 @@ fn sandbox_backend_can_launch() -> bool {
     *BACKEND_CAN_LAUNCH.get_or_init(|| {
         #[cfg(target_os = "linux")]
         let probe_result = ProcessCommand::new("/usr/bin/bwrap")
-            .args([
-                "--unshare-all",
-                "--proc",
-                "/proc",
-                "--dev",
-                "/dev",
-                "/usr/bin/true",
-            ])
+            .args(["--unshare-all", "--proc", "/proc", "--dev", "/dev", "/usr/bin/true"])
             .output();
 
         #[cfg(target_os = "macos")]

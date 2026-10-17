@@ -1,6 +1,4 @@
-use crate::{
-    BoxFuture, ConversationMessage, LlmOptions, ModelId, ProviderId, RunPolicy, StopToken, Usage,
-};
+use crate::{BoxFuture, ConversationMessage, LlmOptions, ModelId, ProviderId, RunPolicy, StopToken, Usage};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -55,11 +53,7 @@ pub struct SubagentProfileRegistry {
 }
 
 impl SubagentProfileRegistry {
-    pub fn register(
-        &mut self,
-        profile_id: SubagentProfileId,
-        profile: SubagentProfile,
-    ) -> Result<(), crate::LlmError> {
+    pub fn register(&mut self, profile_id: SubagentProfileId, profile: SubagentProfile) -> Result<(), crate::LlmError> {
         let tool_names = profile.tool_names.iter().collect::<BTreeSet<_>>();
         let has_invalid_timeout = profile.timeout.is_some_and(|timeout| timeout.is_zero());
 
@@ -70,8 +64,7 @@ impl SubagentProfileRegistry {
 
         let has_duplicate_tool_names = tool_names.len() != profile.tool_names.len();
 
-        let profile_is_invalid =
-            has_invalid_timeout || has_invalid_tool_name || has_duplicate_tool_names;
+        let profile_is_invalid = has_invalid_timeout || has_invalid_tool_name || has_duplicate_tool_names;
 
         if profile_is_invalid {
             return Err(crate::LlmError::InvalidRequest(

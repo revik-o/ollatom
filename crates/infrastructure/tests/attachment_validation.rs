@@ -26,10 +26,7 @@ async fn validates_optional_attachment_media_and_sha256_metadata() {
             transaction
                 .add_message_from_user(
                     "Valid attachment",
-                    vec![attachment_input(
-                        Some("image/png".to_owned()),
-                        Some("a".repeat(64)),
-                    )],
+                    vec![attachment_input(Some("image/png".to_owned()), Some("a".repeat(64)))],
                     &chat,
                 )
                 .await
@@ -42,10 +39,7 @@ async fn validates_optional_attachment_media_and_sha256_metadata() {
         attachment_input(Some("  ".to_owned()), None),
         attachment_input(Some("image/png".to_owned()), Some("A".repeat(64))),
         attachment_input(Some("image/png".to_owned()), Some("a".repeat(63))),
-        attachment_input(
-            Some("image/png".to_owned()),
-            Some(format!("{}g", "a".repeat(63))),
-        ),
+        attachment_input(Some("image/png".to_owned()), Some(format!("{}g", "a".repeat(63)))),
     ];
 
     for invalid_attachment_input in invalid_attachment_inputs {
@@ -53,18 +47,11 @@ async fn validates_optional_attachment_media_and_sha256_metadata() {
             .infrastructure
             .execute_db_actions(async |transaction| {
                 transaction
-                    .add_message_from_user(
-                        "Invalid attachment",
-                        vec![invalid_attachment_input],
-                        &chat,
-                    )
+                    .add_message_from_user("Invalid attachment", vec![invalid_attachment_input], &chat)
                     .await
             })
             .await
             .unwrap_err();
-        assert_eq!(
-            validation_error.kind(),
-            InfrastructureErrorKind::EntityValidationFailed
-        );
+        assert_eq!(validation_error.kind(), InfrastructureErrorKind::EntityValidationFailed);
     }
 }

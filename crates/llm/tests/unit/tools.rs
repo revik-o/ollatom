@@ -1,7 +1,7 @@
 use crate::BoxFuture;
 use crate::tools::{
-    AuthorizationGrant, Tool, ToolAuthorizationRequirement, ToolCall, ToolDefinition, ToolFailure,
-    ToolOutput, ToolPlan, ToolRegistry,
+    AuthorizationGrant, Tool, ToolAuthorizationRequirement, ToolCall, ToolDefinition, ToolFailure, ToolOutput, ToolPlan,
+    ToolRegistry,
 };
 
 struct SchemaValidationTool {
@@ -45,18 +45,12 @@ fn compiled_schema_validation_preserves_large_integer_precision() {
 
     assert!(
         tool_registry
-            .validate_arguments(
-                "integer_precision",
-                &serde_json::json!(9_007_199_254_740_992_u64)
-            )
+            .validate_arguments("integer_precision", &serde_json::json!(9_007_199_254_740_992_u64))
             .is_ok()
     );
     assert!(
         tool_registry
-            .validate_arguments(
-                "integer_precision",
-                &serde_json::json!(9_007_199_254_740_993_u64)
-            )
+            .validate_arguments("integer_precision", &serde_json::json!(9_007_199_254_740_993_u64))
             .is_err()
     );
 }

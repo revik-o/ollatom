@@ -1,6 +1,4 @@
-use infrastructure::{
-    Chat, ChatInitializationParameters, Infrastructure, Project, ProjectInitializationParameters,
-};
+use infrastructure::{Chat, ChatInitializationParameters, Infrastructure, Project, ProjectInitializationParameters};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use tempfile::TempDir;
@@ -13,11 +11,7 @@ pub struct TestInfrastructure {
 pub async fn create_initialized_test_infrastructure() -> TestInfrastructure {
     let temporary_directory = tempfile::tempdir().unwrap();
     #[cfg(unix)]
-    std::fs::set_permissions(
-        temporary_directory.path(),
-        std::fs::Permissions::from_mode(0o700),
-    )
-    .unwrap();
+    std::fs::set_permissions(temporary_directory.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
     let database_file_path = temporary_directory.path().join("ollatom.sqlite3");
     let infrastructure = Infrastructure::init(database_file_path).await.unwrap();
     TestInfrastructure {
@@ -43,11 +37,7 @@ pub async fn create_project_with_chat(infrastructure: &Infrastructure) -> (Proje
                 )
                 .await?;
             let chat = transaction
-                .create_chat(
-                    "Initial chat",
-                    &project,
-                    ChatInitializationParameters::default(),
-                )
+                .create_chat("Initial chat", &project, ChatInitializationParameters::default())
                 .await?;
             Ok((project, chat))
         })

@@ -3,20 +3,18 @@ use llm::{ContentBlock, LlmError, ProviderRunRequest, ReasoningEffort};
 use serde_json::Value;
 use std::collections::BTreeSet;
 
-pub(crate) fn validate_model_features(
-    model_details: &Value,
-    request: &ProviderRunRequest,
-) -> Result<(), LlmError> {
-    let capabilities = model_details
-        .get("capabilities")
-        .and_then(Value::as_array)
-        .map_or_else(BTreeSet::new, |values| {
-            values
-                .iter()
-                .filter_map(Value::as_str)
-                .map(str::to_ascii_lowercase)
-                .collect::<BTreeSet<_>>()
-        });
+pub(crate) fn validate_model_features(model_details: &Value, request: &ProviderRunRequest) -> Result<(), LlmError> {
+    let capabilities =
+        model_details
+            .get("capabilities")
+            .and_then(Value::as_array)
+            .map_or_else(BTreeSet::new, |values| {
+                values
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_ascii_lowercase)
+                    .collect::<BTreeSet<_>>()
+            });
 
     if model_details.get("capabilities").is_some() && !capabilities.contains("completion") {
         return Err(LlmError::UnsupportedOption("chat_completion".into()));

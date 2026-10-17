@@ -1,22 +1,13 @@
 use super::host::RunHost;
 use crate::{LlmError, RunEvent, ToolCall, ToolEvent, ToolFailure, ToolOutput};
 impl RunHost {
-    pub(super) async fn validate_tool_round(
-        &self,
-        round: u16,
-        tool_calls: &[ToolCall],
-    ) -> Result<(), LlmError> {
+    pub(super) async fn validate_tool_round(&self, round: u16, tool_calls: &[ToolCall]) -> Result<(), LlmError> {
         if self.stop.is_stopped() {
             return Err(LlmError::Cancelled);
         }
 
-        if tool_calls
-            .iter()
-            .any(|tool_call| tool_call.id.trim().is_empty())
-        {
-            return Err(LlmError::ToolProtocol(
-                "tool call ID must be non-empty".into(),
-            ));
+        if tool_calls.iter().any(|tool_call| tool_call.id.trim().is_empty()) {
+            return Err(LlmError::ToolProtocol("tool call ID must be non-empty".into()));
         }
 
         let mut host_state = self.state.lock().await;
@@ -27,8 +18,8 @@ impl RunHost {
             )));
         }
 
-        let tool_call_count = u16::try_from(tool_calls.len())
-            .map_err(|_| LlmError::LoopLimit("tool calls per round".into()))?;
+        let tool_call_count =
+            u16::try_from(tool_calls.len()).map_err(|_| LlmError::LoopLimit("tool calls per round".into()))?;
 
         if tool_call_count > self.limits.tool_calls_per_round {
             return Err(LlmError::LoopLimit("tool calls per round".into()));
@@ -48,10 +39,7 @@ impl RunHost {
         Ok(())
     }
 
-    pub(super) async fn preflight_tool_round(
-        &self,
-        tool_calls: &[ToolCall],
-    ) -> Result<(), LlmError> {
+    pub(super) async fn preflight_tool_round(&self, tool_calls: &[ToolCall]) -> Result<(), LlmError> {
         for tool_call in tool_calls {
             self.ensure_active()?;
 
@@ -61,26 +49,17 @@ impl RunHost {
 
             if crate::builtins::built_in_tool_definition(&tool_call.name).is_some() {
                 if !self.is_tool_selected(&tool_call.name) {
-                    return Err(LlmError::ToolProtocol(format!(
-                        "unadvertised tool {}",
-                        tool_call.name
-                    )));
+                    return Err(LlmError::ToolProtocol(format!("unadvertised tool {}", tool_call.name)));
                 }
                 continue;
             }
 
             if !self.is_tool_selected(&tool_call.name) {
-                return Err(LlmError::ToolProtocol(format!(
-                    "unadvertised tool {}",
-                    tool_call.name
-                )));
+                return Err(LlmError::ToolProtocol(format!("unadvertised tool {}", tool_call.name)));
             }
 
             let Some(tool) = self.tools.get(&tool_call.name) else {
-                return Err(LlmError::ToolProtocol(format!(
-                    "unknown tool {}",
-                    tool_call.name
-                )));
+                return Err(LlmError::ToolProtocol(format!("unknown tool {}", tool_call.name)));
             };
 
             let _ = tool;
@@ -89,10 +68,7 @@ impl RunHost {
         Ok(())
     }
 
-    pub(super) async fn execute_tool_call(
-        &self,
-        tool_call: ToolCall,
-    ) -> Result<ToolOutput, LlmError> {
+    pub(super) async fn execute_tool_call(&self, tool_call: ToolCall) -> Result<ToolOutput, LlmError> {
         self.ensure_active()?;
 
         if let Some(cached_output) = self.cached_tool_output(&tool_call).await? {
@@ -101,10 +77,7 @@ impl RunHost {
         }
 
         if !self.is_tool_selected(&tool_call.name) {
-            return Err(LlmError::ToolProtocol(format!(
-                "unadvertised tool {}",
-                tool_call.name
-            )));
+            return Err(LlmError::ToolProtocol(format!("unadvertised tool {}", tool_call.name)));
         }
 
         if crate::builtins::built_in_tool_definition(&tool_call.name).is_some() {
@@ -112,14 +85,9 @@ impl RunHost {
         }
 
         let Some(tool) = self.tools.get(&tool_call.name) else {
-            return Err(LlmError::ToolProtocol(format!(
-                "unknown tool {}",
-                tool_call.name
-            )));
+            return Err(LlmError::ToolProtocol(format!("unknown tool {}", tool_call.name)));
         };
-        let argument_validation = self
-            .tools
-            .validate_arguments(&tool_call.name, &tool_call.arguments);
+        let argument_validation = self.tools.validate_arguments(&tool_call.name, &tool_call.arguments);
 
         if let Err(failure) = argument_validation {
             return self.finish_tool_failure(&tool_call, failure).await;
@@ -160,9 +128,7 @@ impl RunHost {
         let timeout = self
             .overall_deadline
             .and_then(|deadline| deadline.checked_duration_since(std::time::Instant::now()))
-            .map_or(requested_timeout, |remaining| {
-                requested_timeout.min(remaining)
-            });
+            .map_or(requested_timeout, |remaining| requested_timeout.min(remaining));
 
         let tool_output = tokio::select! {
             _ = self.stop.cancelled() => {

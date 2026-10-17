@@ -6,8 +6,7 @@ use super::{
 };
 use futures_util::StreamExt;
 use llm::{
-    AssistantRound, ControlledFutureOutcome, FinishReason, LlmError, ProviderRunHost, RunEvent,
-    StopToken, Usage,
+    AssistantRound, ControlledFutureOutcome, FinishReason, LlmError, ProviderRunHost, RunEvent, StopToken, Usage,
 };
 use reqwest::Response;
 use serde::Deserialize;
@@ -116,10 +115,7 @@ async fn process_frame(
 
     append_response_delta(&frame.message.content, host, assistant_round).await?;
     append_reasoning_delta(&frame.message.thinking, host, assistant_round).await?;
-    merge_native_tool_calls(
-        &frame.message.tool_calls,
-        &mut round_stream_state.tool_calls,
-    )?;
+    merge_native_tool_calls(&frame.message.tool_calls, &mut round_stream_state.tool_calls)?;
 
     if frame.done {
         round_stream_state.is_complete = true;
@@ -136,12 +132,7 @@ fn native_error_frame(error: &NativeChatError) -> LlmError {
         .map(ToString::to_string)
         .unwrap_or_else(|| "Ollama returned an error frame".into());
 
-    LlmError::Provider(
-        error_message
-            .chars()
-            .take(MAXIMUM_ERROR_MESSAGE_CHARACTERS)
-            .collect(),
-    )
+    LlmError::Provider(error_message.chars().take(MAXIMUM_ERROR_MESSAGE_CHARACTERS).collect())
 }
 
 async fn append_response_delta(
@@ -154,8 +145,7 @@ async fn append_response_delta(
     }
 
     assistant_round.text.push_str(response_delta);
-    host.emit(RunEvent::ResponseDelta(response_delta.into()))
-        .await
+    host.emit(RunEvent::ResponseDelta(response_delta.into())).await
 }
 
 async fn append_reasoning_delta(
@@ -172,6 +162,5 @@ async fn append_reasoning_delta(
         .get_or_insert_with(String::new)
         .push_str(reasoning_delta);
 
-    host.emit(RunEvent::ReasoningSummaryDelta(reasoning_delta.into()))
-        .await
+    host.emit(RunEvent::ReasoningSummaryDelta(reasoning_delta.into())).await
 }

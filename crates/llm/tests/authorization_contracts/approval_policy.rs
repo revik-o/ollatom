@@ -129,10 +129,7 @@ async fn runtime_authorizer_is_a_preflight_path_and_receives_full_approval_paylo
     let requests = Arc::new(Mutex::new(Vec::new()));
     let provider = ScriptedProvider::new(
         BuiltInProvider::Ollama,
-        ProviderBehavior::ExecuteToolRound(vec![protected_tool_call(
-            "write-authorized",
-            "/outside/file",
-        )]),
+        ProviderBehavior::ExecuteToolRound(vec![protected_tool_call("write-authorized", "/outside/file")]),
     );
     let mut tools = ToolRegistry::new();
     tools

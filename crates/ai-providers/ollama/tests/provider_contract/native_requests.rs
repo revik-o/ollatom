@@ -3,11 +3,7 @@ use super::*;
 #[tokio::test]
 async fn image_and_audio_payloads_use_the_native_images_field() {
     let scripted_server = ScriptedServer::start(vec![
-        ScriptedResponse::json(
-            200,
-            "OK",
-            json!({"capabilities": ["completion", "vision", "audio"]}),
-        ),
+        ScriptedResponse::json(200, "OK", json!({"capabilities": ["completion", "vision", "audio"]})),
         ScriptedResponse::stream(
             json!({
                 "message": {"role": "assistant", "content": "done"},
@@ -49,12 +45,6 @@ async fn image_and_audio_payloads_use_the_native_images_field() {
     assert!(matches!(outcome, LlmRunOutcome::Completed(_)));
     let requests = scripted_server.finish();
     let request_body = serde_json::from_str::<serde_json::Value>(&requests[1].body).unwrap();
-    assert_eq!(
-        request_body["messages"][0]["images"]
-            .as_array()
-            .unwrap()
-            .len(),
-        2
-    );
+    assert_eq!(request_body["messages"][0]["images"].as_array().unwrap().len(), 2);
     assert!(request_body["messages"][0].get("audio").is_none());
 }

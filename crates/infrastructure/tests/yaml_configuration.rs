@@ -1,6 +1,6 @@
 use infrastructure::{
-    ConfigurationCommitStatus, JsonConfigurationStore, YamlConfigurationError,
-    create_json_configuration_store, create_typed_yaml_file,
+    ConfigurationCommitStatus, JsonConfigurationStore, YamlConfigurationError, create_json_configuration_store,
+    create_typed_yaml_file,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

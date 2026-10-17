@@ -18,10 +18,7 @@ async fn rejects_configuration_keys_that_conflict_with_existing_values() {
         handle.wait().await,
         ConfigurationCommitStatus::Failed(message) if message.contains("conflicts")
     ));
-    assert_eq!(
-        configuration_store.read_parameter("app").await.unwrap(),
-        None
-    );
+    assert_eq!(configuration_store.read_parameter("app").await.unwrap(), None);
 }
 
 #[tokio::test]
@@ -47,10 +44,7 @@ async fn concurrent_conflicting_json_commits_leave_no_partial_update() {
         second_status == ConfigurationCommitStatus::Succeeded
     );
     let app_value = configuration_store.read_parameter("app").await.unwrap();
-    let language_value = configuration_store
-        .read_parameter("app.language")
-        .await
-        .unwrap();
+    let language_value = configuration_store.read_parameter("app.language").await.unwrap();
     assert!(!(app_value.is_some() && language_value.is_some()));
 }
 
@@ -72,12 +66,7 @@ async fn commit_handle_reports_completion_after_wait_future_is_dropped() {
     let reopened_store = open_json_store(temporary_directory.path()).await;
     tokio::time::timeout(std::time::Duration::from_secs(1), async {
         loop {
-            if reopened_store
-                .read_parameter("app.language")
-                .await
-                .unwrap()
-                .is_some()
-            {
+            if reopened_store.read_parameter("app.language").await.unwrap().is_some() {
                 break;
             }
             tokio::task::yield_now().await;
@@ -157,29 +146,19 @@ async fn refuses_symbolic_links_as_configuration_lock_files() {
             .file_type()
             .is_symlink()
     );
-    assert_eq!(
-        std::fs::read_to_string(lock_target_path).unwrap(),
-        "unchanged"
-    );
+    assert_eq!(std::fs::read_to_string(lock_target_path).unwrap(), "unchanged");
 }
 
 #[cfg(unix)]
 #[tokio::test]
 async fn hardens_yaml_directory_before_returning_a_store() {
     let temporary_directory = tempdir().unwrap();
-    std::fs::set_permissions(
-        temporary_directory.path(),
-        std::fs::Permissions::from_mode(0o755),
-    )
-    .unwrap();
+    std::fs::set_permissions(temporary_directory.path(), std::fs::Permissions::from_mode(0o755)).unwrap();
 
     let configuration_store = open_json_store(temporary_directory.path()).await;
 
     assert_eq!(
-        std::fs::metadata(temporary_directory.path())
-            .unwrap()
-            .mode()
-            & 0o777,
+        std::fs::metadata(temporary_directory.path()).unwrap().mode() & 0o777,
         0o700
     );
     assert!(configuration_store.file_path().is_file());

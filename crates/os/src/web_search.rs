@@ -53,10 +53,7 @@ impl WebSearchResponse {
 
     #[must_use]
     pub fn is_success(&self) -> bool {
-        self.error.is_none()
-            && self
-                .status_code
-                .is_some_and(|status| (200..300).contains(&status))
+        self.error.is_none() && self.status_code.is_some_and(|status| (200..300).contains(&status))
     }
 
     #[must_use]
@@ -87,19 +84,13 @@ pub(super) fn build_search_target_url(search_query: &str) -> Result<Url, WebSear
         return Err(WebSearchError::EmptyInput);
     }
 
-    let mut target_url = Url::parse(GOOGLE_SEARCH_URL)
-        .map_err(|error| WebSearchError::InvalidUrl(error.to_string()))?;
-    target_url
-        .query_pairs_mut()
-        .append_pair("q", normalized_search_query);
+    let mut target_url = Url::parse(GOOGLE_SEARCH_URL).map_err(|error| WebSearchError::InvalidUrl(error.to_string()))?;
+    target_url.query_pairs_mut().append_pair("q", normalized_search_query);
 
     Ok(target_url)
 }
 
-pub(super) fn decode_response_body(
-    response_body: &[u8],
-    content_type: Option<&str>,
-) -> Result<String, WebSearchError> {
+pub(super) fn decode_response_body(response_body: &[u8], content_type: Option<&str>) -> Result<String, WebSearchError> {
     let charset_label = content_type.and_then(extract_charset_label);
     let encoding = match charset_label {
         Some(charset_label) => Encoding::for_label(charset_label.as_bytes())

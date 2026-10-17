@@ -101,8 +101,8 @@ impl WorkspaceDirectory {
         let requested_path = path.as_ref().to_owned();
 
         tokio::task::spawn_blocking(move || {
-            let canonical_directory_path = canonicalize(&requested_path)
-                .map_err(|source| io_error(&requested_path, source))?;
+            let canonical_directory_path =
+                canonicalize(&requested_path).map_err(|source| io_error(&requested_path, source))?;
 
             let directory = Dir::open_ambient_dir(&canonical_directory_path, ambient_authority())
                 .map_err(|source| io_error(&canonical_directory_path, source))?;
@@ -126,8 +126,7 @@ impl WorkspaceDirectory {
             };
 
             #[cfg(windows)]
-            let filesystem_identity =
-                directory_filesystem_identity(&canonical_directory_path, &dir_metadata)?;
+            let filesystem_identity = directory_filesystem_identity(&canonical_directory_path, &dir_metadata)?;
 
             Ok(Self {
                 directory: Arc::new(directory),
@@ -136,9 +135,7 @@ impl WorkspaceDirectory {
             })
         })
         .await
-        .map_err(|source| {
-            FilesystemError::throw_filesystem_operation_task_failed(path.as_ref(), source)
-        })?
+        .map_err(|source| FilesystemError::throw_filesystem_operation_task_failed(path.as_ref(), source))?
     }
 
     pub fn canonical_directory_path(&self) -> &Path {
@@ -199,10 +196,7 @@ fn directory_filesystem_identity(
     if is_directory_changed {
         return Err(io_error(
             canonical_directory_path,
-            Error::new(
-                ErrorKind::InvalidData,
-                "directory identity changed while it was opened",
-            ),
+            Error::new(ErrorKind::InvalidData, "directory identity changed while it was opened"),
         ));
     }
 
@@ -222,9 +216,7 @@ impl WorkspaceRelativePath {
                 .all(|component| matches!(component, Component::Normal(_)));
 
         if !valid {
-            return Err(FilesystemError::InvalidWorkspaceRelativePath {
-                path: path.to_owned(),
-            });
+            return Err(FilesystemError::InvalidWorkspaceRelativePath { path: path.to_owned() });
         }
 
         Ok(Self(path.to_owned()))
@@ -237,9 +229,7 @@ impl WorkspaceRelativePath {
 
 fn map_open_error(path: &Path, source: Error) -> FilesystemError {
     if source.raw_os_error() == Some(40) {
-        FilesystemError::SymbolicLinkNotAllowed {
-            path: path.to_owned(),
-        }
+        FilesystemError::SymbolicLinkNotAllowed { path: path.to_owned() }
     } else {
         io_error(path, source)
     }

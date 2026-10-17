@@ -88,8 +88,7 @@ impl LlmProvider for ScriptedProvider {
         model: &'a ModelId,
         _transport: &'a TransportOptions,
     ) -> BoxFuture<'a, Result<ModelInfo, LlmError>> {
-        let model_information =
-            provider_model_information(self.provider_id.clone(), model.as_str());
+        let model_information = provider_model_information(self.provider_id.clone(), model.as_str());
 
         Box::pin(async move { Ok(model_information) })
     }

@@ -1,8 +1,7 @@
 use super::{context_optimization::ContextOptimizer, interactions::InteractionHub};
 use crate::{
-    LlmError, RunId, RunLimits, RunPolicy, StopToken, SubagentProfileRegistry, ToolOutput,
-    ToolRegistry, events::EventDispatcher, interaction::InteractionCallback,
-    subagent::SharedSubagentRunner,
+    LlmError, RunId, RunLimits, RunPolicy, StopToken, SubagentProfileRegistry, ToolOutput, ToolRegistry,
+    events::EventDispatcher, interaction::InteractionCallback, subagent::SharedSubagentRunner,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::{

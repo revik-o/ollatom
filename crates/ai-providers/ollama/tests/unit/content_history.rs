@@ -1,6 +1,4 @@
-use crate::content_history::{
-    native_messages_from_history, native_messages_from_history_with_budget,
-};
+use crate::content_history::{native_messages_from_history, native_messages_from_history_with_budget};
 use crate::content_media::AttachmentBudget;
 use llm::{ContentBlock, ConversationMessage, ConversationRole, ToolCall, ToolOutput};
 
@@ -47,14 +45,11 @@ async fn native_history_enforces_aggregate_attachment_budget_across_messages() {
     ];
     let mut attachment_budget = AttachmentBudget::new(4, 5);
 
-    let error =
-        native_messages_from_history_with_budget(None, &history, false, &mut attachment_budget)
-            .await
-            .unwrap_err();
+    let error = native_messages_from_history_with_budget(None, &history, false, &mut attachment_budget)
+        .await
+        .unwrap_err();
 
-    assert!(
-        matches!(error, llm::LlmError::InvalidRequest(message) if message.contains("aggregate attachments"))
-    );
+    assert!(matches!(error, llm::LlmError::InvalidRequest(message) if message.contains("aggregate attachments")));
 }
 
 #[tokio::test]
@@ -75,14 +70,11 @@ async fn file_attachments_are_read_with_the_remaining_request_budget() {
     ];
     let mut attachment_budget = AttachmentBudget::new(4, 5);
 
-    let error =
-        native_messages_from_history_with_budget(None, &history, false, &mut attachment_budget)
-            .await
-            .unwrap_err();
+    let error = native_messages_from_history_with_budget(None, &history, false, &mut attachment_budget)
+        .await
+        .unwrap_err();
 
-    assert!(
-        matches!(error, llm::LlmError::InvalidRequest(message) if message.contains("aggregate attachments"))
-    );
+    assert!(matches!(error, llm::LlmError::InvalidRequest(message) if message.contains("aggregate attachments")));
 }
 
 fn user_message(block: ContentBlock) -> ConversationMessage {

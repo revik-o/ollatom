@@ -1,9 +1,8 @@
 mod support;
 
 use infrastructure::{
-    ChatUpdateOptions, CommandActionDetails, ExecutionSettingsUpdate, InfrastructureErrorKind,
-    LlmActionDetails, LlmActionInput, LlmActionStatus, LlmActionStatusEventInput, LlmMessageState,
-    MessageRoleMetadata,
+    ChatUpdateOptions, CommandActionDetails, ExecutionSettingsUpdate, InfrastructureErrorKind, LlmActionDetails,
+    LlmActionInput, LlmActionStatus, LlmActionStatusEventInput, LlmMessageState, MessageRoleMetadata,
 };
 use std::collections::BTreeMap;
 use support::{create_initialized_test_infrastructure, create_project_with_chat};
@@ -17,10 +16,7 @@ fn command_action_details() -> LlmActionDetails {
 }
 
 fn status_event(status: LlmActionStatus) -> LlmActionStatusEventInput {
-    LlmActionStatusEventInput {
-        status,
-        payload: None,
-    }
+    LlmActionStatusEventInput { status, payload: None }
 }
 
 #[path = "typed_persistence/action_transitions.rs"]

@@ -1,7 +1,6 @@
 use crate::{
-    Chat, CommandActionDetails, FileChangeDetails, FileChangeOperation, Infrastructure,
-    InfrastructureErrorKind, LlmActionDetails, LlmActionId, LlmActionStatus,
-    LlmActionStatusEventInput, MessageId,
+    Chat, CommandActionDetails, FileChangeDetails, FileChangeOperation, Infrastructure, InfrastructureErrorKind,
+    LlmActionDetails, LlmActionId, LlmActionStatus, LlmActionStatusEventInput, MessageId,
 };
 use std::collections::BTreeMap;
 #[cfg(unix)]
@@ -11,11 +10,7 @@ use tempfile::TempDir;
 async fn create_test_chat() -> (TempDir, Infrastructure, Chat) {
     let temporary_directory = tempfile::tempdir().unwrap();
     #[cfg(unix)]
-    std::fs::set_permissions(
-        temporary_directory.path(),
-        std::fs::Permissions::from_mode(0o700),
-    )
-    .unwrap();
+    std::fs::set_permissions(temporary_directory.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
     let database_file_path = temporary_directory.path().join("action-journal.sqlite3");
     let project_directory_path = temporary_directory.path().join("journal-project");
     std::fs::create_dir(&project_directory_path).unwrap();
@@ -23,11 +18,7 @@ async fn create_test_chat() -> (TempDir, Infrastructure, Chat) {
     let chat = infrastructure
         .execute_db_actions(async |transaction| {
             let project = transaction
-                .create_project(
-                    "Journal project",
-                    &project_directory_path,
-                    Default::default(),
-                )
+                .create_project("Journal project", &project_directory_path, Default::default())
                 .await?;
             transaction
                 .create_chat("Journal chat", &project, Default::default())
@@ -45,9 +36,7 @@ async fn create_pending_command_action(
 ) -> (MessageId, MessageId, LlmActionId) {
     infrastructure
         .execute_db_actions(async |transaction| {
-            let user_message = transaction
-                .add_message_from_user("Question", Vec::new(), chat)
-                .await?;
+            let user_message = transaction.add_message_from_user("Question", Vec::new(), chat).await?;
             let llm_message = transaction
                 .begin_llm_message_by_chat_id_and_user_message_id(chat.id, user_message.id)
                 .await?;

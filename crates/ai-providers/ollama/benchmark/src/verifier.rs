@@ -1,7 +1,5 @@
 use crate::{BenchmarkArtifacts, StageLogger, programming_toolchain_command_options};
-use os::{
-    CommandOutcome, SandboxNetworkPolicy, execute_command_in_directory_with_arguments_and_options,
-};
+use os::{CommandOutcome, SandboxNetworkPolicy, execute_command_in_directory_with_arguments_and_options};
 use serde_json::json;
 use std::{fs, io, time::Duration};
 
@@ -58,31 +56,20 @@ async fn execute_build_command(artifacts: &BenchmarkArtifacts) -> io::Result<Com
     match tokio::time::timeout(INDEPENDENT_BUILD_TIMEOUT, &mut command_future).await {
         Ok(command_result) => command_result.map_err(command_error),
         Err(_) => {
-            command_future
-                .as_ref()
-                .get_ref()
-                .terminate()
-                .map_err(command_error)?;
+            command_future.as_ref().get_ref().terminate().map_err(command_error)?;
 
             let _ = tokio::time::timeout(TERMINATION_COMPLETION_TIMEOUT, command_future).await;
 
-            Err(io::Error::new(
-                io::ErrorKind::TimedOut,
-                "independent build timed out",
-            ))
+            Err(io::Error::new(io::ErrorKind::TimedOut, "independent build timed out"))
         }
     }
 }
 
-fn validate_distribution_output(
-    artifacts: &BenchmarkArtifacts,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+fn validate_distribution_output(artifacts: &BenchmarkArtifacts) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let distribution_directory_path = artifacts.project_root().join("dist");
     let distribution_directory_metadata = fs::symlink_metadata(&distribution_directory_path)?;
 
-    if distribution_directory_metadata.file_type().is_symlink()
-        || !distribution_directory_metadata.is_dir()
-    {
+    if distribution_directory_metadata.file_type().is_symlink() || !distribution_directory_metadata.is_dir() {
         return Err("dist must be a regular directory".into());
     }
 
@@ -95,11 +82,7 @@ fn validate_distribution_output(
 
     let mut resource_count = 0usize;
 
-    count_distribution_resources(
-        &distribution_directory_path,
-        &index_file_path,
-        &mut resource_count,
-    )?;
+    count_distribution_resources(&distribution_directory_path, &index_file_path, &mut resource_count)?;
 
     if resource_count == 0 {
         return Err("dist does not contain a resource besides index.html".into());

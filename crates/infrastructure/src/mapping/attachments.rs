@@ -1,9 +1,6 @@
 use super::columns::{read_column, read_nonnegative_u64, read_u32};
 use crate::database::{parse_timestamp, parse_uuid};
-use crate::{
-    Attachment, AttachmentId, InfrastructureError, InfrastructureErrorKind, InfrastructureResult,
-    MessageId,
-};
+use crate::{Attachment, AttachmentId, InfrastructureError, InfrastructureErrorKind, InfrastructureResult, MessageId};
 use sqlx::sqlite::SqliteRow;
 
 pub(crate) fn map_attachment_row(database_row: &SqliteRow) -> InfrastructureResult<Attachment> {

@@ -81,27 +81,23 @@ pub(crate) fn start_run(
                 Ok(LlmRunOutcome::Completed(response)) if terminal_event_delivered => {
                     Ok(LlmRunOutcome::Completed(response))
                 }
-                Ok(LlmRunOutcome::Completed(response)) => {
-                    Ok(LlmRunOutcome::Failed(crate::FailedRun {
-                        error: terminal_event_result.err().unwrap_or_else(|| {
-                            LlmError::EventSink("terminal event was not acknowledged".into())
-                        }),
-                        partial_response: response.into(),
-                        terminal_event_delivered: false,
-                    }))
-                }
+                Ok(LlmRunOutcome::Completed(response)) => Ok(LlmRunOutcome::Failed(crate::FailedRun {
+                    error: terminal_event_result
+                        .err()
+                        .unwrap_or_else(|| LlmError::EventSink("terminal event was not acknowledged".into())),
+                    partial_response: response.into(),
+                    terminal_event_delivered: false,
+                })),
                 Ok(LlmRunOutcome::Cancelled(partial_response)) if terminal_event_delivered => {
                     Ok(LlmRunOutcome::Cancelled(partial_response))
                 }
-                Ok(LlmRunOutcome::Cancelled(partial_response)) => {
-                    Ok(LlmRunOutcome::Failed(crate::FailedRun {
-                        error: terminal_event_result.err().unwrap_or_else(|| {
-                            LlmError::EventSink("terminal event was not acknowledged".into())
-                        }),
-                        partial_response,
-                        terminal_event_delivered: false,
-                    }))
-                }
+                Ok(LlmRunOutcome::Cancelled(partial_response)) => Ok(LlmRunOutcome::Failed(crate::FailedRun {
+                    error: terminal_event_result
+                        .err()
+                        .unwrap_or_else(|| LlmError::EventSink("terminal event was not acknowledged".into())),
+                    partial_response,
+                    terminal_event_delivered: false,
+                })),
                 Err(error) => Err(error),
             }
         };

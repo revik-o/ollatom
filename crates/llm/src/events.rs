@@ -1,7 +1,5 @@
 pub use crate::event_queue::RunEventStream;
-use crate::{
-    BoxFuture, FinishReason, InteractionRequest, LlmError, RunId, ToolCall, ToolOutput, Usage,
-};
+use crate::{BoxFuture, FinishReason, InteractionRequest, LlmError, RunId, ToolCall, ToolOutput, Usage};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 

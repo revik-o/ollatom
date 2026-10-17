@@ -44,18 +44,14 @@ impl ToolDefinition {
             )));
         }
 
-        crate::schema::validate_schema_contract(&self.input_schema).map_err(|message| {
-            LlmError::InvalidToolDefinition(format!("{} schema: {message}", self.name))
-        })?;
+        crate::schema::validate_schema_contract(&self.input_schema)
+            .map_err(|message| LlmError::InvalidToolDefinition(format!("{} schema: {message}", self.name)))?;
 
         jsonschema::options()
             .with_draft(jsonschema::Draft::Draft202012)
             .build(&self.input_schema)
             .map_err(|error| {
-                LlmError::InvalidToolDefinition(format!(
-                    "{} schema could not be compiled: {error}",
-                    self.name
-                ))
+                LlmError::InvalidToolDefinition(format!("{} schema could not be compiled: {error}", self.name))
             })
     }
 }
@@ -157,10 +153,7 @@ impl AuthorizationGrant {
         &self.stop
     }
 
-    pub fn claim_capabilities(
-        &self,
-        requested_capabilities: &[RequiredCapability],
-    ) -> Result<(), ToolFailure> {
+    pub fn claim_capabilities(&self, requested_capabilities: &[RequiredCapability]) -> Result<(), ToolFailure> {
         if requested_capabilities
             .iter()
             .all(|requested_capability| self.authorized_capabilities.contains(requested_capability))
@@ -186,17 +179,10 @@ pub trait Tool: Send + Sync {
 
     fn plan(&self, call: &ToolCall) -> Result<ToolPlan, ToolFailure>;
 
-    fn execute(
-        &self,
-        plan: ToolPlan,
-        grant: AuthorizationGrant,
-    ) -> BoxFuture<'static, Result<ToolOutput, ToolFailure>>;
+    fn execute(&self, plan: ToolPlan, grant: AuthorizationGrant) -> BoxFuture<'static, Result<ToolOutput, ToolFailure>>;
 }
 
-pub(crate) fn validate_arguments(
-    schema: &serde_json::Value,
-    arguments: &serde_json::Value,
-) -> Result<(), ToolFailure> {
+pub(crate) fn validate_arguments(schema: &serde_json::Value, arguments: &serde_json::Value) -> Result<(), ToolFailure> {
     let validator = jsonschema::options()
         .with_draft(jsonschema::Draft::Draft202012)
         .build(schema)

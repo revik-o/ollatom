@@ -39,9 +39,7 @@ fn replace_event_with_coalesced(state: &mut QueueState, event: &SequencedEvent) 
         return false;
     };
 
-    let (Some(previous_delta), Some(delta)) =
-        (delta_text(&previous.event), delta_text(&event.event))
-    else {
+    let (Some(previous_delta), Some(delta)) = (delta_text(&previous.event), delta_text(&event.event)) else {
         return false;
     };
 
@@ -57,9 +55,7 @@ fn replace_event_with_coalesced(state: &mut QueueState, event: &SequencedEvent) 
     }
 
     if let Some(previous_item) = state.items.pop_back() {
-        state.estimated_bytes = state
-            .estimated_bytes
-            .saturating_sub(item_size(&previous_item));
+        state.estimated_bytes = state.estimated_bytes.saturating_sub(item_size(&previous_item));
     }
 
     let item = RunStreamItem::CoalescedDelta(CoalescedRunDelta {
@@ -161,28 +157,25 @@ fn same_delta_kind(left: &RunEvent, right: &RunEvent) -> bool {
     matches!(
         (left, right),
         (RunEvent::ResponseDelta(_), RunEvent::ResponseDelta(_))
-            | (
-                RunEvent::ReasoningSummaryDelta(_),
-                RunEvent::ReasoningSummaryDelta(_)
-            )
+            | (RunEvent::ReasoningSummaryDelta(_), RunEvent::ReasoningSummaryDelta(_))
             | (RunEvent::ModelTraceDelta(_), RunEvent::ModelTraceDelta(_))
     )
 }
 
 fn delta_text(event: &RunEvent) -> Option<&str> {
     match event {
-        RunEvent::ResponseDelta(delta)
-        | RunEvent::ReasoningSummaryDelta(delta)
-        | RunEvent::ModelTraceDelta(delta) => Some(delta),
+        RunEvent::ResponseDelta(delta) | RunEvent::ReasoningSummaryDelta(delta) | RunEvent::ModelTraceDelta(delta) => {
+            Some(delta)
+        }
         _ => None,
     }
 }
 
 fn delta_text_mut(event: &mut RunEvent) -> Option<&mut String> {
     match event {
-        RunEvent::ResponseDelta(delta)
-        | RunEvent::ReasoningSummaryDelta(delta)
-        | RunEvent::ModelTraceDelta(delta) => Some(delta),
+        RunEvent::ResponseDelta(delta) | RunEvent::ReasoningSummaryDelta(delta) | RunEvent::ModelTraceDelta(delta) => {
+            Some(delta)
+        }
         _ => None,
     }
 }

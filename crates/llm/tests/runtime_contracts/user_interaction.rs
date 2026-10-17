@@ -2,8 +2,7 @@ use super::*;
 
 #[tokio::test]
 async fn ask_user_rejects_the_wrong_reply_type() {
-    let provider =
-        ScriptedProvider::new(BuiltInProvider::Claude, ProviderBehavior::RequestUserInput);
+    let provider = ScriptedProvider::new(BuiltInProvider::Claude, ProviderBehavior::RequestUserInput);
     let runtime = LlmRuntime::builder()
         .provider_with_default(provider, "model")
         .build()
@@ -26,8 +25,7 @@ async fn ask_user_rejects_the_wrong_reply_type() {
 
 #[tokio::test]
 async fn ask_user_waiting_is_cancellable() {
-    let provider =
-        ScriptedProvider::new(BuiltInProvider::Gemini, ProviderBehavior::RequestUserInput);
+    let provider = ScriptedProvider::new(BuiltInProvider::Gemini, ProviderBehavior::RequestUserInput);
     let runtime = LlmRuntime::builder()
         .provider_with_default(provider, "model")
         .build()
@@ -47,10 +45,7 @@ async fn ask_user_waiting_is_cancellable() {
             break;
         }
     }
-    assert!(matches!(
-        run_task.await.unwrap().unwrap(),
-        LlmRunOutcome::Cancelled(_)
-    ));
+    assert!(matches!(run_task.await.unwrap().unwrap(), LlmRunOutcome::Cancelled(_)));
 }
 
 #[test]

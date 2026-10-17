@@ -1,7 +1,4 @@
-use crate::events::{
-    CoalescedRunDelta, RunEvent, RunEventDeliveryFailure, RunStreamItem, RunStreamLag,
-    SequencedEvent,
-};
+use crate::events::{CoalescedRunDelta, RunEvent, RunEventDeliveryFailure, RunStreamItem, RunStreamLag, SequencedEvent};
 use std::{
     collections::VecDeque,
     sync::atomic::{AtomicBool, Ordering},

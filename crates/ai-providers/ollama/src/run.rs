@@ -5,8 +5,8 @@ use super::{
     streaming::stream_round,
 };
 use llm::{
-    AssistantRound, FinishReason, LlmError, LlmResponse, PartialResponse, ProviderRunHost,
-    ProviderRunOutcome, ProviderRunRequest, StopToken, Usage,
+    AssistantRound, FinishReason, LlmError, LlmResponse, PartialResponse, ProviderRunHost, ProviderRunOutcome,
+    ProviderRunRequest, StopToken, Usage,
 };
 use std::sync::Arc;
 
@@ -92,13 +92,11 @@ async fn execute_model_run(
         let response = send_native_chat_request(provider, request, stop, request_body).await?;
         let round_result = {
             let RunProgress {
-                current_round,
-                usage,
-                ..
+                current_round, usage, ..
             } = run_progress;
-            let current_round = current_round.as_mut().ok_or_else(|| {
-                LlmError::ProviderProtocol("Ollama provider round was not started".into())
-            })?;
+            let current_round = current_round
+                .as_mut()
+                .ok_or_else(|| LlmError::ProviderProtocol("Ollama provider round was not started".into()))?;
 
             stream_round(
                 response,
@@ -112,18 +110,16 @@ async fn execute_model_run(
         };
 
         if round_result.tool_calls.is_empty() {
-            let current_round = run_progress.current_round.as_ref().ok_or_else(|| {
-                LlmError::ProviderProtocol("Ollama provider round was not started".into())
-            })?;
+            let current_round = run_progress
+                .current_round
+                .as_ref()
+                .ok_or_else(|| LlmError::ProviderProtocol("Ollama provider round was not started".into()))?;
             emit_provider_round_finished(host, current_round).await?;
             run_progress.finish_current_round()?;
             return Ok(completed_response(request, run_progress));
         }
 
-        if !matches!(
-            round_result.finish_reason,
-            FinishReason::Stop | FinishReason::ToolCalls
-        ) {
+        if !matches!(round_result.finish_reason, FinishReason::Stop | FinishReason::ToolCalls) {
             return Err(LlmError::ProviderProtocol(
                 "Ollama returned tool calls with an invalid finish reason".into(),
             ));
@@ -154,10 +150,7 @@ async fn execute_model_run(
     )))
 }
 
-fn completed_response(
-    request: &ProviderRunRequest,
-    run_progress: &mut RunProgress,
-) -> ProviderRunOutcome {
+fn completed_response(request: &ProviderRunRequest, run_progress: &mut RunProgress) -> ProviderRunOutcome {
     ProviderRunOutcome::Completed(LlmResponse {
         provider: request.provider.clone(),
         model: request.model.clone(),
@@ -167,10 +160,7 @@ fn completed_response(
     })
 }
 
-fn cancelled_response(
-    request: &ProviderRunRequest,
-    run_progress: RunProgress,
-) -> ProviderRunOutcome {
+fn cancelled_response(request: &ProviderRunRequest, run_progress: RunProgress) -> ProviderRunOutcome {
     ProviderRunOutcome::Cancelled(PartialResponse {
         provider: request.provider.clone(),
         model: request.model.clone(),

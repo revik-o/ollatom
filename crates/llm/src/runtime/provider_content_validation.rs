@@ -20,15 +20,11 @@ pub(super) fn validate_context(
 
     validate_provider_opaque_block_ownership(
         selected_provider,
-        conversation_context
-            .iter()
-            .flat_map(|message| message.content.iter()),
+        conversation_context.iter().flat_map(|message| message.content.iter()),
     )
 }
 
-fn validate_tool_history(
-    conversation_history: &[crate::ConversationMessage],
-) -> Result<(), LlmError> {
+fn validate_tool_history(conversation_history: &[crate::ConversationMessage]) -> Result<(), LlmError> {
     let mut seen_call_identifiers = BTreeSet::new();
     let mut unmatched_call_identifiers = BTreeSet::new();
 
@@ -71,17 +67,13 @@ pub(super) fn validate_user_message(
     user_message: &crate::UserMessage,
 ) -> Result<(), LlmError> {
     if user_message.content.is_empty() {
-        return Err(LlmError::InvalidRequest(
-            "user message has no content".into(),
-        ));
+        return Err(LlmError::InvalidRequest("user message has no content".into()));
     }
 
     if user_message.content.iter().any(|content_block| {
         matches!(
             content_block,
-            ContentBlock::ToolCall { .. }
-                | ContentBlock::ToolResult { .. }
-                | ContentBlock::ReasoningSummary { .. }
+            ContentBlock::ToolCall { .. } | ContentBlock::ToolResult { .. } | ContentBlock::ReasoningSummary { .. }
         )
     }) {
         return Err(LlmError::InvalidRequest(
@@ -100,13 +92,9 @@ fn validate_role_content(
     let valid = match role {
         crate::ConversationRole::User => !matches!(
             content_block,
-            ContentBlock::ToolCall { .. }
-                | ContentBlock::ToolResult { .. }
-                | ContentBlock::ReasoningSummary { .. }
+            ContentBlock::ToolCall { .. } | ContentBlock::ToolResult { .. } | ContentBlock::ReasoningSummary { .. }
         ),
-        crate::ConversationRole::Assistant => {
-            !matches!(content_block, ContentBlock::ToolResult { .. })
-        }
+        crate::ConversationRole::Assistant => !matches!(content_block, ContentBlock::ToolResult { .. }),
         crate::ConversationRole::Tool => matches!(content_block, ContentBlock::ToolResult { .. }),
     };
 

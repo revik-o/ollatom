@@ -27,11 +27,7 @@ async fn conversation_tool_results_must_consume_unique_historical_calls() {
 
     let replayed_result = runtime
         .request(BuiltInProvider::Ollama)
-        .context(vec![
-            assistant_call.clone(),
-            tool_result.clone(),
-            tool_result.clone(),
-        ])
+        .context(vec![assistant_call.clone(), tool_result.clone(), tool_result.clone()])
         .user_message("continue")
         .send()
         .unwrap()
@@ -76,10 +72,7 @@ async fn empty_user_messages_and_history_entries_are_rejected() {
         .send()
         .unwrap()
         .await;
-    assert!(matches!(
-        empty_user_message,
-        Err(LlmError::InvalidRequest(_))
-    ));
+    assert!(matches!(empty_user_message, Err(LlmError::InvalidRequest(_))));
 
     let empty_history_message = runtime
         .request(BuiltInProvider::Ollama)
@@ -91,10 +84,7 @@ async fn empty_user_messages_and_history_entries_are_rejected() {
         .send()
         .unwrap()
         .await;
-    assert!(matches!(
-        empty_history_message,
-        Err(LlmError::InvalidRequest(_))
-    ));
+    assert!(matches!(empty_history_message, Err(LlmError::InvalidRequest(_))));
     assert!(provider.recorded_requests.lock().unwrap().is_empty());
 }
 

@@ -50,11 +50,7 @@ impl<State> RequestBuilder<State> {
         let provider_id = self.provider_id()?.clone();
         let registration = self.runtime()?.provider_registration(&provider_id)?;
 
-        let selected_model = self
-            .data
-            .model
-            .as_ref()
-            .or(registration.default_model.as_ref());
+        let selected_model = self.data.model.as_ref().or(registration.default_model.as_ref());
 
         let mut availability_report = registration
             .provider
@@ -77,9 +73,9 @@ impl<State> RequestBuilder<State> {
             availability_report.state = AvailabilityState::MissingConfiguration;
             availability_report.model = AvailabilityState::MissingConfiguration;
             availability_report.selected_model = None;
-            availability_report.message.get_or_insert_with(|| {
-                "no model was selected and the provider has no configured default".into()
-            });
+            availability_report
+                .message
+                .get_or_insert_with(|| "no model was selected and the provider has no configured default".into());
         }
 
         Ok(availability_report)

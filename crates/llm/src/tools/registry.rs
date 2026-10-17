@@ -44,20 +44,11 @@ impl ToolRegistry {
         Ok(())
     }
     pub fn definitions(&self) -> Vec<ToolDefinition> {
-        self.tools
-            .values()
-            .map(|tool| tool.definition.clone())
-            .collect()
+        self.tools.values().map(|tool| tool.definition.clone()).collect()
     }
 
-    pub fn selected_definitions(
-        &self,
-        names: &BTreeSet<String>,
-    ) -> Result<Vec<ToolDefinition>, LlmError> {
-        names
-            .iter()
-            .map(|name| self.definition_for_name(name))
-            .collect()
+    pub fn selected_definitions(&self, names: &BTreeSet<String>) -> Result<Vec<ToolDefinition>, LlmError> {
+        names.iter().map(|name| self.definition_for_name(name)).collect()
     }
 
     pub fn definition_for_name(&self, name: &str) -> Result<ToolDefinition, LlmError> {
@@ -73,11 +64,7 @@ impl ToolRegistry {
             .map(|registered_tool| registered_tool.implementation.clone())
     }
 
-    pub(crate) fn validate_arguments(
-        &self,
-        name: &str,
-        arguments: &serde_json::Value,
-    ) -> Result<(), ToolFailure> {
+    pub(crate) fn validate_arguments(&self, name: &str, arguments: &serde_json::Value) -> Result<(), ToolFailure> {
         let registered_tool = self
             .tools
             .get(name)

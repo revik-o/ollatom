@@ -4,21 +4,15 @@ use std::path::PathBuf;
 use std::sync::{Arc, LazyLock, Mutex, Weak};
 use tokio::sync::Mutex as AsyncMutex;
 
-static CONFIGURATION_COORDINATORS: LazyLock<
-    Mutex<HashMap<PathBuf, Weak<ConfigurationCoordinator>>>,
-> = LazyLock::new(|| Mutex::new(HashMap::new()));
+static CONFIGURATION_COORDINATORS: LazyLock<Mutex<HashMap<PathBuf, Weak<ConfigurationCoordinator>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
-pub(super) fn configuration_coordinator(
-    configuration_path: PathBuf,
-) -> Arc<ConfigurationCoordinator> {
+pub(super) fn configuration_coordinator(configuration_path: PathBuf) -> Arc<ConfigurationCoordinator> {
     let mut coordinators = CONFIGURATION_COORDINATORS
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-    if let Some(coordinator) = coordinators
-        .get(&configuration_path)
-        .and_then(Weak::upgrade)
-    {
+    if let Some(coordinator) = coordinators.get(&configuration_path).and_then(Weak::upgrade) {
         return coordinator;
     }
 

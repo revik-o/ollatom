@@ -3,14 +3,8 @@ use super::*;
 #[test]
 fn default_configuration_uses_ollama_endpoint_and_identity() {
     let provider = OllamaProvider::new();
-    assert_eq!(
-        provider.endpoint().as_str(),
-        format!("{DEFAULT_OLLAMA_ENDPOINT}/")
-    );
-    assert_eq!(
-        provider.id(),
-        &llm::ProviderId::from(BuiltInProvider::Ollama)
-    );
+    assert_eq!(provider.endpoint().as_str(), format!("{DEFAULT_OLLAMA_ENDPOINT}/"));
+    assert_eq!(provider.id(), &llm::ProviderId::from(BuiltInProvider::Ollama));
 }
 
 #[test]
@@ -51,11 +45,7 @@ fn provider_capabilities_are_conservative() {
         capabilities.local_runtime_options.get("keep_alive_seconds"),
         Some(&CapabilitySupport::Supported)
     );
-    assert!(
-        !capabilities
-            .local_runtime_options
-            .contains_key("keep_alive")
-    );
+    assert!(!capabilities.local_runtime_options.contains_key("keep_alive"));
     assert!(!capabilities.generation_options.contains_key("top_p"));
     assert!(!capabilities.generation_options.contains_key("top_k"));
 }
@@ -70,10 +60,7 @@ async fn unavailable_daemon_returns_structured_report_without_credentials() {
         .unwrap();
     let model = llm::ModelId::new("gemma4:e2b").unwrap();
     let transport = TransportOptions::default();
-    let report = provider
-        .availability(Some(&model), &transport)
-        .await
-        .unwrap();
+    let report = provider.availability(Some(&model), &transport).await.unwrap();
     assert_eq!(report.selected_model, Some(model));
     assert!(!report.message.unwrap_or_default().contains("secret-token"));
 }
@@ -104,11 +91,7 @@ async fn unauthorized_daemon_reports_a_reachable_endpoint_and_failed_authenticat
 
 #[tokio::test]
 async fn malformed_version_reports_an_unknown_service_on_a_reachable_endpoint() {
-    let scripted_server = ScriptedServer::start(vec![ScriptedResponse::json(
-        200,
-        "OK",
-        json!({"unexpected": true}),
-    )]);
+    let scripted_server = ScriptedServer::start(vec![ScriptedResponse::json(200, "OK", json!({"unexpected": true}))]);
     let provider = OllamaProvider::builder()
         .endpoint(scripted_server.endpoint())
         .build()
@@ -136,10 +119,7 @@ async fn missing_model_report_preserves_the_exact_requested_identifier() {
     let requested_model = llm::ModelId::new("custom-alias").unwrap();
 
     let transport = TransportOptions::default();
-    let report = provider
-        .availability(Some(&requested_model), &transport)
-        .await
-        .unwrap();
+    let report = provider.availability(Some(&requested_model), &transport).await.unwrap();
 
     assert_eq!(report.state, AvailabilityState::ModelMissing);
     assert_eq!(report.model, AvailabilityState::ModelMissing);

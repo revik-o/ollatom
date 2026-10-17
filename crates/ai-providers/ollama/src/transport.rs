@@ -14,11 +14,7 @@ const MAXIMUM_CACHED_CLIENT_COUNT: usize = 16;
 const AUTHENTICATION_FAILURE_MESSAGE: &str = "Ollama authentication failed";
 
 impl OllamaProvider {
-    pub(super) fn request(
-        &self,
-        method: Method,
-        path: &str,
-    ) -> Result<reqwest::RequestBuilder, llm::LlmError> {
+    pub(super) fn request(&self, method: Method, path: &str) -> Result<reqwest::RequestBuilder, llm::LlmError> {
         self.request_with_client(&self.client, method, path)
     }
 
@@ -44,8 +40,7 @@ impl OllamaProvider {
                     .map_err(|error| llm::LlmError::InvalidRequest(error.to_string()))?;
 
                 if clients_by_connection_timeout.len() >= MAXIMUM_CACHED_CLIENT_COUNT
-                    && let Some(oldest_timeout) =
-                        clients_by_connection_timeout.keys().next().copied()
+                    && let Some(oldest_timeout) = clients_by_connection_timeout.keys().next().copied()
                 {
                     clients_by_connection_timeout.remove(&oldest_timeout);
                 }
@@ -134,20 +129,15 @@ pub(super) fn normalize_endpoint(endpoint: String) -> Result<Url, llm::LlmError>
         format!("http://{endpoint}")
     };
 
-    let mut normalized_endpoint = Url::parse(&endpoint_with_scheme).map_err(|error| {
-        llm::LlmError::InvalidRequest(format!("invalid Ollama endpoint: {error}"))
-    })?;
+    let mut normalized_endpoint = Url::parse(&endpoint_with_scheme)
+        .map_err(|error| llm::LlmError::InvalidRequest(format!("invalid Ollama endpoint: {error}")))?;
 
     if !matches!(normalized_endpoint.scheme(), "http" | "https") {
-        return Err(llm::LlmError::InvalidRequest(
-            "endpoint must use http or https".into(),
-        ));
+        return Err(llm::LlmError::InvalidRequest("endpoint must use http or https".into()));
     }
 
     if normalized_endpoint.host_str().is_none() {
-        return Err(llm::LlmError::InvalidRequest(
-            "endpoint must include a host".into(),
-        ));
+        return Err(llm::LlmError::InvalidRequest("endpoint must include a host".into()));
     }
 
     if !normalized_endpoint.username().is_empty() || normalized_endpoint.password().is_some() {
@@ -194,18 +184,14 @@ pub(super) fn network_error(error: reqwest::Error) -> llm::LlmError {
     error
         .is_timeout()
         .then_some(llm::LlmError::Timeout("Ollama request timed out".into()))
-        .unwrap_or(llm::LlmError::Unavailable(
-            "Ollama daemon is unreachable".into(),
-        ))
+        .unwrap_or(llm::LlmError::Unavailable("Ollama daemon is unreachable".into()))
 }
 
 fn protocol_error(_: reqwest::Error) -> llm::LlmError {
     llm::LlmError::ProviderProtocol("invalid Ollama response".into())
 }
 
-pub(super) fn validate_model_details_response(
-    model_details: Value,
-) -> Result<Value, llm::LlmError> {
+pub(super) fn validate_model_details_response(model_details: Value) -> Result<Value, llm::LlmError> {
     let recognized_fields = [
         "capabilities",
         "details",
@@ -223,8 +209,6 @@ pub(super) fn validate_model_details_response(
     }) {
         Ok(model_details)
     } else {
-        Err(llm::LlmError::ProviderProtocol(
-            "invalid Ollama model response".into(),
-        ))
+        Err(llm::LlmError::ProviderProtocol("invalid Ollama model response".into()))
     }
 }

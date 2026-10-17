@@ -37,9 +37,7 @@ pub(super) fn resolve_workspace_file_argument(
     let relative_path = tool_arguments
         .get(argument_name)
         .and_then(Value::as_str)
-        .ok_or_else(|| {
-            ToolFailure::InvalidArguments(format!("{argument_name} must be a string"))
-        })?;
+        .ok_or_else(|| ToolFailure::InvalidArguments(format!("{argument_name} must be a string")))?;
 
     configuration
         .workspace_directory()
@@ -63,13 +61,7 @@ pub(super) fn create_tool_plan(
     required_capabilities: Vec<crate::RequiredCapability>,
     timeout: Option<std::time::Duration>,
 ) -> ToolPlan {
-    create_tool_plan_with_filesystem_capability(
-        tool_call,
-        normalized_arguments,
-        required_capabilities,
-        timeout,
-        None,
-    )
+    create_tool_plan_with_filesystem_capability(tool_call, normalized_arguments, required_capabilities, timeout, None)
 }
 
 pub(super) fn create_tool_plan_with_filesystem_capability(

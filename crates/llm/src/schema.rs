@@ -51,22 +51,15 @@ fn serialized_schema_byte_count(schema: &Value) -> Result<usize, String> {
                 add_schema_bytes(&mut byte_count, serialized_string.len())?;
             }
             Value::Array(values) => {
-                add_schema_bytes(
-                    &mut byte_count,
-                    serialized_container_overhead(values.len())?,
-                )?;
+                add_schema_bytes(&mut byte_count, serialized_container_overhead(values.len())?)?;
                 pending_values.extend(values.iter());
             }
             Value::Object(values) => {
-                add_schema_bytes(
-                    &mut byte_count,
-                    serialized_container_overhead(values.len())?,
-                )?;
+                add_schema_bytes(&mut byte_count, serialized_container_overhead(values.len())?)?;
 
                 for (key, child_value) in values {
-                    let serialized_key = serde_json::to_string(key).map_err(|error| {
-                        format!("schema property name could not be serialized: {error}")
-                    })?;
+                    let serialized_key = serde_json::to_string(key)
+                        .map_err(|error| format!("schema property name could not be serialized: {error}"))?;
                     add_schema_bytes(
                         &mut byte_count,
                         serialized_key
@@ -122,11 +115,7 @@ fn validate_schema_node(schema: &Value, path: &str, depth: usize) -> Result<(), 
 
     for keyword in SINGLE_SCHEMA_KEYWORDS {
         if let Some(child_schema) = object.get(*keyword) {
-            validate_schema_node(
-                child_schema,
-                &format!("{path}.{keyword}"),
-                next_schema_depth(depth)?,
-            )?;
+            validate_schema_node(child_schema, &format!("{path}.{keyword}"), next_schema_depth(depth)?)?;
         }
     }
 
@@ -164,31 +153,21 @@ pub(crate) fn next_schema_depth(depth: usize) -> Result<usize, String> {
         .ok_or_else(|| "schema exceeds the maximum nesting depth".to_string())
 }
 
-fn validate_schema_dialect(
-    schema: &serde_json::Map<String, Value>,
-    path: &str,
-) -> Result<(), String> {
+fn validate_schema_dialect(schema: &serde_json::Map<String, Value>, path: &str) -> Result<(), String> {
     if let Some(schema_uri) = schema.get("$schema")
         && schema_uri.as_str() != Some(DRAFT_2020_12_SCHEMA_URI)
     {
-        return Err(format!(
-            "{path} declares an unsupported JSON Schema dialect"
-        ));
+        return Err(format!("{path} declares an unsupported JSON Schema dialect"));
     }
 
     if schema.contains_key("$vocabulary") {
-        return Err(format!(
-            "{path} declares an unsupported JSON Schema vocabulary"
-        ));
+        return Err(format!("{path} declares an unsupported JSON Schema vocabulary"));
     }
 
     Ok(())
 }
 
-fn validate_required_properties(
-    schema: &serde_json::Map<String, Value>,
-    path: &str,
-) -> Result<(), String> {
+fn validate_required_properties(schema: &serde_json::Map<String, Value>, path: &str) -> Result<(), String> {
     let Some(required) = schema.get("required").and_then(Value::as_array) else {
         return Ok(());
     };

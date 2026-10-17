@@ -14,10 +14,7 @@ pub(super) fn executable_identity(
 }
 
 #[cfg(unix)]
-pub(super) fn directory_identity(
-    _path: &Path,
-    metadata: &std::fs::Metadata,
-) -> Result<DirectoryIdentity, CommandError> {
+pub(super) fn directory_identity(_path: &Path, metadata: &std::fs::Metadata) -> Result<DirectoryIdentity, CommandError> {
     use std::os::unix::fs::MetadataExt;
 
     Ok(DirectoryIdentity::Unix {
@@ -46,10 +43,7 @@ pub(super) fn executable_identity(
 }
 
 #[cfg(windows)]
-pub(super) fn directory_identity(
-    path: &Path,
-    metadata: &std::fs::Metadata,
-) -> Result<DirectoryIdentity, CommandError> {
+pub(super) fn directory_identity(path: &Path, metadata: &std::fs::Metadata) -> Result<DirectoryIdentity, CommandError> {
     if !metadata.is_dir() {
         return Err(CommandError::InvalidAuthorization(
             "working directory is not a directory".into(),
@@ -72,10 +66,7 @@ pub(super) fn windows_file_identity(path: &Path) -> Result<(Vec<u8>, [u8; 16]), 
         win_file_id::FileId::HighRes {
             volume_serial_number,
             file_id,
-        } => Ok((
-            volume_serial_number.to_le_bytes().to_vec(),
-            file_id.to_le_bytes(),
-        )),
+        } => Ok((volume_serial_number.to_le_bytes().to_vec(), file_id.to_le_bytes())),
         win_file_id::FileId::LowRes { .. } => Err(CommandError::InvalidAuthorization(
             "high-resolution Windows file identity is unavailable".into(),
         )),

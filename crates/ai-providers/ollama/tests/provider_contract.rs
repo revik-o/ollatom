@@ -1,9 +1,8 @@
 mod support;
 
 use llm::{
-    AvailabilityState, BuiltInProvider, CapabilitySupport, ContentBlock, GenerationOptions,
-    LlmOptions, LlmProvider, LlmRunOutcome, LocalRuntimeOptions, ModelCapability, TransportOptions,
-    UserMessage,
+    AvailabilityState, BuiltInProvider, CapabilitySupport, ContentBlock, GenerationOptions, LlmOptions, LlmProvider,
+    LlmRunOutcome, LocalRuntimeOptions, ModelCapability, TransportOptions, UserMessage,
 };
 use ollama::{DEFAULT_OLLAMA_ENDPOINT, OllamaProvider};
 use serde_json::json;

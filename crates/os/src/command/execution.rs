@@ -1,8 +1,6 @@
 use super::*;
 
-pub fn execute_sandboxed_command(
-    authorization: SandboxedCommandAuthorization,
-) -> Result<CommandEntity, CommandError> {
+pub fn execute_sandboxed_command(authorization: SandboxedCommandAuthorization) -> Result<CommandEntity, CommandError> {
     tokio::runtime::Handle::try_current().map_err(|_| CommandError::MissingRuntime)?;
     validate_authorization_identity(&authorization)?;
 
@@ -14,13 +12,7 @@ pub fn execute_sandboxed_command(
     let monitor_terminal_logs = terminal_logs.clone();
 
     tokio::spawn(async move {
-        let result = monitor_command(
-            command_text,
-            authorization,
-            monitor_terminal_logs,
-            termination_receiver,
-        )
-        .await;
+        let result = monitor_command(command_text, authorization, monitor_terminal_logs, termination_receiver).await;
         let _ = completion_sender.send(result);
     });
 

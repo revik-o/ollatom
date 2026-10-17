@@ -11,11 +11,9 @@ pub(super) fn serialize_yaml_configuration<Configuration>(
 where
     Configuration: Serialize,
 {
-    serde_saphyr::to_string(configuration).map_err(|source| {
-        YamlConfigurationError::YamlSerialization {
-            path: file_path.to_owned(),
-            source: Box::new(source),
-        }
+    serde_saphyr::to_string(configuration).map_err(|source| YamlConfigurationError::YamlSerialization {
+        path: file_path.to_owned(),
+        source: Box::new(source),
     })
 }
 
@@ -29,9 +27,7 @@ pub(super) fn deserialize_configuration_document(
     Ok(configuration_document)
 }
 
-pub(super) async fn read_configuration_document(
-    file_pointer: &FilePointer,
-) -> Result<Value, YamlConfigurationError> {
+pub(super) async fn read_configuration_document(file_pointer: &FilePointer) -> Result<Value, YamlConfigurationError> {
     let configuration_contents = file_pointer.read_text().await?;
 
     if configuration_contents.trim().is_empty() {
@@ -55,11 +51,9 @@ pub(super) fn deserialize_yaml_configuration<Configuration>(
 where
     Configuration: DeserializeOwned,
 {
-    serde_saphyr::from_str(configuration_contents).map_err(|source| {
-        YamlConfigurationError::YamlDeserialization {
-            path: file_path.to_owned(),
-            source: Box::new(source),
-        }
+    serde_saphyr::from_str(configuration_contents).map_err(|source| YamlConfigurationError::YamlDeserialization {
+        path: file_path.to_owned(),
+        source: Box::new(source),
     })
 }
 
@@ -76,9 +70,7 @@ pub(super) fn validate_configuration_document_root(
     })
 }
 
-pub(super) fn validate_configuration_key(
-    configuration_key: &str,
-) -> Result<(), YamlConfigurationError> {
+pub(super) fn validate_configuration_key(configuration_key: &str) -> Result<(), YamlConfigurationError> {
     if configuration_key.is_empty()
         || configuration_key
             .split('.')
@@ -103,19 +95,18 @@ pub(super) fn add_value_to_configuration_document(
 
     let configuration_key_segments = configuration_key.split('.').collect::<Vec<_>>();
 
-    let (final_configuration_key_segment, parent_configuration_key_segments) =
-        configuration_key_segments
-            .split_last()
-            .expect("validated configuration keys always contain a segment");
+    let (final_configuration_key_segment, parent_configuration_key_segments) = configuration_key_segments
+        .split_last()
+        .expect("validated configuration keys always contain a segment");
 
     let mut current_configuration_value = configuration_document;
 
     for configuration_key_segment in parent_configuration_key_segments {
-        let current_configuration_mapping = current_configuration_value
-            .as_object_mut()
-            .ok_or_else(|| YamlConfigurationError::YamlConfigurationKeyConflict {
+        let current_configuration_mapping = current_configuration_value.as_object_mut().ok_or_else(|| {
+            YamlConfigurationError::YamlConfigurationKeyConflict {
                 configuration_key: configuration_key.to_owned(),
-            })?;
+            }
+        })?;
 
         current_configuration_value = current_configuration_mapping
             .entry((*configuration_key_segment).to_owned())
@@ -133,10 +124,7 @@ pub(super) fn add_value_to_configuration_document(
         .ok_or_else(|| YamlConfigurationError::YamlConfigurationKeyConflict {
             configuration_key: configuration_key.to_owned(),
         })?
-        .insert(
-            (*final_configuration_key_segment).to_owned(),
-            configuration_value,
-        );
+        .insert((*final_configuration_key_segment).to_owned(), configuration_value);
     Ok(())
 }
 

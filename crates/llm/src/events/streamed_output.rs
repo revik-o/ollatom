@@ -25,10 +25,7 @@ impl StreamedOutput {
     }
 
     pub(super) fn add_tool_call(&mut self, call: &ToolCall) {
-        let target_round = self
-            .current_round
-            .as_mut()
-            .or_else(|| self.assistant_rounds.last_mut());
+        let target_round = self.current_round.as_mut().or_else(|| self.assistant_rounds.last_mut());
 
         if let Some(target_round) = target_round
             && !target_round

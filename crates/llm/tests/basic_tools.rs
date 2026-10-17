@@ -6,10 +6,7 @@ use std::{
 };
 
 fn temporary_root() -> PathBuf {
-    let suffix = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
+    let suffix = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
     std::env::temp_dir().join(format!("llm-basic-tools-{suffix}"))
 }
 

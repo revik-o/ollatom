@@ -93,15 +93,8 @@ fn append_content_block(
         ContentBlock::Text { text } if conversion.role != ConversationRole::Tool => {
             native_message.content.push_str(text);
         }
-        ContentBlock::Binary {
-            media_type, data, ..
-        } if conversion.role == ConversationRole::User => {
-            add_media(
-                native_message,
-                conversion.attachment_budget,
-                media_type,
-                data,
-            )?;
+        ContentBlock::Binary { media_type, data, .. } if conversion.role == ConversationRole::User => {
+            add_media(native_message, conversion.attachment_budget, media_type, data)?;
         }
         ContentBlock::File { path, .. } => {
             return Err(LlmError::UnsupportedOption(format!(
@@ -113,10 +106,7 @@ fn append_content_block(
                 return Err(LlmError::InvalidToolArguments(call.name.clone()));
             }
 
-            if !conversion
-                .seen_tool_call_identifiers
-                .insert(call.id.clone())
-            {
+            if !conversion.seen_tool_call_identifiers.insert(call.id.clone()) {
                 return Err(LlmError::InvalidRequest(format!(
                     "duplicate historical tool call id {}",
                     call.id
@@ -151,34 +141,21 @@ fn append_content_block(
             let call_identifier = output.call_id();
 
             native_message.tool_call_identifier = Some(call_identifier.to_owned());
-            native_message.tool_name = Some(
-                conversion
-                    .historical_tool_names
-                    .remove(call_identifier)
-                    .ok_or_else(|| {
-                        LlmError::InvalidRequest(format!(
-                            "tool result {} has no unmatched call",
-                            call_identifier
-                        ))
-                    })?,
-            );
+            native_message.tool_name = Some(conversion.historical_tool_names.remove(call_identifier).ok_or_else(
+                || LlmError::InvalidRequest(format!("tool result {} has no unmatched call", call_identifier)),
+            )?);
 
             native_message.content = super::content_history::tool_output_content(output)?;
         }
         ContentBlock::ReasoningSummary { text }
             if conversion.role == ConversationRole::Assistant && !conversion.omit_thinking =>
         {
-            native_message
-                .thinking
-                .get_or_insert_with(String::new)
-                .push_str(text);
+            native_message.thinking.get_or_insert_with(String::new).push_str(text);
         }
         ContentBlock::ReasoningSummary { .. }
             if conversion.role == ConversationRole::Assistant && conversion.omit_thinking => {}
         ContentBlock::ProviderOpaque { .. } => {
-            return Err(LlmError::UnsupportedOption(
-                "provider_opaque_content".into(),
-            ));
+            return Err(LlmError::UnsupportedOption("provider_opaque_content".into()));
         }
         ContentBlock::ToolCall { .. }
         | ContentBlock::Text { .. }
@@ -228,8 +205,7 @@ pub(super) async fn message_from_content_async(
             }
 
             let resolved_media_type = infer_media_type(path, media_type.as_deref())?;
-            let attachment_data =
-                read_attachment(path, &resolved_media_type, conversion.attachment_budget).await?;
+            let attachment_data = read_attachment(path, &resolved_media_type, conversion.attachment_budget).await?;
 
             add_media(
                 &mut native_message,

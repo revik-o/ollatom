@@ -1,7 +1,6 @@
 use super::tool_support;
 use crate::{
-    AuthorizationGrant, BoxFuture, RequiredCapability, Tool, ToolCall, ToolDefinition, ToolFailure,
-    ToolOutput, ToolPlan,
+    AuthorizationGrant, BoxFuture, RequiredCapability, Tool, ToolCall, ToolDefinition, ToolFailure, ToolOutput, ToolPlan,
 };
 use os::{search_target_host, web_search};
 use serde_json::{Value, json};
@@ -32,8 +31,8 @@ impl Tool for WebSearchTool {
     fn plan(&self, tool_call: &ToolCall) -> Result<ToolPlan, ToolFailure> {
         tool_support::validate_tool_call(&self.definition, tool_call)?;
         let search_query = parse_search_query(&tool_call.arguments)?;
-        let network_host = search_target_host(search_query)
-            .map_err(|error| ToolFailure::InvalidArguments(error.to_string()))?;
+        let network_host =
+            search_target_host(search_query).map_err(|error| ToolFailure::InvalidArguments(error.to_string()))?;
 
         Ok(tool_support::create_tool_plan(
             tool_call,
@@ -50,11 +49,10 @@ impl Tool for WebSearchTool {
     ) -> BoxFuture<'static, Result<ToolOutput, ToolFailure>> {
         Box::pin(async move {
             let search_query = parse_search_query(&tool_plan.normalized_arguments)?;
-            let network_host = search_target_host(search_query)
-                .map_err(|error| ToolFailure::InvalidArguments(error.to_string()))?;
+            let network_host =
+                search_target_host(search_query).map_err(|error| ToolFailure::InvalidArguments(error.to_string()))?;
 
-            authorization_grant
-                .claim_capabilities(&[RequiredCapability::Network { host: network_host }])?;
+            authorization_grant.claim_capabilities(&[RequiredCapability::Network { host: network_host }])?;
 
             let web_search_response = web_search(search_query.to_owned()).await;
             let filtered_text = web_search_response

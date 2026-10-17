@@ -12,8 +12,7 @@ where
     ValueType: Serialize + ?Sized,
 {
     let mut counting_writer = CountingWriter::default();
-    serde_json::to_writer(&mut counting_writer, value)
-        .map_err(|error| LlmError::ProviderProtocol(error.to_string()))?;
+    serde_json::to_writer(&mut counting_writer, value).map_err(|error| LlmError::ProviderProtocol(error.to_string()))?;
 
     counting_writer
         .byte_count
@@ -45,10 +44,7 @@ impl Write for CountingWriter {
     }
 }
 
-pub(crate) fn context_input_limit(
-    request: &ProviderRunRequest,
-    model_details: &Value,
-) -> Option<u64> {
+pub(crate) fn context_input_limit(request: &ProviderRunRequest, model_details: &Value) -> Option<u64> {
     let configured_context_length = request
         .options
         .local
@@ -76,11 +72,7 @@ pub(crate) fn context_input_limit(
         .min()
 }
 
-pub(crate) fn context_pressure_reached(
-    observed_input_tokens: u64,
-    estimated_tool_tokens: u64,
-    limit: u64,
-) -> bool {
+pub(crate) fn context_pressure_reached(observed_input_tokens: u64, estimated_tool_tokens: u64, limit: u64) -> bool {
     let pressure = observed_input_tokens.saturating_add(estimated_tool_tokens);
 
     pressure.saturating_mul(CONTEXT_OPTIMIZATION_PRESSURE_DENOMINATOR)

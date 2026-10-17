@@ -2,10 +2,9 @@ use crate::database::{database_operation_error, format_timestamp, validate_nonbl
 use crate::mapping::{map_attachment_row, map_message_row, serialize_json};
 use crate::{
     Attachment, AttachmentId, AttachmentInput, ChatId, FileChangeOperation, InfrastructureError,
-    InfrastructureErrorKind, InfrastructureResult, LlmAction, LlmActionDetails, LlmActionId,
-    LlmActionInitialStatus, LlmActionInput, LlmActionStatus, LlmActionStatusEvent,
-    LlmActionStatusEventId, LlmActionStatusEventInput, LlmMessageState, Message, MessageId,
-    MessageRoleMetadata, MessageValidity, UserMessageMetadata,
+    InfrastructureErrorKind, InfrastructureResult, LlmAction, LlmActionDetails, LlmActionId, LlmActionInitialStatus,
+    LlmActionInput, LlmActionStatus, LlmActionStatusEvent, LlmActionStatusEventId, LlmActionStatusEventInput,
+    LlmMessageState, Message, MessageId, MessageRoleMetadata, MessageValidity, UserMessageMetadata,
 };
 use sqlx::{AssertSqlSafe, Row, Sqlite, Transaction};
 use time::OffsetDateTime;

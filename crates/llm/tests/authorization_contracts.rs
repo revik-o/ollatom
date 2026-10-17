@@ -50,12 +50,7 @@ impl Tool for ProtectedTool {
         _authorization_grant: AuthorizationGrant,
     ) -> BoxFuture<'static, Result<ToolOutput, ToolFailure>> {
         self.execution_count.fetch_add(1, Ordering::SeqCst);
-        Box::pin(async move {
-            Ok(ToolOutput::success(
-                plan.call.id,
-                serde_json::json!("written"),
-            ))
-        })
+        Box::pin(async move { Ok(ToolOutput::success(plan.call.id, serde_json::json!("written"))) })
     }
 }
 
@@ -147,14 +142,9 @@ fn runtime_with_protected_tool(
     tool_call: ToolCall,
     execution_count: Arc<AtomicUsize>,
 ) -> LlmRuntime {
-    let provider = ScriptedProvider::new(
-        provider_id,
-        ProviderBehavior::ExecuteToolRound(vec![tool_call]),
-    );
+    let provider = ScriptedProvider::new(provider_id, ProviderBehavior::ExecuteToolRound(vec![tool_call]));
     let mut tool_registry = ToolRegistry::new();
-    tool_registry
-        .register(ProtectedTool { execution_count })
-        .unwrap();
+    tool_registry.register(ProtectedTool { execution_count }).unwrap();
 
     LlmRuntime::builder()
         .provider_with_default(provider, "model")
@@ -173,9 +163,7 @@ fn runtime_with_unscoped_tool(execution_count: Arc<AtomicUsize>) -> LlmRuntime {
         }]),
     );
     let mut tools = ToolRegistry::new();
-    tools
-        .register(AuthorizationRequiredTool { execution_count })
-        .unwrap();
+    tools.register(AuthorizationRequiredTool { execution_count }).unwrap();
 
     LlmRuntime::builder()
         .provider_with_default(provider, "model")
@@ -189,10 +177,7 @@ struct ApprovingToolAuthorizer {
 }
 
 impl ToolAuthorizer for ApprovingToolAuthorizer {
-    fn authorize(
-        &self,
-        request: ApprovalRequest,
-    ) -> BoxFuture<'_, Result<ApprovalDecision, LlmError>> {
+    fn authorize(&self, request: ApprovalRequest) -> BoxFuture<'_, Result<ApprovalDecision, LlmError>> {
         self.requests.lock().unwrap().push(request);
         Box::pin(async { Ok(ApprovalDecision::AllowOnce) })
     }

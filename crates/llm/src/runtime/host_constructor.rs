@@ -4,8 +4,8 @@ use super::{
     interactions::InteractionHub,
 };
 use crate::{
-    RunId, RunLimits, RunPolicy, StopToken, SubagentProfileRegistry, ToolRegistry,
-    events::EventDispatcher, interaction::InteractionCallback, subagent::SharedSubagentRunner,
+    RunId, RunLimits, RunPolicy, StopToken, SubagentProfileRegistry, ToolRegistry, events::EventDispatcher,
+    interaction::InteractionCallback, subagent::SharedSubagentRunner,
 };
 use std::{
     collections::BTreeSet,

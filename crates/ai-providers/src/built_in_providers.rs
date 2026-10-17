@@ -1,6 +1,6 @@
 use llm::{
-    IntoModelId, IntoProviderId, LlmError, LlmProvider, LlmRuntime, ModelId, ProviderId,
-    RunEventSink, SubagentProfileRegistry, SubagentRunner, ToolAuthorizer, ToolRegistry,
+    IntoModelId, IntoProviderId, LlmError, LlmProvider, LlmRuntime, ModelId, ProviderId, RunEventSink,
+    SubagentProfileRegistry, SubagentRunner, ToolAuthorizer, ToolRegistry,
 };
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -117,17 +117,13 @@ impl BuiltInProvidersBuilder {
 
         for provider in self.providers {
             runtime_builder = match default_models.remove(provider.id()) {
-                Some(default_model) => {
-                    runtime_builder.provider_with_default(provider, default_model)
-                }
+                Some(default_model) => runtime_builder.provider_with_default(provider, default_model),
                 None => runtime_builder.provider(provider),
             };
         }
 
         if let Some(unregistered_provider_id) = default_models.keys().next() {
-            return Err(LlmError::ProviderNotRegistered(
-                unregistered_provider_id.clone(),
-            ));
+            return Err(LlmError::ProviderNotRegistered(unregistered_provider_id.clone()));
         }
 
         runtime_builder.build()

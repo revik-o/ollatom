@@ -67,9 +67,7 @@ impl Display for InfrastructureError {
 
 impl Error for InfrastructureError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        self.source
-            .as_deref()
-            .map(|source| source as &(dyn Error + 'static))
+        self.source.as_deref().map(|source| source as &(dyn Error + 'static))
     }
 }
 

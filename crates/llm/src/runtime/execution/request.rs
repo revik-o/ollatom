@@ -1,9 +1,6 @@
 use super::super::{
     context_optimization::ContextOptimizer,
-    execution_outcome::{
-        HostResults, attach_host_results, cancelled_outcome, empty_cancelled_outcome,
-        failed_outcome,
-    },
+    execution_outcome::{HostResults, attach_host_results, cancelled_outcome, empty_cancelled_outcome, failed_outcome},
     host::RunHost,
     host_constructor::RunHostDependencies,
     negotiation, request_validation,
@@ -24,10 +21,7 @@ pub(super) async fn execute_request(
         return Err(error);
     }
 
-    let runtime = request_data
-        .runtime
-        .as_ref()
-        .ok_or(LlmError::MissingRuntime)?;
+    let runtime = request_data.runtime.as_ref().ok_or(LlmError::MissingRuntime)?;
 
     let provider_id = request_data
         .provider
@@ -54,10 +48,7 @@ pub(super) async fn execute_request(
         event_dispatcher.emit(RunEvent::Warning(warning)).await?;
     }
 
-    let tool_definitions = request_validation::resolve_selected_tool_definitions(
-        runtime,
-        &request_data.selected_tools,
-    )?;
+    let tool_definitions = request_validation::resolve_selected_tool_definitions(runtime, &request_data.selected_tools)?;
 
     request_validation::validate_tool_limits(&request_data.selected_tools, request_data.limits)?;
 
@@ -113,31 +104,25 @@ pub(super) async fn execute_request(
         return Ok(empty_cancelled_outcome(provider_id, model_id));
     }
 
-    let provider_timeout =
-        overall_deadline.map(|deadline| deadline.saturating_duration_since(Instant::now()));
+    let provider_timeout = overall_deadline.map(|deadline| deadline.saturating_duration_since(Instant::now()));
 
     let provider_result = if provider_timeout.is_some_and(|timeout| timeout.is_zero()) {
         stop_handle.stop();
-        Err(LlmError::Timeout(
-            "LLM run exceeded its overall deadline".into(),
-        ))
+        Err(LlmError::Timeout("LLM run exceeded its overall deadline".into()))
     } else {
-        let provider_future =
-            registration
-                .provider
-                .run(provider_request, run_host.clone(), stop_token.clone());
+        let provider_future = registration
+            .provider
+            .run(provider_request, run_host.clone(), stop_token.clone());
         await_provider(provider_future, provider_timeout, &stop_token, &stop_handle).await
     };
 
     let (mut provider_result, invalid_identity_outcome) = match provider_result {
-        Ok(provider_outcome) => match super::super::outcome_validation::validate_identity(
-            &provider_outcome,
-            &provider_id,
-            &model_id,
-        ) {
-            Ok(()) => (Ok(provider_outcome), None),
-            Err(error) => (Err(error), Some(provider_outcome)),
-        },
+        Ok(provider_outcome) => {
+            match super::super::outcome_validation::validate_identity(&provider_outcome, &provider_id, &model_id) {
+                Ok(()) => (Ok(provider_outcome), None),
+                Err(error) => (Err(error), Some(provider_outcome)),
+            }
+        }
         Err(error) => (Err(error), None),
     };
 
@@ -151,10 +136,7 @@ pub(super) async fn execute_request(
 
     run_host.finalize();
 
-    let host_results = HostResults::new(
-        run_host.take_child_usage().await,
-        run_host.take_tool_records().await,
-    );
+    let host_results = HostResults::new(run_host.take_child_usage().await, run_host.take_tool_records().await);
 
     if let Some(error @ LlmError::Timeout(_)) = provider_result.as_ref().err() {
         return Ok(failed_outcome(
@@ -169,14 +151,7 @@ pub(super) async fn execute_request(
     }
 
     if stop_token.is_stopped() {
-        return Ok(cancelled_outcome(
-            provider_result,
-            provider_id,
-            model_id,
-            &event_dispatcher,
-            host_results,
-        )
-        .await);
+        return Ok(cancelled_outcome(provider_result, provider_id, model_id, &event_dispatcher, host_results).await);
     }
 
     let provider_outcome = match provider_result {
@@ -195,13 +170,9 @@ pub(super) async fn execute_request(
     };
 
     Ok(match provider_outcome {
-        ProviderRunOutcome::Completed(response) if stop_token.is_stopped() => {
-            LlmRunOutcome::Cancelled(response.into())
-        }
+        ProviderRunOutcome::Completed(response) if stop_token.is_stopped() => LlmRunOutcome::Cancelled(response.into()),
         ProviderRunOutcome::Completed(response) => LlmRunOutcome::Completed(response),
-        ProviderRunOutcome::Cancelled(partial_response) => {
-            LlmRunOutcome::Cancelled(partial_response)
-        }
+        ProviderRunOutcome::Cancelled(partial_response) => LlmRunOutcome::Cancelled(partial_response),
     })
 }
 

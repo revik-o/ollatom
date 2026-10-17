@@ -29,9 +29,7 @@ pub fn open_or_create_owner_only_file(path: &Path) -> io::Result<File> {
     {
         use std::os::unix::fs::OpenOptionsExt;
 
-        options
-            .mode(0o600)
-            .custom_flags(nix::fcntl::OFlag::O_NOFOLLOW.bits());
+        options.mode(0o600).custom_flags(nix::fcntl::OFlag::O_NOFOLLOW.bits());
     }
     #[cfg(windows)]
     {
@@ -44,9 +42,7 @@ pub fn open_or_create_owner_only_file(path: &Path) -> io::Result<File> {
                     | windows_file_access::READ_CONTROL
                     | windows_file_access::WRITE_DAC,
             )
-            .share_mode(
-                windows_file_access::FILE_SHARE_READ | windows_file_access::FILE_SHARE_WRITE,
-            )
+            .share_mode(windows_file_access::FILE_SHARE_READ | windows_file_access::FILE_SHARE_WRITE)
             .custom_flags(windows_file_attribute::OPEN_REPARSE_POINT);
     }
     let mut file = options.open(path)?;
@@ -56,9 +52,7 @@ pub fn open_or_create_owner_only_file(path: &Path) -> io::Result<File> {
     Ok(file)
 }
 
-pub(crate) fn restrict_capability_file_to_current_user(
-    file: &mut cap_std::fs::File,
-) -> io::Result<()> {
+pub(crate) fn restrict_capability_file_to_current_user(file: &mut cap_std::fs::File) -> io::Result<()> {
     #[cfg(unix)]
     {
         restrict_unix_capability_file(file)
@@ -106,11 +100,7 @@ fn restrict_unix_capability_file(file: &mut cap_std::fs::File) -> io::Result<()>
 }
 
 #[cfg(unix)]
-fn validate_unix_private_file(
-    is_regular_file: bool,
-    owner_id: u32,
-    link_count: u64,
-) -> io::Result<()> {
+fn validate_unix_private_file(is_regular_file: bool, owner_id: u32, link_count: u64) -> io::Result<()> {
     if !is_regular_file || owner_id != nix::unistd::geteuid().as_raw() || link_count != 1 {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
@@ -137,9 +127,7 @@ fn restrict_windows_std_file(file: &mut File) -> io::Result<()> {
     use std::os::windows::fs::MetadataExt;
 
     let file_metadata = file.metadata()?;
-    if !file_metadata.is_file()
-        || file_metadata.file_attributes() & windows_file_attribute::REPARSE_POINT != 0
-    {
+    if !file_metadata.is_file() || file_metadata.file_attributes() & windows_file_attribute::REPARSE_POINT != 0 {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
             "private file must be a regular file and must not be a reparse point",
@@ -155,9 +143,7 @@ fn restrict_windows_capability_file(file: &mut cap_std::fs::File) -> io::Result<
 
     let file_metadata = file.metadata()?;
 
-    if !file_metadata.is_file()
-        || file_metadata.file_attributes() & windows_file_attribute::REPARSE_POINT != 0
-    {
+    if !file_metadata.is_file() || file_metadata.file_attributes() & windows_file_attribute::REPARSE_POINT != 0 {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
             "private file must be a regular file and must not be a reparse point",

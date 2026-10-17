@@ -1,11 +1,7 @@
 use crate::{FilesystemAccess, TrustedFolder};
 use std::path::{Component, Path};
 
-pub(crate) fn folder_permits(
-    trusted_folder: &TrustedFolder,
-    path: &Path,
-    access: FilesystemAccess,
-) -> bool {
+pub(crate) fn folder_permits(trusted_folder: &TrustedFolder, path: &Path, access: FilesystemAccess) -> bool {
     if access == FilesystemAccess::Delete && !trusted_folder.allow_delete {
         return false;
     }

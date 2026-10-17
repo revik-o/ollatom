@@ -1,14 +1,11 @@
 use super::{
     metadata_normalization::{
-        normalized_context_window, normalized_display_name, normalized_maximum_output_tokens,
-        normalized_model_state, normalized_owner, normalized_quantization,
+        normalized_context_window, normalized_display_name, normalized_maximum_output_tokens, normalized_model_state,
+        normalized_owner, normalized_quantization,
     },
     metadata_values::{apply_model_capabilities, native_capabilities, parse_parameter_value},
 };
-use llm::{
-    CapabilitySupport, ModelCapability, ModelId, ModelInfo, ProviderCapabilities, ProviderId,
-    ReasoningEffort,
-};
+use llm::{CapabilitySupport, ModelCapability, ModelId, ModelInfo, ProviderCapabilities, ProviderId, ReasoningEffort};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
@@ -37,11 +34,7 @@ impl NativeModelListEntry {
     }
 }
 
-fn native_model_raw_value(
-    model_name: &str,
-    canonical_model_name: Option<&str>,
-    additional_fields: &Value,
-) -> Value {
+fn native_model_raw_value(model_name: &str, canonical_model_name: Option<&str>, additional_fields: &Value) -> Value {
     let mut native_model = additional_fields.as_object().cloned().unwrap_or_default();
 
     native_model.insert("name".into(), json!(model_name));
@@ -170,11 +163,7 @@ pub(super) struct ModelInformationSources<'a> {
 }
 
 impl<'a> ModelInformationSources<'a> {
-    pub(super) fn new(
-        model_details: &'a Value,
-        model_tag: Option<&'a Value>,
-        running_model: Option<&'a Value>,
-    ) -> Self {
+    pub(super) fn new(model_details: &'a Value, model_tag: Option<&'a Value>, running_model: Option<&'a Value>) -> Self {
         Self {
             model_details,
             model_tag,

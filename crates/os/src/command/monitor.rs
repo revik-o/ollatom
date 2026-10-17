@@ -8,13 +8,7 @@ pub(super) async fn monitor_command(
 ) -> Result<CommandOutcome, CommandError> {
     #[cfg(windows)]
     {
-        command_windows::monitor_command(
-            command_text,
-            authorization,
-            terminal_logs,
-            termination_receiver,
-        )
-        .await
+        command_windows::monitor_command(command_text, authorization, terminal_logs, termination_receiver).await
     }
 
     #[cfg(not(windows))]
@@ -73,11 +67,7 @@ pub(super) async fn monitor_command(
             output_sender.clone(),
         );
 
-        let standard_error_reader = spawn_output_reader(
-            standard_error,
-            OutputDestination::StandardError,
-            output_sender,
-        );
+        let standard_error_reader = spawn_output_reader(standard_error, OutputDestination::StandardError, output_sender);
 
         let mut closed_stream_count = 0_usize;
         let mut standard_output_byte_count = 0_usize;
@@ -192,8 +182,8 @@ pub(super) async fn monitor_command(
             return Err(output_failure);
         }
 
-        let process_status = process_status
-            .ok_or_else(|| CommandError::Output("process status was unavailable".into()))?;
+        let process_status =
+            process_status.ok_or_else(|| CommandError::Output("process status was unavailable".into()))?;
 
         let final_terminal_logs = terminal_logs.lock().map_or_else(
             |poisoned| poisoned.into_inner().clone(),

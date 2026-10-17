@@ -38,10 +38,7 @@ impl BasicToolConfiguration {
         self
     }
 
-    pub fn sandboxed_command_options(
-        mut self,
-        command_options: os::SandboxedCommandOptions,
-    ) -> Self {
+    pub fn sandboxed_command_options(mut self, command_options: os::SandboxedCommandOptions) -> Self {
         self.command_options = command_options;
         self
     }
@@ -110,6 +107,5 @@ fn is_directory_name(directory_name: &str) -> bool {
     let directory_path = std::path::Path::new(directory_name);
     let mut components = directory_path.components();
 
-    matches!(components.next(), Some(std::path::Component::Normal(_)))
-        && components.next().is_none()
+    matches!(components.next(), Some(std::path::Component::Normal(_))) && components.next().is_none()
 }

@@ -30,9 +30,7 @@ where
                     }
                 }
                 Err(error) => {
-                    let _ = output_sender
-                        .send(OutputMessage::Failed(error.to_string()))
-                        .await;
+                    let _ = output_sender.send(OutputMessage::Failed(error.to_string())).await;
                     return;
                 }
             }

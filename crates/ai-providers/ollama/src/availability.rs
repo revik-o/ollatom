@@ -7,21 +7,14 @@ pub(super) async fn report(
     selected_model: Option<ModelId>,
     transport: &TransportOptions,
 ) -> Result<AvailabilityReport, LlmError> {
-    let mut availability_report =
-        initial_report(provider.provider_identifier.clone(), selected_model.clone());
+    let mut availability_report = initial_report(provider.provider_identifier.clone(), selected_model.clone());
 
     if !probe_version(provider, &mut availability_report, transport).await? {
         return Ok(availability_report);
     }
 
     if let Some(selected_model) = selected_model {
-        probe_model(
-            provider,
-            &mut availability_report,
-            &selected_model,
-            transport,
-        )
-        .await?;
+        probe_model(provider, &mut availability_report, &selected_model, transport).await?;
     } else {
         availability_report.state = AvailabilityState::Ready;
     }
@@ -63,10 +56,7 @@ async fn probe_model(
     selected_model: &ModelId,
     transport: &TransportOptions,
 ) -> Result<(), LlmError> {
-    match provider
-        .fetch_model_details(selected_model, false, transport)
-        .await
-    {
+    match provider.fetch_model_details(selected_model, false, transport).await {
         Ok(_) => {
             availability_report.state = AvailabilityState::Ready;
             availability_report.model = AvailabilityState::Ready;
@@ -88,10 +78,7 @@ async fn probe_model(
     Ok(())
 }
 
-fn initial_report(
-    provider_identifier: ProviderId,
-    selected_model: Option<ModelId>,
-) -> AvailabilityReport {
+fn initial_report(provider_identifier: ProviderId, selected_model: Option<ModelId>) -> AvailabilityReport {
     AvailabilityReport {
         provider: provider_identifier,
         state: AvailabilityState::Unreachable,
@@ -99,9 +86,7 @@ fn initial_report(
         authentication: AvailabilityState::Unknown,
         model: selected_model
             .as_ref()
-            .map_or(AvailabilityState::MissingConfiguration, |_| {
-                AvailabilityState::Unknown
-            }),
+            .map_or(AvailabilityState::MissingConfiguration, |_| AvailabilityState::Unknown),
         selected_model,
         message: None,
     }

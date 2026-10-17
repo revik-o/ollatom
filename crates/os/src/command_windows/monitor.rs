@@ -1,8 +1,7 @@
 use super::super::{
-    CommandError, CommandOutcome, MAXIMUM_STANDARD_ERROR_BYTES, MAXIMUM_STANDARD_OUTPUT_BYTES,
-    OUTPUT_DRAIN_TIMEOUT, OutputDestination, OutputMessage, SandboxNetworkPolicy,
-    SandboxedCommandAuthorization, TerminalLogs, append_output, command_semaphore,
-    join_output_reader, output_drain_deadline, spawn_output_reader,
+    CommandError, CommandOutcome, MAXIMUM_STANDARD_ERROR_BYTES, MAXIMUM_STANDARD_OUTPUT_BYTES, OUTPUT_DRAIN_TIMEOUT,
+    OutputDestination, OutputMessage, SandboxNetworkPolicy, SandboxedCommandAuthorization, TerminalLogs, append_output,
+    command_semaphore, join_output_reader, output_drain_deadline, spawn_output_reader,
 };
 use super::{WorkspacePackageAccess, environment};
 use rappct::launch::{JobLimits, LaunchOptions, StdioConfig, launch_in_container_with_io};
@@ -37,22 +36,17 @@ pub(super) async fn monitor_command(
 
     let (mut workspace_access, security_capabilities) = WorkspacePackageAccess::grant(
         &authorization.filesystem_policy.workspace_directory,
-        &authorization
-            .filesystem_policy
-            .additional_read_only_directories,
+        &authorization.filesystem_policy.additional_read_only_directories,
         authorization.network_policy,
     )?;
 
     super::super::validate_pinned_workspace_path(&authorization, &pinned_workspace)?;
     super::super::validate_pinned_executable_path(&authorization, &pinned_executable)?;
 
-    let command_line = environment::build_windows_command_line(
-        &authorization.executable_path,
-        &authorization.arguments,
-    )?;
+    let command_line =
+        environment::build_windows_command_line(&authorization.executable_path, &authorization.arguments)?;
 
-    let environment =
-        environment::build_windows_environment(&authorization.environment, &authorization)?;
+    let environment = environment::build_windows_environment(&authorization.environment, &authorization)?;
 
     let launch_options = LaunchOptions {
         exe: authorization.executable_path.clone(),
@@ -74,9 +68,12 @@ pub(super) async fn monitor_command(
 
     drop(launched_process.stdin.take());
 
-    let mut process_tree_guard = Some(launched_process.job_guard.take().ok_or_else(|| {
-        CommandError::Spawn("Windows sandbox did not create a kill-on-close job".into())
-    })?);
+    let mut process_tree_guard = Some(
+        launched_process
+            .job_guard
+            .take()
+            .ok_or_else(|| CommandError::Spawn("Windows sandbox did not create a kill-on-close job".into()))?,
+    );
 
     let process_identifier = launched_process.pid;
 
@@ -226,8 +223,8 @@ pub(super) async fn monitor_command(
         return Err(output_failure);
     }
 
-    let process_exit_code = process_exit_code
-        .ok_or_else(|| CommandError::Output("process status was unavailable".into()))?;
+    let process_exit_code =
+        process_exit_code.ok_or_else(|| CommandError::Output("process status was unavailable".into()))?;
 
     let exit_code = i32::from_ne_bytes(process_exit_code.to_ne_bytes());
 

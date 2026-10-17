@@ -2,10 +2,7 @@ use super::*;
 
 #[tokio::test]
 async fn provider_round_limits_are_enforced() {
-    let provider = ScriptedProvider::new(
-        BuiltInProvider::LlamaCpp,
-        ProviderBehavior::BeginProviderRounds(3),
-    );
+    let provider = ScriptedProvider::new(BuiltInProvider::LlamaCpp, ProviderBehavior::BeginProviderRounds(3));
     let runtime = LlmRuntime::builder()
         .provider_with_default(provider, "model")
         .build()

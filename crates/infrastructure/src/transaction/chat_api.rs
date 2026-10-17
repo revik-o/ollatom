@@ -1,10 +1,6 @@
 use super::InfrastructureTransaction;
-use super::store::{
-    BooleanEntitySetting, UsageEntitySetting, create_chat, delete_chat_by_id, update_chat,
-};
-use crate::{
-    Chat, ChatId, ChatInitializationParameters, ChatUpdateOptions, InfrastructureResult, ProjectId,
-};
+use super::store::{BooleanEntitySetting, UsageEntitySetting, create_chat, delete_chat_by_id, update_chat};
+use crate::{Chat, ChatId, ChatInitializationParameters, ChatUpdateOptions, InfrastructureResult, ProjectId};
 
 impl InfrastructureTransaction {
     pub async fn create_chat(
@@ -23,20 +19,13 @@ impl InfrastructureTransaction {
         self.record_operation_result(operation_result)
     }
 
-    pub async fn update_chat(
-        &mut self,
-        update_options: ChatUpdateOptions,
-    ) -> InfrastructureResult<Option<Chat>> {
+    pub async fn update_chat(&mut self, update_options: ChatUpdateOptions) -> InfrastructureResult<Option<Chat>> {
         let operation_result = update_chat(self.database_transaction_mut()?, update_options).await;
         self.record_operation_result(operation_result)
     }
 
-    pub async fn delete_chat(
-        &mut self,
-        chat_id: impl Into<ChatId>,
-    ) -> InfrastructureResult<Option<Chat>> {
-        let operation_result =
-            delete_chat_by_id(self.database_transaction_mut()?, chat_id.into()).await;
+    pub async fn delete_chat(&mut self, chat_id: impl Into<ChatId>) -> InfrastructureResult<Option<Chat>> {
+        let operation_result = delete_chat_by_id(self.database_transaction_mut()?, chat_id.into()).await;
         self.record_operation_result(operation_result)
     }
 

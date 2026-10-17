@@ -1,8 +1,7 @@
 use super::interactions::InteractionHub;
 use super::{LlmRuntime, ProviderRegistration, RuntimeInner};
 use crate::{
-    IntoModelId, LlmError, LlmProvider, ModelId, RunEventSink, SubagentProfileRegistry,
-    SubagentRunner, ToolRegistry,
+    IntoModelId, LlmError, LlmProvider, ModelId, RunEventSink, SubagentProfileRegistry, SubagentRunner, ToolRegistry,
 };
 use std::{
     collections::BTreeMap,
@@ -31,11 +30,7 @@ impl LlmRuntimeBuilder {
         self
     }
 
-    pub fn provider_with_default(
-        mut self,
-        provider: Arc<dyn LlmProvider>,
-        model: impl IntoModelId,
-    ) -> Self {
+    pub fn provider_with_default(mut self, provider: Arc<dyn LlmProvider>, model: impl IntoModelId) -> Self {
         match model.into_model_id() {
             Ok(model) => self.providers.push((provider, Some(model))),
             Err(error) => {

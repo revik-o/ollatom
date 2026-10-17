@@ -74,10 +74,7 @@ async fn unknown_profiles_are_model_visible_tool_failures() {
     let child_stop_token = Arc::new(Mutex::new(None));
     let mut profiles = SubagentProfileRegistry::default();
     profiles
-        .register(
-            SubagentProfileId::new("known").unwrap(),
-            default_subagent_profile(),
-        )
+        .register(SubagentProfileId::new("known").unwrap(), default_subagent_profile())
         .unwrap();
     let runtime = LlmRuntime::builder()
         .provider_with_default(provider, "model")
@@ -120,9 +117,7 @@ async fn parent_cancellation_stops_an_active_child() {
     let child_stop_token = Arc::new(Mutex::new(None));
     let child_started = Arc::new(Notify::new());
     let mut profiles = SubagentProfileRegistry::default();
-    profiles
-        .register(profile_id, default_subagent_profile())
-        .unwrap();
+    profiles.register(profile_id, default_subagent_profile()).unwrap();
     let runtime = LlmRuntime::builder()
         .provider_with_default(provider, "model")
         .subagent_profiles(profiles)
@@ -147,16 +142,8 @@ async fn parent_cancellation_stops_an_active_child() {
     }
 
     stop_handle.stop();
-    assert!(matches!(
-        run_task.await.unwrap().unwrap(),
-        LlmRunOutcome::Cancelled(_)
-    ));
-    let child_was_stopped = child_stop_token
-        .lock()
-        .unwrap()
-        .as_ref()
-        .unwrap()
-        .is_stopped();
+    assert!(matches!(run_task.await.unwrap().unwrap(), LlmRunOutcome::Cancelled(_)));
+    let child_was_stopped = child_stop_token.lock().unwrap().as_ref().unwrap().is_stopped();
     assert!(child_was_stopped);
 }
 
@@ -167,9 +154,7 @@ async fn profiles_explicitly_control_context_inheritance_and_child_depth() {
     child_profile.allow_context = true;
     child_profile.max_depth = 1;
     let mut profiles = SubagentProfileRegistry::default();
-    profiles
-        .register(profile_id.clone(), child_profile)
-        .unwrap();
+    profiles.register(profile_id.clone(), child_profile).unwrap();
     let provider = ScriptedProvider::new(
         BuiltInProvider::LmStudio,
         ProviderBehavior::InvokeSubagent(InvokeSubagentRequest {

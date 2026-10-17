@@ -70,9 +70,7 @@ impl ScriptedServer {
         let listener = TcpListener::bind("127.0.0.1:0").expect("test server should bind");
         let endpoint = format!(
             "http://{}",
-            listener
-                .local_addr()
-                .expect("test server address should be available")
+            listener.local_addr().expect("test server address should be available")
         );
         let captured_requests = Arc::new(Mutex::new(Vec::new()));
         let server_captured_requests = captured_requests.clone();
@@ -128,8 +126,7 @@ fn read_request(connection: &mut TcpStream) -> CapturedRequest {
             break header_end;
         }
     };
-    let headers = String::from_utf8(request_bytes[..header_end].to_vec())
-        .expect("test request headers should be UTF-8");
+    let headers = String::from_utf8(request_bytes[..header_end].to_vec()).expect("test request headers should be UTF-8");
     let content_length = content_length(&headers);
 
     let body_end = header_end
@@ -167,12 +164,9 @@ fn content_length(headers: &str) -> usize {
         .lines()
         .find_map(|header_line| {
             let (header_name, header_value) = header_line.split_once(':')?;
-            header_name.eq_ignore_ascii_case("content-length").then(|| {
-                header_value
-                    .trim()
-                    .parse()
-                    .expect("content length should parse")
-            })
+            header_name
+                .eq_ignore_ascii_case("content-length")
+                .then(|| header_value.trim().parse().expect("content length should parse"))
         })
         .unwrap_or(0)
 }

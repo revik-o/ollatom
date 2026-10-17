@@ -10,11 +10,8 @@ pub(super) fn model_info_value<'a>(model_info: &'a Value, suffix: &str) -> Optio
         return Some(exact_value);
     }
 
-    if let Some(preferred_architecture) = model_information
-        .get("general.architecture")
-        .and_then(Value::as_str)
-        && let Some(preferred_value) =
-            model_information.get(&format!("{preferred_architecture}.{suffix}"))
+    if let Some(preferred_architecture) = model_information.get("general.architecture").and_then(Value::as_str)
+        && let Some(preferred_value) = model_information.get(&format!("{preferred_architecture}.{suffix}"))
     {
         return Some(preferred_value);
     }
@@ -53,22 +50,16 @@ pub(super) fn native_model_is_remote(
     .flatten()
     .any(|value| {
         value.as_object().is_some_and(|object| {
-            [
-                "remote",
-                "remote_model",
-                "remote_host",
-                "remote_url",
-                "cloud",
-            ]
-            .iter()
-            .any(|key| {
-                object.get(*key).is_some_and(|entry| match entry {
-                    Value::Bool(value) => *value,
-                    Value::String(value) => !value.is_empty(),
-                    Value::Null => false,
-                    _ => true,
+            ["remote", "remote_model", "remote_host", "remote_url", "cloud"]
+                .iter()
+                .any(|key| {
+                    object.get(*key).is_some_and(|entry| match entry {
+                        Value::Bool(value) => *value,
+                        Value::String(value) => !value.is_empty(),
+                        Value::Null => false,
+                        _ => true,
+                    })
                 })
-            })
         })
     })
 }
@@ -82,13 +73,8 @@ pub(super) fn model_matches_scope(scope: ModelScope, is_remote: bool, is_loaded:
     }
 }
 
-pub(super) fn first_unsigned_integer<'a>(
-    values: impl IntoIterator<Item = Option<&'a Value>>,
-) -> Option<u64> {
-    values
-        .into_iter()
-        .flatten()
-        .find_map(parse_unsigned_integer)
+pub(super) fn first_unsigned_integer<'a>(values: impl IntoIterator<Item = Option<&'a Value>>) -> Option<u64> {
+    values.into_iter().flatten().find_map(parse_unsigned_integer)
 }
 
 pub(super) fn parse_unsigned_integer(value: &Value) -> Option<u64> {
@@ -103,9 +89,7 @@ pub(super) fn parse_parameter_value(value: &Value) -> Option<u64> {
         .or_else(|| value.as_str().and_then(parse_parameter_count))
 }
 
-pub(super) fn first_string<'a>(
-    values: impl IntoIterator<Item = Option<&'a Value>>,
-) -> Option<String> {
+pub(super) fn first_string<'a>(values: impl IntoIterator<Item = Option<&'a Value>>) -> Option<String> {
     values
         .into_iter()
         .flatten()
@@ -131,9 +115,7 @@ fn parse_scaled_parameter_count(numeric_text: &str, multiplier: u128) -> Option<
     let integer_text = decimal_parts.next()?;
     let fractional_text = decimal_parts.next();
 
-    if decimal_parts.next().is_some()
-        || integer_text.is_empty() && fractional_text.is_none_or(str::is_empty)
-    {
+    if decimal_parts.next().is_some() || integer_text.is_empty() && fractional_text.is_none_or(str::is_empty) {
         return None;
     }
 
@@ -161,11 +143,7 @@ fn parse_scaled_parameter_count(numeric_text: &str, multiplier: u128) -> Option<
     u64::try_from(scaled_integer.checked_add(scaled_fraction)?).ok()
 }
 
-pub(super) fn native_capabilities(
-    show: &Value,
-    tag: Option<&Value>,
-    running: Option<&Value>,
-) -> Vec<String> {
+pub(super) fn native_capabilities(show: &Value, tag: Option<&Value>, running: Option<&Value>) -> Vec<String> {
     let values = show
         .get("capabilities")
         .or_else(|| tag.and_then(|value| value.get("capabilities")))

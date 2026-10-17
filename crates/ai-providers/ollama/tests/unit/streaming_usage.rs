@@ -13,9 +13,7 @@ fn reported_total_includes_reasoning_tokens() {
     let mut round_stream_state = RoundStreamState::default();
 
     record_completed_frame_usage(
-        &completed_frame(
-            r#"{"done":true,"prompt_eval_count":7,"eval_count":2,"reasoning_tokens":3}"#,
-        ),
+        &completed_frame(r#"{"done":true,"prompt_eval_count":7,"eval_count":2,"reasoning_tokens":3}"#),
         &mut aggregate_usage,
         &mut assistant_round,
         &mut round_stream_state,
@@ -35,9 +33,7 @@ fn reported_total_overflow_is_rejected_without_partial_mutation() {
     let mut round_stream_state = RoundStreamState::default();
 
     let error = record_completed_frame_usage(
-        &completed_frame(
-            r#"{"done":true,"prompt_eval_count":18446744073709551615,"eval_count":1}"#,
-        ),
+        &completed_frame(r#"{"done":true,"prompt_eval_count":18446744073709551615,"eval_count":1}"#),
         &mut aggregate_usage,
         &mut assistant_round,
         &mut round_stream_state,

@@ -12,9 +12,7 @@ pub(crate) async fn add_llm_action_to_message(
     };
 
     let MessageRoleMetadata::Llm(llm_message_metadata) = message.role_metadata else {
-        return Err(invalid_message_operation(
-            "actions can only be added to an LLM message",
-        ));
+        return Err(invalid_message_operation("actions can only be added to an LLM message"));
     };
 
     if llm_message_metadata.llm_message_state != LlmMessageState::InProgress
@@ -51,17 +49,13 @@ pub(crate) async fn append_llm_action_status_event(
 
     let (latest_sequence_number, latest_status_text) = match latest_event_row {
         Some(latest_event_row) => {
-            let latest_sequence_number: i64 =
-                latest_event_row
-                    .try_get("sequence_number")
-                    .map_err(|source| {
-                        database_operation_error("failed to decode action sequence", source)
-                    })?;
+            let latest_sequence_number: i64 = latest_event_row
+                .try_get("sequence_number")
+                .map_err(|source| database_operation_error("failed to decode action sequence", source))?;
 
-            let latest_status_text: String =
-                latest_event_row.try_get("status").map_err(|source| {
-                    database_operation_error("failed to decode action status", source)
-                })?;
+            let latest_status_text: String = latest_event_row
+                .try_get("status")
+                .map_err(|source| database_operation_error("failed to decode action status", source))?;
 
             (latest_sequence_number, latest_status_text)
         }
@@ -71,9 +65,7 @@ pub(crate) async fn append_llm_action_status_event(
                     .bind(llm_action_id.as_bytes().to_vec())
                     .fetch_optional(&mut **database_transaction)
                     .await
-                    .map_err(|source| {
-                        database_operation_error("failed to read initial action status", source)
-                    })?;
+                    .map_err(|source| database_operation_error("failed to read initial action status", source))?;
 
             let Some(initial_status_text) = initial_status_text else {
                 return Err(InfrastructureError::new(
@@ -98,9 +90,7 @@ pub(crate) async fn append_llm_action_status_event(
     .await
 }
 
-pub(crate) fn next_action_status_sequence_number(
-    latest_sequence_number: i64,
-) -> InfrastructureResult<u32> {
+pub(crate) fn next_action_status_sequence_number(latest_sequence_number: i64) -> InfrastructureResult<u32> {
     latest_sequence_number
         .checked_add(1)
         .and_then(|sequence_number| u32::try_from(sequence_number).ok())
@@ -121,11 +111,7 @@ pub(crate) async fn insert_action_status_event(
     let status_event_id = LlmActionStatusEventId::new();
     let occurred_at = OffsetDateTime::now_utc();
     let occurred_at_text = format_timestamp(occurred_at)?;
-    let payload_json = status_event_input
-        .payload
-        .as_ref()
-        .map(serialize_json)
-        .transpose()?;
+    let payload_json = status_event_input.payload.as_ref().map(serialize_json).transpose()?;
 
     sqlx::query(
         "INSERT INTO action_status_events (id, llm_action_id, sequence_number, status, payload_json, occurred_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -218,8 +204,7 @@ async fn cancel_action_rows(
             let action_identifier_bytes: Vec<u8> = action_row
                 .try_get("id")
                 .map_err(|source| database_operation_error("failed to decode action ID", source))?;
-            let action_id =
-                LlmActionId::from(crate::database::parse_uuid(action_identifier_bytes)?);
+            let action_id = LlmActionId::from(crate::database::parse_uuid(action_identifier_bytes)?);
 
             append_llm_action_status_event(
                 database_transaction,

@@ -34,12 +34,7 @@ fn pressure_is_reported_and_terminal_event_is_retained() {
     let state = queue.state.lock().unwrap();
     assert!(state.items.len() <= MAXIMUM_QUEUE_ITEMS);
     assert!(state.estimated_bytes <= MAXIMUM_QUEUE_BYTES);
-    assert!(
-        state
-            .items
-            .iter()
-            .any(|item| matches!(item, RunStreamItem::Lagged(_)))
-    );
+    assert!(state.items.iter().any(|item| matches!(item, RunStreamItem::Lagged(_))));
     assert!(matches!(
         state.items.back(),
         Some(RunStreamItem::Event(SequencedEvent {

@@ -26,10 +26,7 @@ impl std::fmt::Debug for OllamaProvider {
         formatter
             .debug_struct("OllamaProvider")
             .field("endpoint", &self.endpoint)
-            .field(
-                "bearer_token",
-                &self.bearer_token.as_ref().map(|_| "[REDACTED]"),
-            )
+            .field("bearer_token", &self.bearer_token.as_ref().map(|_| "[REDACTED]"))
             .field("discovery_timeout", &self.discovery_timeout)
             .field("provider_identifier", &self.provider_identifier)
             .field("client", &"[configured]")
@@ -50,10 +47,7 @@ impl std::fmt::Debug for OllamaProviderBuilder {
         formatter
             .debug_struct("OllamaProviderBuilder")
             .field("endpoint", &self.endpoint)
-            .field(
-                "bearer_token",
-                &self.bearer_token.as_ref().map(|_| "[REDACTED]"),
-            )
+            .field("bearer_token", &self.bearer_token.as_ref().map(|_| "[REDACTED]"))
             .field("discovery_timeout", &self.discovery_timeout)
             .finish()
     }
@@ -62,9 +56,7 @@ impl std::fmt::Debug for OllamaProviderBuilder {
 impl OllamaProvider {
     #[must_use]
     pub fn new() -> Self {
-        Self::builder()
-            .build()
-            .expect("the default Ollama endpoint is valid")
+        Self::builder().build().expect("the default Ollama endpoint is valid")
     }
 
     pub fn builder() -> OllamaProviderBuilder {
@@ -82,9 +74,7 @@ impl OllamaProvider {
             builder.endpoint = endpoint;
         }
 
-        builder.bearer_token = env::var("OLLAMA_API_KEY")
-            .ok()
-            .filter(|value| !value.is_empty());
+        builder.bearer_token = env::var("OLLAMA_API_KEY").ok().filter(|value| !value.is_empty());
 
         builder.build()
     }

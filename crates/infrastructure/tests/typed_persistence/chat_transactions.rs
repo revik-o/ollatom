@@ -12,9 +12,7 @@ async fn typed_chat_repository_updates_and_deletes_chats() {
                 .update_chat(
                     ChatUpdateOptions::new(chat.id)
                         .with_name("Renamed chat")
-                        .with_execution_settings(
-                            ExecutionSettingsUpdate::default().with_cpu_usage_percentage(75),
-                        ),
+                        .with_execution_settings(ExecutionSettingsUpdate::default().with_cpu_usage_percentage(75)),
                 )
                 .await
         })
@@ -41,9 +39,7 @@ async fn typed_message_repository_persists_revisions_and_actions() {
     let (user_message, llm_message, revised_message) = test_infrastructure
         .infrastructure
         .execute_db_actions(async |transaction| {
-            let user_message = transaction
-                .add_message_from_user("Question", Vec::new(), &chat)
-                .await?;
+            let user_message = transaction.add_message_from_user("Question", Vec::new(), &chat).await?;
             let llm_message = transaction
                 .add_message_from_llm(
                     "Answer",
@@ -87,10 +83,7 @@ async fn typed_message_repository_persists_revisions_and_actions() {
     };
     assert_eq!(revision_metadata.user_revision_number, 2);
     assert_eq!(revised_message.contents, "Revised question");
-    assert!(matches!(
-        llm_message.role_metadata,
-        MessageRoleMetadata::Llm(_)
-    ));
+    assert!(matches!(llm_message.role_metadata, MessageRoleMetadata::Llm(_)));
     assert_ne!(user_message.id, revised_message.id);
 }
 
@@ -105,9 +98,7 @@ async fn failed_typed_transaction_rolls_back_prior_mutations() {
             transaction
                 .add_message_from_user("Temporary", Vec::new(), &chat)
                 .await?;
-            transaction
-                .add_message_from_user("", Vec::new(), &chat)
-                .await
+            transaction.add_message_from_user("", Vec::new(), &chat).await
         })
         .await;
     assert!(result.is_err());
@@ -129,11 +120,7 @@ async fn explicit_transaction_commit_and_rollback_have_distinct_effects() {
     let test_infrastructure = create_initialized_test_infrastructure().await;
     let (_, chat) = create_project_with_chat(&test_infrastructure.infrastructure).await;
 
-    let mut rolled_back_transaction = test_infrastructure
-        .infrastructure
-        .make_transaction()
-        .await
-        .unwrap();
+    let mut rolled_back_transaction = test_infrastructure.infrastructure.make_transaction().await.unwrap();
     rolled_back_transaction
         .add_message_from_user("Rolled back", Vec::new(), &chat)
         .await
@@ -142,11 +129,7 @@ async fn explicit_transaction_commit_and_rollback_have_distinct_effects() {
 
     let committed_message = test_infrastructure
         .infrastructure
-        .execute_db_actions(async |transaction| {
-            transaction
-                .add_message_from_user("Committed", Vec::new(), &chat)
-                .await
-        })
+        .execute_db_actions(async |transaction| transaction.add_message_from_user("Committed", Vec::new(), &chat).await)
         .await
         .unwrap();
     assert_eq!(committed_message.sequence_number, 1);
@@ -160,9 +143,7 @@ async fn typed_action_journal_enforces_transitions_before_completion() {
     let completed_message = test_infrastructure
         .infrastructure
         .execute_db_actions(async |transaction| {
-            let user_message = transaction
-                .add_message_from_user("Question", Vec::new(), &chat)
-                .await?;
+            let user_message = transaction.add_message_from_user("Question", Vec::new(), &chat).await?;
             let llm_message = transaction
                 .begin_llm_message_by_chat_id_and_user_message_id(chat.id, user_message.id)
                 .await?;
@@ -182,9 +163,7 @@ async fn typed_action_journal_enforces_transitions_before_completion() {
                 .append_llm_action_status_event(action.id, status_event(LlmActionStatus::Succeeded))
                 .await?;
             assert_eq!(succeeded_event.sequence_number, 3);
-            transaction
-                .complete_llm_message_by_id(llm_message.id, "Done")
-                .await
+            transaction.complete_llm_message_by_id(llm_message.id, "Done").await
         })
         .await
         .unwrap()

@@ -52,12 +52,13 @@ async fn open_configuration_file(
     })?;
 
     let _opened_file = create_file(file_name, directory_path).await?;
-    let canonical_parent = tokio::fs::canonicalize(directory_path)
-        .await
-        .map_err(|source| YamlConfigurationError::Coordination {
-            path: directory_path.to_owned(),
-            source,
-        })?;
+    let canonical_parent =
+        tokio::fs::canonicalize(directory_path)
+            .await
+            .map_err(|source| YamlConfigurationError::Coordination {
+                path: directory_path.to_owned(),
+                source,
+            })?;
 
     let file_path = canonical_parent.join(file_name);
     let lock_file_path = canonical_parent.join(format!("{file_name}.lock"));

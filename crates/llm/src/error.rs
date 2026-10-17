@@ -42,9 +42,7 @@ impl Display for LlmError {
             Self::InvalidProvider(value) => write!(formatter, "invalid provider: {value}"),
             Self::InvalidModel(value) => write!(formatter, "invalid model: {value}"),
             Self::MissingRuntime => formatter.write_str("no global LLM runtime is installed"),
-            Self::GlobalRuntimeAlreadyInstalled => {
-                formatter.write_str("the global LLM runtime is already installed")
-            }
+            Self::GlobalRuntimeAlreadyInstalled => formatter.write_str("the global LLM runtime is already installed"),
             Self::ProviderNotRegistered(provider_id) => {
                 write!(formatter, "provider is not registered: {provider_id}")
             }
@@ -52,10 +50,7 @@ impl Display for LlmError {
                 write!(formatter, "provider is registered twice: {provider_id}")
             }
             Self::ModelRequired(provider_id) => {
-                write!(
-                    formatter,
-                    "provider {provider_id} has no configured default model"
-                )
+                write!(formatter, "provider {provider_id} has no configured default model")
             }
             Self::ModelNotFound(model_id) => {
                 write!(formatter, "model was not found: {model_id}")
@@ -85,10 +80,7 @@ impl Display for LlmError {
                 write!(formatter, "interaction was not found: {interaction_id}")
             }
             Self::InteractionAlreadyResolved(interaction_id) => {
-                write!(
-                    formatter,
-                    "interaction was already resolved: {interaction_id}"
-                )
+                write!(formatter, "interaction was already resolved: {interaction_id}")
             }
             Self::Authorization(message) => write!(formatter, "authorization failed: {message}"),
             Self::EventSink(message) => write!(formatter, "event sink failed: {message}"),

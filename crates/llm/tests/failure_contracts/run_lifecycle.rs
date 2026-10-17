@@ -38,10 +38,7 @@ async fn cancelling_before_first_poll_never_invokes_the_provider() {
 
 #[tokio::test]
 async fn cancellation_preserves_streamed_partial_output_and_usage() {
-    let provider = ScriptedProvider::new(
-        BuiltInProvider::Claude,
-        ProviderBehavior::StreamUntilCancellation,
-    );
+    let provider = ScriptedProvider::new(BuiltInProvider::Claude, ProviderBehavior::StreamUntilCancellation);
     let runtime = LlmRuntime::builder()
         .provider_with_default(provider, "model")
         .build()
@@ -65,9 +62,7 @@ async fn cancellation_preserves_streamed_partial_output_and_usage() {
     };
     assert_eq!(partial_response.assistant_rounds[0].text, "partial");
     assert_eq!(
-        partial_response.assistant_rounds[0]
-            .visible_reasoning
-            .as_deref(),
+        partial_response.assistant_rounds[0].visible_reasoning.as_deref(),
         Some("summary")
     );
     assert_eq!(partial_response.usage.total_tokens, Some(3));
@@ -76,10 +71,7 @@ async fn cancellation_preserves_streamed_partial_output_and_usage() {
 
 #[tokio::test]
 async fn provider_response_identity_is_validated() {
-    let provider = ScriptedProvider::new(
-        BuiltInProvider::Gemini,
-        ProviderBehavior::ReturnWrongIdentity,
-    );
+    let provider = ScriptedProvider::new(BuiltInProvider::Gemini, ProviderBehavior::ReturnWrongIdentity);
     let runtime = LlmRuntime::builder()
         .provider_with_default(provider, "model")
         .build()
@@ -95,10 +87,7 @@ async fn provider_response_identity_is_validated() {
         panic!("expected identity failure")
     };
     assert!(matches!(failed_run.error, LlmError::ProviderProtocol(_)));
-    assert_eq!(
-        failed_run.partial_response.assistant_rounds[0].text,
-        "wrong"
-    );
+    assert_eq!(failed_run.partial_response.assistant_rounds[0].text, "wrong");
     assert_eq!(failed_run.partial_response.provider.as_str(), "gemini");
 }
 
@@ -138,14 +127,8 @@ async fn failed_run_preserves_partial_streams_usage_and_completed_tool_records()
         panic!("expected failed run with a partial response")
     };
 
-    assert_eq!(
-        failed_run.error,
-        LlmError::Provider("scripted provider failure".into())
-    );
-    assert_eq!(
-        failed_run.partial_response.assistant_rounds[0].text,
-        "partial answer"
-    );
+    assert_eq!(failed_run.error, LlmError::Provider("scripted provider failure".into()));
+    assert_eq!(failed_run.partial_response.assistant_rounds[0].text, "partial answer");
     assert_eq!(
         failed_run.partial_response.assistant_rounds[0]
             .visible_reasoning
@@ -154,10 +137,7 @@ async fn failed_run_preserves_partial_streams_usage_and_completed_tool_records()
     );
     assert_eq!(failed_run.partial_response.usage.total_tokens, Some(7));
     assert_eq!(failed_run.partial_response.tool_executions.len(), 1);
-    assert_eq!(
-        failed_run.partial_response.tool_executions[0].call_id,
-        "call-1"
-    );
+    assert_eq!(failed_run.partial_response.tool_executions[0].call_id, "call-1");
     assert_eq!(executions.load(Ordering::SeqCst), 1);
 }
 

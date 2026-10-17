@@ -1,7 +1,7 @@
 use super::{BasicToolConfiguration, tool_support};
 use crate::{
-    AuthorizationGrant, BoxFuture, FilesystemAccess, RequiredCapability, Tool, ToolCall,
-    ToolDefinition, ToolFailure, ToolOutput, ToolPlan,
+    AuthorizationGrant, BoxFuture, FilesystemAccess, RequiredCapability, Tool, ToolCall, ToolDefinition, ToolFailure,
+    ToolOutput, ToolPlan,
 };
 use os::execute_command_in_directory_with_arguments_and_options;
 use serde_json::{Value, json};
@@ -114,22 +114,19 @@ fn parse_command_arguments(tool_arguments: &Value) -> Result<(String, Vec<String
         .ok_or_else(|| ToolFailure::InvalidArguments("program must be a string".into()))?
         .to_owned();
 
-    let arguments = tool_arguments
-        .get("arguments")
-        .map_or(Ok(Vec::new()), |arguments| {
-            arguments
-                .as_array()
-                .ok_or_else(|| ToolFailure::InvalidArguments("arguments must be an array".into()))?
-                .iter()
-                .map(|argument| {
-                    argument.as_str().map(str::to_owned).ok_or_else(|| {
-                        ToolFailure::InvalidArguments(
-                            "every command argument must be a string".into(),
-                        )
-                    })
-                })
-                .collect()
-        })?;
+    let arguments = tool_arguments.get("arguments").map_or(Ok(Vec::new()), |arguments| {
+        arguments
+            .as_array()
+            .ok_or_else(|| ToolFailure::InvalidArguments("arguments must be an array".into()))?
+            .iter()
+            .map(|argument| {
+                argument
+                    .as_str()
+                    .map(str::to_owned)
+                    .ok_or_else(|| ToolFailure::InvalidArguments("every command argument must be a string".into()))
+            })
+            .collect()
+    })?;
 
     Ok((program, arguments))
 }

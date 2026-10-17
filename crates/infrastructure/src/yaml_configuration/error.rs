@@ -35,10 +35,7 @@ pub enum YamlConfigurationError {
     #[error("YAML configuration commit identifiers are exhausted for '{path}'")]
     ConfigurationCommitIdentifierExhausted { path: PathBuf },
     #[error("YAML configuration commit {operation_identifier} failed: {message}")]
-    ConfigurationCommitFailed {
-        operation_identifier: u64,
-        message: String,
-    },
+    ConfigurationCommitFailed { operation_identifier: u64, message: String },
     #[error("YAML coordination task for '{path}' failed: {source}")]
     CoordinationTaskFailed {
         path: PathBuf,

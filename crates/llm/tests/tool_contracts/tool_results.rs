@@ -21,10 +21,7 @@ fn tool_output_serializes_its_exclusive_result_variant() {
         success
     );
 
-    let failure = ToolOutput::failure(
-        "failure-1",
-        ToolFailure::Execution("operation failed".into()),
-    );
+    let failure = ToolOutput::failure("failure-1", ToolFailure::Execution("operation failed".into()));
     assert!(matches!(
         &failure,
         ToolOutput::Failure {

@@ -23,11 +23,7 @@ fn explicit_url_text_is_encoded_as_a_search_query() {
 
 #[test]
 fn response_body_uses_declared_charset() {
-    let decoded_body = decode_response_body(
-        &[0x63, 0x61, 0x66, 0xE9],
-        Some("text/html; charset=windows-1252"),
-    )
-    .unwrap();
+    let decoded_body = decode_response_body(&[0x63, 0x61, 0x66, 0xE9], Some("text/html; charset=windows-1252")).unwrap();
 
     assert_eq!(decoded_body, "café");
 }

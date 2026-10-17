@@ -1,6 +1,6 @@
 use super::super::{
-    AtomicCommitHandle, AtomicCommitIdentifier, AtomicCommitStatus, AtomicMetadataPolicy,
-    PreparedAtomicWrite, WorkspaceFile, io_error,
+    AtomicCommitHandle, AtomicCommitIdentifier, AtomicCommitStatus, AtomicMetadataPolicy, PreparedAtomicWrite,
+    WorkspaceFile, io_error,
 };
 
 use crate::FilesystemError;
@@ -28,16 +28,11 @@ impl WorkspaceFile {
     ) -> Result<PreparedAtomicWrite, FilesystemError> {
         let this = self.clone();
 
-        tokio::task::spawn_blocking(move || {
-            this.prepare_atomic_write_blocking(contents, metadata_policy)
-        })
-        .await
-        .map_err(|source| {
-            FilesystemError::throw_filesystem_operation_task_failed(
-                self.relative_path.0.clone(),
-                source,
-            )
-        })?
+        tokio::task::spawn_blocking(move || this.prepare_atomic_write_blocking(contents, metadata_policy))
+            .await
+            .map_err(|source| {
+                FilesystemError::throw_filesystem_operation_task_failed(self.relative_path.0.clone(), source)
+            })?
     }
     fn prepare_atomic_write_blocking(
         &self,
@@ -64,10 +59,7 @@ impl WorkspaceFile {
         let temporary_name = OsString::from(format!(".ollatom-atomic-{identifier}.tmp"));
         let mut options = OpenOptions::new();
 
-        options
-            .write(true)
-            .create_new(true)
-            .follow(FollowSymlinks::No);
+        options.write(true).create_new(true).follow(FollowSymlinks::No);
 
         #[cfg(unix)]
         options.mode(0o600);
@@ -124,18 +116,12 @@ impl PreparedAtomicWrite {
         self.temporary_name.clear();
 
         tokio::task::spawn_blocking(move || {
-            let status = match parent_directory.rename(
-                &temporary_name,
-                &parent_directory,
-                &destination_name,
-            ) {
+            let status = match parent_directory.rename(&temporary_name, &parent_directory, &destination_name) {
                 Ok(()) => match parent_directory.open(".").and_then(|file| file.sync_all()) {
                     Ok(()) => AtomicCommitStatus::Succeeded,
                     Err(source) => AtomicCommitStatus::Failed(source.to_string()),
                 },
-                Err(source) => {
-                    AtomicCommitStatus::Failed(io_error(&destination_path, source).to_string())
-                }
+                Err(source) => AtomicCommitStatus::Failed(io_error(&destination_path, source).to_string()),
             };
 
             completion_sender.send_replace(status);
@@ -178,9 +164,7 @@ impl AtomicCommitHandle {
 
 fn next_atomic_commit_identifier() -> Result<AtomicCommitIdentifier, FilesystemError> {
     NEXT_ATOMIC_COMMIT_IDENTIFIER
-        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
-            current.checked_add(1)
-        })
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| current.checked_add(1))
         .map(AtomicCommitIdentifier)
         .map_err(|_| FilesystemError::AtomicCommitIdentifierExhausted)
 }

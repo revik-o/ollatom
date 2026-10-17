@@ -53,8 +53,7 @@ impl WorkspacePackageAccess {
         additional_read_only_directories: &[PathBuf],
         network_policy: SandboxNetworkPolicy,
     ) -> Result<(Self, rappct::SecurityCapabilities), CommandError> {
-        let unique_profile_name =
-            format!("ollatom.command.{}.{}", std::process::id(), Uuid::new_v4());
+        let unique_profile_name = format!("ollatom.command.{}.{}", std::process::id(), Uuid::new_v4());
 
         let package_profile = AppContainerProfile::ensure(
             &unique_profile_name,
@@ -82,9 +81,7 @@ impl WorkspacePackageAccess {
 
         let capability_builder = match network_policy {
             SandboxNetworkPolicy::Denied => capability_builder,
-            SandboxNetworkPolicy::Allowed => {
-                capability_builder.with_known(&[KnownCapability::InternetClient])
-            }
+            SandboxNetworkPolicy::Allowed => capability_builder.with_known(&[KnownCapability::InternetClient]),
         };
 
         let security_capabilities = capability_builder
@@ -149,8 +146,7 @@ impl Drop for WorkspacePackageAccess {
         }
 
         if self.access_granted {
-            let _ =
-                remove_package_access(&self.workspace_directory, &self.package_security_identifier);
+            let _ = remove_package_access(&self.workspace_directory, &self.package_security_identifier);
             self.access_granted = false;
         }
 
@@ -159,10 +155,7 @@ impl Drop for WorkspacePackageAccess {
         }
     }
 }
-fn remove_package_access(
-    workspace_directory: &Path,
-    package_security_identifier: &str,
-) -> Result<(), CommandError> {
+fn remove_package_access(workspace_directory: &Path, package_security_identifier: &str) -> Result<(), CommandError> {
     let system_root = environment::system_root_directory()?;
     let acl_utility_path = system_root.join("System32").join("icacls.exe");
 
