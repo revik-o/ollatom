@@ -102,6 +102,7 @@ fn restrict_unix_capability_file(file: &mut cap_std::fs::File) -> io::Result<()>
     let metadata = file.metadata()?;
 
     validate_unix_private_file(metadata.is_file(), metadata.uid(), metadata.nlink())?;
+
     file.set_permissions(cap_std::fs::Permissions::from_mode(0o600))?;
 
     verify_unix_private_file_mode(file.metadata()?.mode())
